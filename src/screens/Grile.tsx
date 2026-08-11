@@ -1,0 +1,461 @@
+import { useEffect } from 'react';
+import { AnswerOptions } from '../components/AnswerOptions';
+import { Segmented } from '../components/Segmented';
+import { OPTION_KEYS, QUESTIONS, tipLabel, type OptionKey } from '../data/questions';
+import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
+import { formatClock } from '../lib/time';
+import { SANS, SERIF, eyebrow } from '../lib/ui';
+import { useApp } from '../state/AppState';
+
+type Variant = 'a' | 'b';
+
+/** Răspunsul corect al fiecărei grile, pentru colorarea navigatorului. */
+const QUESTION_CORRECT: OptionKey[] = QUESTIONS.map((q) => q.correct);
+
+export function Grile() {
+  const { go, session } = useApp();
+  const isDesktop = useIsDesktop();
+  const [layout, setLayout] = usePersistentState<Variant>('medbuc.solve', 'a');
+  const now = useNow();
+
+  const { question, qi, total, answer, isRevealed, isMarked, isCorrect } = session;
+  const withContext = layout === 'b';
+
+  // Tastele A–E aleg varianta, Enter verifică sau trece mai departe.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+
+      const k = e.key.toUpperCase();
+      if (k.length === 1 && (OPTION_KEYS as string[]).includes(k)) {
+        session.pick(k as OptionKey);
+        e.preventDefault();
+      } else if (e.key === 'Enter') {
+        session.primary();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [session]);
+
+  const elapsed = formatClock((now - session.startedAt) / 1000);
+
+  return (
+    <div className="screen">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => go('acasa')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
+        >
+          ← Ieși din sesiune
+        </button>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={{ font: `600 13.5px/1.2 ${SANS}` }}>Sesiune rapidă · {question.materie}</div>
+          <div style={{ marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+            Capitole mixte · fără limită de timp
+          </div>
+        </div>
+        <div className="tabular" style={{ font: `500 13px ${SANS}`, color: 'var(--fg2)' }} aria-label="Timp scurs">
+          {elapsed}
+        </div>
+        <Segmented
+          items={[
+            { id: 'a' as Variant, label: 'Focus' },
+            { id: 'b' as Variant, label: 'Cu context' },
+          ]}
+          value={layout}
+          onChange={setLayout}
+          ariaLabel="Aranjarea ecranului de rezolvare"
+        />
+      </div>
+
+      <div
+        style={
+          withContext && isDesktop
+            ? { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20, alignItems: 'start' }
+            : { display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 20, maxWidth: 820, margin: '0 auto' }
+        }
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
+              {Array.from({ length: total }, (_, i) => {
+                const revealed = !!session.revealed[i];
+                const ok = session.answers[i] === QUESTION_CORRECT[i];
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => session.goTo(i)}
+                    aria-label={`Grila ${i + 1}`}
+                    style={{
+                      flex: 1,
+                      minWidth: 14,
+                      height: 6,
+                      border: 0,
+                      borderRadius: 99,
+                      padding: 0,
+                      cursor: 'pointer',
+                      background:
+                        i === qi
+                          ? 'var(--brand)'
+                          : revealed
+                            ? ok
+                              ? 'var(--ok)'
+                              : 'var(--bad)'
+                            : 'var(--surf3)',
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div className="tabular" style={{ font: `500 12.5px ${SANS}`, color: 'var(--fg3)', whiteSpace: 'nowrap' }}>
+              Grila {qi + 1} din {total}
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 26 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  ...eyebrow('var(--brand)'),
+                  letterSpacing: '.1em',
+                  background: 'var(--brandS)',
+                  borderRadius: 6,
+                  padding: '6px 9px',
+                }}
+              >
+                {tipLabel(question.tip)}
+              </span>
+              <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
+                {question.materie} · {question.cap}
+              </span>
+              <button
+                type="button"
+                onClick={session.toggleMark}
+                aria-pressed={isMarked}
+                style={{
+                  marginLeft: 'auto',
+                  padding: '6px 11px',
+                  border: `1px solid ${isMarked ? 'var(--acc)' : 'var(--line)'}`,
+                  borderRadius: 8,
+                  background: isMarked ? 'var(--accS)' : 'transparent',
+                  color: isMarked ? 'var(--acc)' : 'var(--fg3)',
+                  font: `500 12px ${SANS}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {isMarked ? '★ Marcată' : '☆ Marchează'}
+              </button>
+            </div>
+
+            <p style={{ margin: '18px 0 0', font: `400 21px/1.45 ${SERIF}`, color: 'var(--fg)', textWrap: 'pretty' }}>
+              {question.text}
+            </p>
+
+            {question.enunturi && (
+              <div
+                style={{
+                  marginTop: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 7,
+                  padding: '16px 18px',
+                  background: 'var(--surf2)',
+                  borderRadius: 11,
+                }}
+              >
+                {question.enunturi.map((t, i) => (
+                  <div key={t} style={{ display: 'flex', gap: 10, font: `400 14.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--fg)', flex: '0 0 auto' }}>{i + 1}.</span>
+                    <span>{t}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <AnswerOptions
+              question={question}
+              answer={answer}
+              revealed={isRevealed}
+              onPick={session.pick}
+            />
+
+            {isRevealed && (
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: 18,
+                  borderRadius: 12,
+                  border: `1px solid ${isCorrect ? 'var(--ok)' : 'var(--bad)'}`,
+                  background: isCorrect ? 'var(--okS)' : 'var(--badS)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'grid',
+                      placeItems: 'center',
+                      font: `600 13px ${SANS}`,
+                      background: isCorrect ? 'var(--ok)' : 'var(--bad)',
+                      color: 'var(--onBrand)',
+                    }}
+                  >
+                    {isCorrect ? '✓' : '✕'}
+                  </span>
+                  <span style={{ font: `600 14.5px ${SANS}`, color: 'var(--fg)' }}>
+                    {isCorrect ? 'Corect. Ai reținut bine noțiunea.' : 'Greșit — hai să vedem de ce.'}
+                  </span>
+                  <span style={{ marginLeft: 'auto', font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
+                    Răspuns corect: {question.correct}
+                  </span>
+                </div>
+
+                <p
+                  style={{
+                    margin: '12px 0 0',
+                    font: `400 14px/1.6 ${SANS}`,
+                    color: 'var(--fg2)',
+                    textWrap: 'pretty',
+                  }}
+                >
+                  {question.expl}
+                </p>
+
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line2)' }}>
+                  <div style={{ ...eyebrow(), letterSpacing: '.1em' }}>De ce fiecare variantă</div>
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {question.opts.map(([k]) => (
+                      <div key={k} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                        <span
+                          style={{
+                            flex: '0 0 auto',
+                            width: 26,
+                            height: 26,
+                            borderRadius: 8,
+                            display: 'grid',
+                            placeItems: 'center',
+                            font: `600 12px ${SANS}`,
+                            background: k === question.correct ? 'var(--ok)' : 'var(--surf3)',
+                            color: k === question.correct ? 'var(--onBrand)' : 'var(--fg3)',
+                          }}
+                        >
+                          {k}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              font: `400 13.5px/1.55 ${SANS}`,
+                              color: 'var(--fg2)',
+                              textWrap: 'pretty',
+                            }}
+                          >
+                            {question.why[k]}
+                          </p>
+                          {answer === k && (
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                marginTop: 5,
+                                font: `500 11px ${SANS}`,
+                                color: 'var(--fg3)',
+                              }}
+                            >
+                              Varianta aleasă de tine
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      font: `400 11.5px ${SANS}`,
+                      color: 'var(--fg3)',
+                      borderLeft: '2px solid var(--line2)',
+                      paddingLeft: 10,
+                    }}
+                  >
+                    {question.src}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{ marginLeft: 'auto', padding: '8px 13px', borderRadius: 9, font: `500 12.5px ${SANS}`, background: 'var(--surf)' }}
+                  >
+                    Adaugă la recapitulare
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => go('materii')}
+                    style={{ padding: '8px 13px', borderRadius: 9, font: `500 12.5px ${SANS}`, background: 'var(--surf)' }}
+                  >
+                    Deschide capitolul
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 22,
+                paddingTop: 18,
+                borderTop: '1px solid var(--line)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={session.prev}
+                style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}
+              >
+                Înapoi
+              </button>
+              <span style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)', marginLeft: 2 }}>
+                Taste: A–E pentru răspuns, Enter pentru {isRevealed ? 'următoarea' : 'verificare'}
+              </span>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={session.primary}
+                disabled={!isRevealed && !answer}
+                style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}
+              >
+                {isRevealed ? 'Următoarea grilă →' : 'Verifică răspunsul'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {withContext && <ContextColumn />}
+      </div>
+    </div>
+  );
+}
+
+/** Coloana de context: navigatorul sesiunii, notița pe capitol și cifrele capitolului. */
+function ContextColumn() {
+  const { session } = useApp();
+  const [note, setNote] = usePersistentState<string>(`medbuc.note.${session.question.cap}`, '');
+
+  return (
+    <div style={{ display: 'grid', gap: 16, alignContent: 'start', minWidth: 0 }}>
+      <div className="card-flat" style={{ padding: 18 }}>
+        <div style={eyebrow()}>Grile în sesiune</div>
+        <div
+          style={{
+            marginTop: 14,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(38px,1fr))',
+            gap: 7,
+          }}
+        >
+          {Array.from({ length: session.total }, (_, i) => {
+            const revealed = !!session.revealed[i];
+            const ok = revealed && session.answers[i] === QUESTION_CORRECT[i];
+            const cur = i === session.qi;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => session.goTo(i)}
+                aria-current={cur ? 'true' : undefined}
+                style={{
+                  aspectRatio: '1',
+                  borderRadius: 9,
+                  cursor: 'pointer',
+                  font: `600 13px ${SANS}`,
+                  border: `1px solid ${cur ? 'var(--brand)' : 'var(--line)'}`,
+                  background: revealed
+                    ? ok
+                      ? 'var(--okS)'
+                      : 'var(--badS)'
+                    : cur
+                      ? 'var(--brandS)'
+                      : 'var(--surf2)',
+                  color: revealed ? (ok ? 'var(--ok)' : 'var(--bad)') : cur ? 'var(--brand)' : 'var(--fg2)',
+                }}
+              >
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          style={{
+            marginTop: 14,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 7,
+            font: `400 11.5px/1.4 ${SANS}`,
+            color: 'var(--fg3)',
+          }}
+        >
+          {[
+            ['var(--ok)', 'Corecte', session.tally.corecte],
+            ['var(--bad)', 'Greșite', session.tally.gresite],
+            ['var(--acc)', 'Marcate', session.tally.marcate],
+          ].map(([color, label, n]) => (
+            <div key={String(label)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: String(color) }} />
+              {label} {n}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card-flat" style={{ padding: 18 }}>
+        <div style={eyebrow()}>Notița mea pentru capitol</div>
+        <textarea
+          className="field"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Scrie ce vrei să ții minte…"
+          style={{ marginTop: 12, minHeight: 96, resize: 'vertical', padding: '11px 12px', font: `400 13px/1.5 ${SANS}` }}
+        />
+      </div>
+
+      <div className="card-flat" style={{ padding: 18 }}>
+        <div style={eyebrow()}>Capitolul tău în cifre</div>
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            ['Corecte în acest capitol', '68%'],
+            ['Media platformei', '74%'],
+            ['Timp mediu / grilă', '41s'],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                font: `400 13px ${SANS}`,
+                color: 'var(--fg2)',
+              }}
+            >
+              {label}
+              <b style={{ color: 'var(--fg)', fontWeight: 600 }}>{value}</b>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
