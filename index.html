@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MedBuc · admitere UMFCD 2027</title>
+    <meta
+      name="description"
+      content="MedBuc — grile, plan de învățare și simulări pentru admiterea la UMFCD „Carol Davila”."
+    />
+    <link rel="icon" href="/logo-kitty.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300..800;1,400&family=Newsreader:opsz,wght@6..72,300..700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Set the theme before first paint so the page never flashes the wrong palette.
+      (function () {
+        try {
+          var saved = localStorage.getItem('medbuc.theme');
+          var dark = saved
+            ? saved === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
