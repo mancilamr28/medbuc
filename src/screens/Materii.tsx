@@ -2,8 +2,9 @@ import { Progress } from '../components/Progress';
 import { Switch } from '../components/Switch';
 import { MATERII, MATERIE_TABS, isSaved, type Chapter } from '../data/chapters';
 import { useIsDesktop } from '../lib/hooks';
-import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill, sideStack } from '../lib/ui';
+import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill, sideStack, statusChip } from '../lib/ui';
 import { useApp, type FilterId } from '../state/AppState';
+import { scoreOf, setIdOf } from '../state/useSession';
 
 const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'neterminate', label: 'Doar capitolele neterminate' },
@@ -13,20 +14,37 @@ const FILTERS: { id: FilterId; label: string }[] = [
 ];
 
 export function Materii() {
-  const { materie, setMaterie, filters, toggleFilter, go } = useApp();
+  const { materie, setMaterie, filters, toggleFilter, go, session } = useApp();
   const isDesktop = useIsDesktop();
   const mat = MATERII[materie];
 
   /**
    * Primele trei filtre restrâng lista de capitole. Al patrulea lărgește
    * bazinul de grile al sesiunii, deci nu schimbă ce capitole se văd.
+   *
+   * Un capitol e terminat dacă are un set încheiat; cifrele statice rămân
+   * rezervă. Setul deschis pe ecranul de grile trece de filtru oricum, ca
+   * rândul să nu dispară sub ochii elevului imediat ce-l încheie.
    */
-  const chapters = mat.list.filter((c: Chapter) => {
-    if (filters.neterminate && c.done >= c.total) return false;
-    if (filters.greseli && (c.done === 0 || c.pct === 100)) return false;
-    if (filters.bookmark && !isSaved(materie, c)) return false;
-    return true;
-  });
+  const chapters = mat.list
+    .map((c: Chapter) => {
+      const id = setIdOf(materie, c);
+      const rezultat = session.results[id];
+      const curent = session.run?.setId === id;
+      return {
+        c,
+        id,
+        scor: rezultat ? scoreOf(rezultat) : undefined,
+        curent,
+        activ: curent && session.phase === 'rulare',
+      };
+    })
+    .filter(({ c, scor, curent }) => {
+      if (filters.neterminate && (scor !== undefined || c.done >= c.total) && !curent) return false;
+      if (filters.greseli && (c.done === 0 || c.pct === 100)) return false;
+      if (filters.bookmark && !isSaved(materie, c)) return false;
+      return true;
+    });
 
   const stats = [
     { label: 'Grile disponibile', value: mat.count.split(' ').slice(0, -1).join(' '), unit: mat.unit },
@@ -128,7 +146,7 @@ export function Materii() {
               </button>
             </div>
 
-            {chapters.map((c) => (
+            {chapters.map(({ c, id, scor, activ }) => (
               <div
                 key={`${c.nr}-${c.name}`}
                 className="list-row"
@@ -157,14 +175,44 @@ export function Materii() {
                     </div>
                   </div>
                 </div>
+                {scor ? (
+                  <span
+                    style={
+                      scor.pct >= 65
+                        ? statusChip('var(--okS)', 'var(--ok)')
+                        : statusChip('var(--badS)', 'var(--bad)')
+                    }
+                  >
+                    {scor.corecte}/{scor.total}
+                  </span>
+                ) : activ ? (
+                  <span style={statusChip('var(--brandS)', 'var(--brand)')}>În curs</span>
+                ) : null}
                 <div style={pctPill(c.pct)}>{c.pct}%</div>
+                {scor && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => {
+                      session.openReview(id);
+                      go('grile');
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: 9, font: `500 12.5px ${SANS}`, whiteSpace: 'nowrap' }}
+                  >
+                    Revezi
+                  </button>
+                )}
                 <button
                   type="button"
                   className="practice-btn"
-                  onClick={() => go('grile')}
+                  onClick={() => {
+                    // „Continuă” nu repornește setul — ar șterge răspunsurile în lucru.
+                    if (!activ) session.start(materie, c);
+                    go('grile');
+                  }}
                   style={{ padding: '8px 14px', font: `500 12.5px ${SANS}`, whiteSpace: 'nowrap' }}
                 >
-                  Exersează
+                  {activ ? 'Continuă' : scor ? 'Reia' : 'Exersează'}
                 </button>
               </div>
             ))}

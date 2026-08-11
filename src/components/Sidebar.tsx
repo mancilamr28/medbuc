@@ -13,7 +13,7 @@ interface NavEntry {
 
 export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
   const { role, session } = useApp();
-  const ramase = session.total - Object.keys(session.revealed).length;
+  const ramase = session.ramase;
 
   return {
     main: [
