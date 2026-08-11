@@ -28,7 +28,7 @@ export function Acasa() {
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
   const daysLeft = daysUntil(EXAM_DATE);
-  const ramase = session.ramase;
+  const ramase = session.total - Object.keys(session.revealed).length;
 
   const chartTabs = (
     <Segmented
