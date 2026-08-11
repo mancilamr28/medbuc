@@ -35,7 +35,7 @@ export function Logo({ size = 32 }: { size?: number }) {
       }}
     >
       <img
-        src="/logo-kitty.svg"
+        src={`${import.meta.env.BASE_URL}logo-kitty.svg`}
         alt="MedBuc"
         className={`logo${pop ? ' logo--pop' : ''}`}
         style={{ width: size, height: size, display: 'block' }}
