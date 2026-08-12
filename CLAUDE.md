@@ -49,9 +49,16 @@ The simulation clock only ticks while its screen is open — `AppState.tsx` pass
 
 The only way state should touch `localStorage`. Keys are namespaced `medbuc.*` (`medbuc.theme`, `medbuc.setari`, `medbuc.sim.run`, and dynamic ones like `medbuc.note.${cap}`). It swallows storage errors, so private-mode/quota failures degrade to in-memory state instead of throwing.
 
+Two behaviours to preserve:
+
+- **The key may change while mounted** (`medbuc.note.${cap}` does exactly that). The hook stores `{ key, value }` together and re-reads synchronously when the key changes. Without this, the previous chapter's note stays on screen and the first keystroke overwrites the new chapter's saved note.
+- **An optional third argument is a type guard** (`Validator<T>`). Anything stored that fails it — an older shape, a hand-edited value — is dropped *and removed from storage*, so a bad value cannot break the app on every reload. `useSimulare` passes `isSimRun` for `medbuc.sim.run`, the one payload complex enough to crash rendering. Add a validator whenever a persisted shape is more than a primitive.
+
+`ErrorBoundary` (`src/components/ErrorBoundary.tsx`) wraps the whole app in `main.tsx` and offers "Șterge datele locale", which clears every `medbuc.*` key — the escape hatch for any persisted state that still manages to break rendering.
+
 ### Theming — two writers to keep in sync
 
-1. An inline script in `index.html` sets `document.documentElement.dataset.theme` **before first paint** (from `localStorage` + `prefers-color-scheme`) so the page never flashes the wrong palette.
+1. An inline script in `index.html` sets `document.documentElement.dataset.theme` **before first paint** (from `localStorage` + `prefers-color-scheme`) so the page never flashes the wrong palette. It must parse the stored value as **JSON** — `usePersistentState` writes `"dark"` with quotes, and comparing against bare `dark` silently ignored every saved preference.
 2. `toggleTheme()` in `AppState.tsx` writes *both* the DOM dataset and the persisted `medbuc.theme` value.
 
 Changing theme logic in one place without the other causes a flash-of-wrong-theme on reload.

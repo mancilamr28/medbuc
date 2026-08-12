@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Urmărește un media query — pentru layout-urile care nu se pot exprima doar în CSS. */
 export function useMediaQuery(query: string): boolean {
@@ -41,31 +41,69 @@ export function useNow(active = true, intervalMs = 1000): number {
   return now;
 }
 
-/** Stare persistată în localStorage, tolerantă la storage indisponibil. */
-export function usePersistentState<T>(key: string, initial: T): [T, (value: T | ((prev: T) => T)) => void] {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw === null ? initial : (JSON.parse(raw) as T);
-    } catch {
-      return initial;
+/** Verifică forma unei valori venite din localStorage; ce nu trece e aruncat. */
+export type Validator<T> = (value: unknown) => value is T;
+
+function readStored<T>(key: string, fallback: T, isValid?: Validator<T>): T {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const parsed = JSON.parse(raw) as unknown;
+    if (isValid && !isValid(parsed)) {
+      // Valoare dintr-o versiune veche sau stricată de mână: o ștergem, ca
+      // reîncărcarea următoare să nu cadă din nou pe aceeași dată.
+      console.warn(`[medbuc] Valoare invalidă în localStorage pentru "${key}" — am resetat-o.`);
+      localStorage.removeItem(key);
+      return fallback;
     }
-  });
+    return parsed as T;
+  } catch {
+    if (raw !== null) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* storage indisponibil — nu avem ce curăța */
+      }
+    }
+    return fallback;
+  }
+}
+
+/** Stare persistată în localStorage, tolerantă la storage indisponibil. */
+export function usePersistentState<T>(
+  key: string,
+  initial: T,
+  isValid?: Validator<T>,
+): [T, (value: T | ((prev: T) => T)) => void] {
+  const initialRef = useRef(initial);
+  const validRef = useRef(isValid);
+  const [state, setState] = useState<{ key: string; value: T }>(() => ({
+    key,
+    value: readStored(key, initialRef.current, validRef.current),
+  }));
+
+  // Cheia poate să se schimbe cât timp componenta e montată (ex. notița pe capitol,
+  // `medbuc.note.${cap}`). Recitim sincron: altfel valoarea cheii vechi ar rămâne
+  // afișată și prima scriere ar suprascrie ce era salvat sub cheia nouă.
+  if (state.key !== key) {
+    setState({ key, value: readStored(key, initialRef.current, validRef.current) });
+  }
 
   const set = useCallback(
     (next: T | ((prev: T) => T)) => {
-      setValue((prev) => {
-        const resolved = typeof next === 'function' ? (next as (p: T) => T)(prev) : next;
+      setState((prev) => {
+        const resolved = typeof next === 'function' ? (next as (p: T) => T)(prev.value) : next;
         try {
           localStorage.setItem(key, JSON.stringify(resolved));
         } catch {
           /* modul privat sau storage plin — rămânem doar cu starea din memorie */
         }
-        return resolved;
+        return { key, value: resolved };
       });
     },
     [key],
   );
 
-  return [value, set];
+  return [state.value, set];
 }

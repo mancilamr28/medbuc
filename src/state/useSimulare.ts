@@ -37,6 +37,32 @@ interface SimRun {
   marks: Record<number, boolean>;
 }
 
+/**
+ * `SimRun` ajunge în localStorage, deci poate rămâne de la o versiune mai veche
+ * sau poate fi modificat manual. Fără verificarea asta, un `order` lipsă arunca
+ * un TypeError la prima randare și lăsa aplicația pe ecran alb la fiecare reload.
+ */
+const isSimRun = (v: unknown): v is SimRun => {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Partial<SimRun>;
+  return (
+    typeof r.startedAt === 'number' &&
+    typeof r.endsAt === 'number' &&
+    typeof r.qi === 'number' &&
+    Array.isArray(r.order) &&
+    r.order.length > 0 &&
+    r.order.every((i) => typeof i === 'number' && i >= 0 && i < QUESTIONS.length) &&
+    r.qi >= 0 &&
+    r.qi < r.order.length &&
+    typeof r.config === 'object' &&
+    r.config !== null &&
+    typeof r.answers === 'object' &&
+    r.answers !== null &&
+    typeof r.marks === 'object' &&
+    r.marks !== null
+  );
+};
+
 export interface Simulare {
   phase: SimPhase;
   config: SimConfig;
@@ -91,7 +117,11 @@ function buildOrder(count: number, ordine: string): number[] {
 
 export function useSimulare(now: number): Simulare {
   const [config, setConfigState] = usePersistentState<SimConfig>('medbuc.sim.config', DEFAULT_SIM_CONFIG);
-  const [run, setRun] = usePersistentState<SimRun | null>('medbuc.sim.run', null);
+  const [run, setRun] = usePersistentState<SimRun | null>(
+    'medbuc.sim.run',
+    null,
+    (v): v is SimRun | null => v === null || isSimRun(v),
+  );
 
   const setConfig = useCallback(
     (key: keyof SimConfig, value: string) => setConfigState((prev) => ({ ...prev, [key]: value })),
