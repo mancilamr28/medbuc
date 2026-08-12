@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { QUESTIONS, type OptionKey, type Question } from '../data/questions';
 import { usePersistentState } from '../lib/hooks';
 
-export type SimPhase = 'config' | 'rulare';
+export type SimPhase = 'config' | 'rulare' | 'rezultat';
 
 export interface SimConfig {
   model: string;
@@ -25,16 +25,57 @@ export const DEFAULT_SIM_CONFIG: SimConfig = {
   ordine: 'Amestecate',
 };
 
-interface SimRun {
+export interface SimRun {
   startedAt: number;
   /** Momentul la care expiră timpul — cronometrul curge și cu fereastra închisă. */
   endsAt: number;
+  /**
+   * Momentul predării. Lucrarea nu se șterge la predare: rămâne salvată, ca
+   * ecranul de rezultat să poată arăta scorul și explicațiile.
+   */
+  finishedAt: number | null;
   config: SimConfig;
   /** Ordinea grilelor: pentru fiecare poziție, indexul din banca de întrebări. */
   order: number[];
   qi: number;
   answers: Record<number, OptionKey>;
   marks: Record<number, boolean>;
+}
+
+export interface SimScore {
+  corecte: number;
+  gresite: number;
+  neraspunse: number;
+  total: number;
+  /** Punctaj UMFCD: grila nemarcată valorează 0, deci procentul e din total. */
+  pct: number;
+  durataMs: number;
+}
+
+const EMPTY_SCORE: SimScore = { corecte: 0, gresite: 0, neraspunse: 0, total: 0, pct: 0, durataMs: 0 };
+
+/** Grila de pe poziția `i` din lucrare (pozițiile indexează `order`, nu banca). */
+export const questionAtPosition = (run: SimRun, i: number): Question =>
+  QUESTIONS[run.order[i] ?? 0] ?? QUESTIONS[0]!;
+
+function scoreOf(run: SimRun, finishedAt: number): SimScore {
+  let corecte = 0;
+  let raspunse = 0;
+  run.order.forEach((_, i) => {
+    const ales = run.answers[i];
+    if (ales === undefined) return;
+    raspunse += 1;
+    if (ales === questionAtPosition(run, i).correct) corecte += 1;
+  });
+  const total = run.order.length;
+  return {
+    corecte,
+    gresite: raspunse - corecte,
+    neraspunse: total - raspunse,
+    total,
+    pct: total === 0 ? 0 : Math.round((corecte / total) * 100),
+    durataMs: Math.max(0, finishedAt - run.startedAt),
+  };
 }
 
 /**
@@ -48,6 +89,8 @@ const isSimRun = (v: unknown): v is SimRun => {
   return (
     typeof r.startedAt === 'number' &&
     typeof r.endsAt === 'number' &&
+    // Lucrările salvate înainte de ecranul de rezultat nu au `finishedAt`.
+    (r.finishedAt === undefined || r.finishedAt === null || typeof r.finishedAt === 'number') &&
     typeof r.qi === 'number' &&
     Array.isArray(r.order) &&
     r.order.length > 0 &&
@@ -68,8 +111,14 @@ export interface Simulare {
   config: SimConfig;
   setConfig: (key: keyof SimConfig, value: string) => void;
   start: () => void;
-  /** Predarea lucrării — sau expirarea timpului. */
+  /** Predarea lucrării. Idempotentă: lucrarea rămâne salvată, cu ora predării. */
   finish: () => void;
+  /** Renunță la lucrarea încheiată și revine la configurare. */
+  reset: () => void;
+  /** Timpul a expirat, deci lucrarea s-a încheiat de la sine. */
+  expired: boolean;
+  /** Bilanțul lucrării; zerouri cât timp nu există o lucrare. */
+  score: SimScore;
   run: SimRun | null;
   question: Question;
   qi: number;
@@ -134,6 +183,7 @@ export function useSimulare(now: number): Simulare {
     setRun({
       startedAt,
       endsAt: startedAt + minutesOf(config.durata) * 60_000,
+      finishedAt: null,
       config,
       order: buildOrder(count, config.ordine),
       qi: 0,
@@ -142,10 +192,27 @@ export function useSimulare(now: number): Simulare {
     });
   }, [config, setRun]);
 
-  const finish = useCallback(() => setRun(null), [setRun]);
+  /**
+   * Predarea păstrează lucrarea și notează ora. Ștergerea ei aici a fost multă
+   * vreme motivul pentru care „Predă lucrarea" arunca examenul fără niciun scor.
+   */
+  const finish = useCallback(
+    () => setRun((prev) => (prev && prev.finishedAt === null ? { ...prev, finishedAt: Date.now() } : prev)),
+    [setRun],
+  );
+
+  const reset = useCallback(() => setRun(null), [setRun]);
 
   const secondsLeft = run ? Math.max(0, Math.round((run.endsAt - now) / 1000)) : 0;
   const expired = !!run && secondsLeft === 0;
+
+  // Expirarea încheie lucrarea fără să o piardă: `finishedAt` se deduce din
+  // `endsAt`, deci rezultatul e același și după o reîncărcare.
+  const finishedAt = run ? (run.finishedAt ?? (expired ? run.endsAt : null)) : null;
+  const score = useMemo(
+    () => (run && finishedAt !== null ? scoreOf(run, finishedAt) : run ? scoreOf(run, now) : EMPTY_SCORE),
+    [finishedAt, now, run],
+  );
 
   const patch = useCallback(
     (change: (prev: SimRun) => SimRun) => setRun((prev) => (prev ? change(prev) : prev)),
@@ -165,11 +232,14 @@ export function useSimulare(now: number): Simulare {
   );
 
   return {
-    phase: run && !expired ? 'rulare' : 'config',
+    phase: !run ? 'config' : finishedAt !== null ? 'rezultat' : 'rulare',
     config,
     setConfig,
     start,
     finish,
+    reset,
+    expired,
+    score,
     run,
     question,
     qi,
