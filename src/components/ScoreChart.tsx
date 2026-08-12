@@ -47,10 +47,11 @@ export function ScoreChart() {
           strokeWidth={1}
           strokeDasharray="5 5"
         />
+        {/* Eticheta stă la capătul din stânga al liniei, ca să nu se lovească
+            de valoarea ultimului punct când scorul se apropie de țintă. */}
         <text
-          x={W - PAD}
+          x={PAD}
           y={targetY - 8}
-          textAnchor="end"
           style={{ font: `500 11px ${SANS}`, fill: 'var(--acc)' }}
         >
           ținta ta · {SCORE_TARGET}

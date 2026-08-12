@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppProvider } from './state/AppState';
 import './styles.css';
 
@@ -9,8 +10,10 @@ if (!root) throw new Error('Elementul #root lipsește din index.html');
 
 createRoot(root).render(
   <StrictMode>
-    <AppProvider>
-      <App />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <App />
+      </AppProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );
