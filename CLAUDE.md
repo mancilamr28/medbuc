@@ -10,9 +10,13 @@ npm run dev        # dev server on http://localhost:5173
 npm run build      # tsc -b && vite build → dist/
 npm run preview    # serve the production build
 npm run typecheck  # tsc -b --noEmit
+npm test           # vitest run
+npm run test:watch # vitest
 ```
 
-There is **no test framework and no linter** configured. `npm run build` is the only gate — it typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
+**There is no linter** — but there are tests, and CI. `.github/workflows/ci.yml` runs typecheck → tests → build on every pull request and on pushes to `master`; `.github/workflows/deploy.yml` publishes to Pages separately. `npm run build` typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
+
+Tests live next to their subject as `*.test.ts` and cover **pure functions only** — no DOM, no React renderer, so `vitest` is the sole test dependency. They are inside `include`, so `npm run typecheck` checks them too, and they are never imported by the app, so they stay out of the bundle. To keep logic testable, extract it as a pure function taking its inputs as arguments (as `scoreOf` in `useSession.ts` does) rather than reading `Date.now()`, `Math.random()` or hook state directly.
 
 ## Language
 
