@@ -48,28 +48,8 @@ export const segGroup: SX = {
   borderRadius: 11,
 };
 
-export const navItem = (active: boolean): SX => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: 11,
-  width: '100%',
-  padding: '9px 10px',
-  border: 0,
-  borderRadius: 9,
-  cursor: 'pointer',
-  textAlign: 'left',
-  font: `${active ? 600 : 400} 13.5px ${SANS}`,
-  background: active ? 'var(--brandS)' : 'transparent',
-  color: active ? 'var(--brand)' : 'var(--fg2)',
-});
-
-export const navDot = (active: boolean): SX => ({
-  width: 5,
-  height: 5,
-  borderRadius: 2,
-  flex: '0 0 auto',
-  background: active ? 'var(--brand)' : 'var(--line2)',
-});
+// Bara laterală folosește clasa `.nav-item` din styles.css: are hover și un
+// indicator de ecran curent, pe care stilurile inline nu le pot exprima.
 
 export const mobileNavItem = (active: boolean): SX => ({
   flex: 1,
@@ -84,13 +64,6 @@ export const mobileNavItem = (active: boolean): SX => ({
   font: `${active ? 600 : 400} 11px ${SANS}`,
   background: active ? 'var(--brandS)' : 'transparent',
   color: active ? 'var(--brand)' : 'var(--fg3)',
-});
-
-export const mobileNavDot = (active: boolean): SX => ({
-  width: 6,
-  height: 6,
-  borderRadius: 2,
-  background: active ? 'var(--brand)' : 'var(--line2)',
 });
 
 /** Procentul de corecte: gri când capitolul e neînceput, roșu sub 65, verde peste 80. */
