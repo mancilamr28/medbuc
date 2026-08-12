@@ -1,6 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
 import { QUESTIONS, type OptionKey, type Question } from '../data/questions';
 
+export interface SessionScore {
+  corecte: number;
+  gresite: number;
+  neraspunse: number;
+  total: number;
+  /** Procentul se raportează la total, deci grilele fără răspuns contează în minus. */
+  pct: number;
+  durataMs: number;
+}
+
 export interface Session {
   /** Indexul grilei curente. */
   qi: number;
@@ -14,6 +24,8 @@ export interface Session {
   isMarked: boolean;
   isCorrect: boolean;
   startedAt: number;
+  /** Sesiunea a fost încheiată: ecranul de grile arată panoul de rezultat. */
+  finished: boolean;
   pick: (key: OptionKey) => void;
   /** Enter: verifică răspunsul, iar dacă e deja verificat trece mai departe. */
   primary: () => void;
@@ -21,8 +33,14 @@ export interface Session {
   prev: () => void;
   goTo: (index: number) => void;
   toggleMark: () => void;
+  /** Încheie sesiunea și îngheață timpul; apelurile ulterioare nu schimbă nimic. */
+  finish: () => void;
+  /** Reia sesiunea de la prima grilă, cu cronometrul de la zero. */
+  restart: () => void;
   /** Câte grile sunt corecte / greșite / marcate în sesiunea curentă. */
   tally: { corecte: number; gresite: number; marcate: number };
+  /** Bilanțul final, raportat la toate grilele din sesiune. */
+  score: SessionScore;
 }
 
 export function useSession(): Session {
@@ -30,7 +48,8 @@ export function useSession(): Session {
   const [answers, setAnswers] = useState<Record<number, OptionKey>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [marked, setMarked] = useState<Record<number, boolean>>({});
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt, setStartedAt] = useState(() => Date.now());
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
   const total = QUESTIONS.length;
   const question = QUESTIONS[qi] ?? QUESTIONS[0]!;
@@ -47,17 +66,31 @@ export function useSession(): Session {
     [qi, revealed],
   );
 
-  const goTo = useCallback((index: number) => setQi(((index % total) + total) % total), [total]);
-  const next = useCallback(() => setQi((i) => (i + 1) % total), [total]);
-  const prev = useCallback(() => setQi((i) => (i - 1 + total) % total), [total]);
+  /** Navigarea se oprește la capete: ultima grilă trebuie să rămână ultima. */
+  const goTo = useCallback((index: number) => setQi(Math.max(0, Math.min(index, total - 1))), [total]);
+  const next = useCallback(() => setQi((i) => Math.min(i + 1, total - 1)), [total]);
+  const prev = useCallback(() => setQi((i) => Math.max(i - 1, 0)), []);
+
+  /** Idempotent: o sesiune încheiată nu-și rescrie momentul de final. */
+  const finish = useCallback(() => setFinishedAt((f) => f ?? Date.now()), []);
+
+  const restart = useCallback(() => {
+    setQi(0);
+    setAnswers({});
+    setRevealed({});
+    setMarked({});
+    setFinishedAt(null);
+    setStartedAt(Date.now());
+  }, []);
 
   const primary = useCallback(() => {
     if (!revealed[qi]) {
       if (answers[qi]) setRevealed((prev) => ({ ...prev, [qi]: true }));
       return;
     }
-    next();
-  }, [answers, next, qi, revealed]);
+    if (qi >= total - 1) finish();
+    else next();
+  }, [answers, finish, next, qi, revealed, total]);
 
   const toggleMark = useCallback(() => setMarked((prev) => ({ ...prev, [qi]: !prev[qi] })), [qi]);
 
@@ -72,6 +105,25 @@ export function useSession(): Session {
     return { corecte, gresite, marcate: Object.values(marked).filter(Boolean).length };
   }, [answers, marked, revealed]);
 
+  /** Spre deosebire de `tally`, bilanțul final numără și grilele alese, dar neverificate. */
+  const score = useMemo<SessionScore>(() => {
+    let corecte = 0;
+    let raspunse = 0;
+    QUESTIONS.forEach((q, i) => {
+      if (answers[i] === undefined) return;
+      raspunse += 1;
+      if (answers[i] === q.correct) corecte += 1;
+    });
+    return {
+      corecte,
+      gresite: raspunse - corecte,
+      neraspunse: total - raspunse,
+      total,
+      pct: total === 0 ? 0 : Math.round((corecte / total) * 100),
+      durataMs: Math.max(0, (finishedAt ?? Date.now()) - startedAt),
+    };
+  }, [answers, finishedAt, startedAt, total]);
+
   return {
     qi,
     question,
@@ -84,12 +136,16 @@ export function useSession(): Session {
     isMarked: !!marked[qi],
     isCorrect,
     startedAt,
+    finished: finishedAt !== null,
     pick,
     primary,
     next,
     prev,
     goTo,
     toggleMark,
+    finish,
+    restart,
     tally,
+    score,
   };
 }

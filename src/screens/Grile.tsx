@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
+import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { OPTION_KEYS, QUESTIONS, tipLabel, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { formatClock } from '../lib/time';
-import { SANS, SERIF, eyebrow } from '../lib/ui';
+import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/AppState';
 
 type Variant = 'a' | 'b';
@@ -12,7 +13,13 @@ type Variant = 'a' | 'b';
 /** Răspunsul corect al fiecărei grile, pentru colorarea navigatorului. */
 const QUESTION_CORRECT: OptionKey[] = QUESTIONS.map((q) => q.correct);
 
+/** Ecranul de grile își alege faza: rezolvare sau panoul de rezultat. */
 export function Grile() {
+  const { session } = useApp();
+  return session.finished ? <GrileRezultat /> : <GrileRun />;
+}
+
+function GrileRun() {
   const { go, session } = useApp();
   const isDesktop = useIsDesktop();
   const [layout, setLayout] = usePersistentState<Variant>('medbuc.solve', 'a');
@@ -20,6 +27,7 @@ export function Grile() {
 
   const { question, qi, total, answer, isRevealed, isMarked, isCorrect } = session;
   const withContext = layout === 'b';
+  const ultima = qi === total - 1;
 
   // Tastele A–E aleg varianta, Enter verifică sau trece mai departe.
   useEffect(() => {
@@ -63,6 +71,14 @@ export function Grile() {
         <div className="tabular" style={{ font: `500 13px ${SANS}`, color: 'var(--fg2)' }} aria-label="Timp scurs">
           {elapsed}
         </div>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={session.finish}
+          style={{ padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
+        >
+          Încheie sesiunea
+        </button>
         <Segmented
           items={[
             { id: 'a' as Variant, label: 'Focus' },
@@ -325,12 +341,14 @@ export function Grile() {
                 type="button"
                 className="btn-ghost"
                 onClick={session.prev}
+                disabled={qi === 0}
                 style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}
               >
                 Înapoi
               </button>
               <span style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)', marginLeft: 2 }}>
-                Taste: A–E pentru răspuns, Enter pentru {isRevealed ? 'următoarea' : 'verificare'}
+                Taste: A–E pentru răspuns, Enter pentru{' '}
+                {isRevealed ? (ultima ? 'rezultat' : 'următoarea') : 'verificare'}
               </span>
               <button
                 type="button"
@@ -339,13 +357,100 @@ export function Grile() {
                 disabled={!isRevealed && !answer}
                 style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}
               >
-                {isRevealed ? 'Următoarea grilă →' : 'Verifică răspunsul'}
+                {isRevealed ? (ultima ? 'Vezi rezultatul →' : 'Următoarea grilă →') : 'Verifică răspunsul'}
               </button>
             </div>
           </div>
         </div>
 
         {withContext && <ContextColumn />}
+      </div>
+    </div>
+  );
+}
+
+/** Panoul de rezultat: cât ai nimerit, cât ai greșit și cât a durat sesiunea. */
+function GrileRezultat() {
+  const { go, session } = useApp();
+  const { corecte, gresite, neraspunse, total, pct, durataMs } = session.score;
+  const culoare = pct >= 80 ? 'var(--ok)' : pct >= 65 ? 'var(--brand)' : 'var(--bad)';
+
+  const dale: [string, string, string][] = [
+    ['Corecte', String(corecte), 'var(--ok)'],
+    ['Greșite', String(gresite), 'var(--bad)'],
+    ['Fără răspuns', String(neraspunse), 'var(--fg3)'],
+    ['Timp', formatClock(durataMs / 1000), 'var(--fg)'],
+  ];
+
+  return (
+    <div className="screen">
+      <div style={{ maxWidth: 820, margin: '0 auto' }}>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => go('acasa')}
+          style={{ marginBottom: 18, padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
+        >
+          ← Înapoi acasă
+        </button>
+
+        <div className="card" style={{ padding: 26 }}>
+          <div style={eyebrow('var(--brand)')}>Sesiune încheiată</div>
+          <h1 style={{ margin: '8px 0 0', font: `500 30px/1.15 ${SERIF}`, color: 'var(--fg)' }}>Rezultatul tău</h1>
+
+          <div style={{ marginTop: 20, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            <span className="tabular" style={{ font: `600 46px/1 ${SERIF}`, color: culoare }}>
+              {pct}%
+            </span>
+            <span style={{ font: `400 14px ${SANS}`, color: 'var(--fg2)' }}>
+              {corecte} din {total} grile corecte
+            </span>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <Progress pct={pct} height={8} color={culoare} label={`Scor ${pct}%`} />
+          </div>
+
+          <div style={{ ...autoGrid(140, 14), marginTop: 20 }}>
+            {dale.map(([label, value, color]) => (
+              <div key={label} className="card-flat" style={{ padding: 16 }}>
+                <div style={eyebrow()}>{label}</div>
+                <div className="tabular" style={{ marginTop: 8, font: `600 24px/1 ${SANS}`, color }}>
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              marginTop: 22,
+              paddingTop: 18,
+              borderTop: '1px solid var(--line)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => go('materii')}
+              style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}
+            >
+              Înapoi la materii
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={session.restart}
+              style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}
+            >
+              Reia sesiunea
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
