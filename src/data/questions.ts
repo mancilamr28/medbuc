@@ -1,7 +1,16 @@
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 export type QuestionType = 'simplu' | 'grupat';
 
+/**
+ * Identitatea unei grile. Până acum identitatea era poziția în `QUESTIONS`, ceea
+ * ce lega tot ce se salvează (ordinea unei simulări) de ordinea din fișier:
+ * o grilă inserată la mijloc muta răspunsurile tuturor lucrărilor salvate.
+ * Id-ul rămâne același indiferent de ordine și supraviețuiește mutării în bază.
+ */
+export type QuestionId = string;
+
 export interface Question {
+  id: QuestionId;
   tip: QuestionType;
   materie: string;
   cap: string;
@@ -26,6 +35,7 @@ export const QUESTIONS: Question[] = [
   {
     tip: 'simplu',
     materie: 'Biologie',
+    id: 'bio-nervos-01',
     cap: '03. Sistemul nervos',
     text: 'Substanța cenușie a medulei spinării este dispusă:',
     opts: [
@@ -49,6 +59,7 @@ export const QUESTIONS: Question[] = [
   {
     tip: 'grupat',
     materie: 'Chimie organică',
+    id: 'chim-alcooli-01',
     cap: '05. Alcooli. Fenoli',
     text: 'Referitor la etanol sunt corecte afirmațiile:',
     enunturi: [
@@ -78,6 +89,7 @@ export const QUESTIONS: Question[] = [
   {
     tip: 'simplu',
     materie: 'Biologie',
+    id: 'bio-endocrin-01',
     cap: '04. Glandele endocrine',
     text: 'Insulina este secretată de:',
     opts: [
@@ -101,6 +113,7 @@ export const QUESTIONS: Question[] = [
   {
     tip: 'grupat',
     materie: 'Biologie',
+    id: 'bio-sange-01',
     cap: '07. Sângele. Hemostaza',
     text: 'Despre hematiile adultului sunt adevărate afirmațiile:',
     enunturi: [
@@ -130,6 +143,7 @@ export const QUESTIONS: Question[] = [
   {
     tip: 'simplu',
     materie: 'Biologie',
+    id: 'bio-osos-01',
     cap: '05. Sistemul osos',
     text: 'Numărul vertebrelor din regiunea toracală a coloanei vertebrale este:',
     opts: [
@@ -153,6 +167,7 @@ export const QUESTIONS: Question[] = [
   {
     tip: 'simplu',
     materie: 'Chimie organică',
+    id: 'chim-arene-01',
     cap: '04. Arene',
     text: 'Formula moleculară a benzenului este:',
     opts: [
@@ -174,3 +189,19 @@ export const QUESTIONS: Question[] = [
     src: 'Chimie organică, manual clasa a X-a · Arene',
   },
 ];
+
+/** Grilele după id. Un id duplicat ar face o grilă de negăsit, deci se semnalează. */
+export const QUESTION_BY_ID: ReadonlyMap<QuestionId, Question> = (() => {
+  const map = new Map<QuestionId, Question>();
+  for (const q of QUESTIONS) {
+    if (map.has(q.id)) throw new Error(`Id de grilă duplicat: ${q.id}`);
+    map.set(q.id, q);
+  }
+  return map;
+})();
+
+export const questionById = (id: QuestionId): Question | undefined => QUESTION_BY_ID.get(id);
+
+/** Un id care chiar există în bancă — folosit la validarea lucrărilor salvate. */
+export const isQuestionId = (v: unknown): v is QuestionId =>
+  typeof v === 'string' && QUESTION_BY_ID.has(v);
