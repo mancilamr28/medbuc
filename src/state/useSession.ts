@@ -11,6 +11,38 @@ export interface SessionScore {
   durataMs: number;
 }
 
+/**
+ * Bilanțul unei sesiuni, ca funcție pură — ia grilele și răspunsurile, nu starea
+ * hook-ului, ca să poată fi testat direct.
+ *
+ * Spre deosebire de `tally`, numără orice grilă cu răspuns ales, chiar
+ * neverificată: „Încheie sesiunea" nu are voie să piardă un răspuns. Procentul e
+ * raportat la total, deci grilele fără răspuns contează în minus.
+ */
+export function scoreOf(
+  questions: readonly Question[],
+  answers: Record<number, OptionKey>,
+  durataMs: number,
+): SessionScore {
+  let corecte = 0;
+  let raspunse = 0;
+  questions.forEach((q, i) => {
+    const ales = answers[i];
+    if (ales === undefined) return;
+    raspunse += 1;
+    if (ales === q.correct) corecte += 1;
+  });
+  const total = questions.length;
+  return {
+    corecte,
+    gresite: raspunse - corecte,
+    neraspunse: total - raspunse,
+    total,
+    pct: total === 0 ? 0 : Math.round((corecte / total) * 100),
+    durataMs: Math.max(0, durataMs),
+  };
+}
+
 export interface Session {
   /** Indexul grilei curente. */
   qi: number;
@@ -105,24 +137,10 @@ export function useSession(): Session {
     return { corecte, gresite, marcate: Object.values(marked).filter(Boolean).length };
   }, [answers, marked, revealed]);
 
-  /** Spre deosebire de `tally`, bilanțul final numără și grilele alese, dar neverificate. */
-  const score = useMemo<SessionScore>(() => {
-    let corecte = 0;
-    let raspunse = 0;
-    QUESTIONS.forEach((q, i) => {
-      if (answers[i] === undefined) return;
-      raspunse += 1;
-      if (answers[i] === q.correct) corecte += 1;
-    });
-    return {
-      corecte,
-      gresite: raspunse - corecte,
-      neraspunse: total - raspunse,
-      total,
-      pct: total === 0 ? 0 : Math.round((corecte / total) * 100),
-      durataMs: Math.max(0, (finishedAt ?? Date.now()) - startedAt),
-    };
-  }, [answers, finishedAt, startedAt, total]);
+  const score = useMemo<SessionScore>(
+    () => scoreOf(QUESTIONS, answers, (finishedAt ?? Date.now()) - startedAt),
+    [answers, finishedAt, startedAt],
+  );
 
   return {
     qi,
