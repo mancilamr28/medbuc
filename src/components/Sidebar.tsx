@@ -1,13 +1,29 @@
-import { SRS_TOTAL, STUDENT } from '../data/profile';
-import { EXAM_DATE_LABEL } from '../data/profile';
-import { SANS, eyebrow, navDot, navItem } from '../lib/ui';
+import {
+  faBookOpen,
+  faCalendarDays,
+  faChartLine,
+  faChevronRight,
+  faGear,
+  faHouse,
+  faListCheck,
+  faNoteSticky,
+  faRotateLeft,
+  faShieldHalved,
+  faStopwatch,
+} from '@fortawesome/free-solid-svg-icons';
+import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { EXAM_DATE, EXAM_DATE_LABEL, SRS_TOTAL, STUDENT } from '../data/profile';
+import { daysUntil } from '../lib/time';
+import { SANS, eyebrow } from '../lib/ui';
 import type { Screen } from '../lib/router';
 import { useApp } from '../state/AppState';
+import { Icon } from './Icon';
 import { Logo } from './Logo';
 
 interface NavEntry {
   id: Screen;
   label: string;
+  icon: IconDefinition;
   badge?: string;
 }
 
@@ -17,18 +33,18 @@ export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
 
   return {
     main: [
-      { id: 'acasa', label: 'Acasă' },
-      { id: 'materii', label: 'Materii' },
-      { id: 'grile', label: 'Grile', badge: ramase > 0 ? String(ramase) : undefined },
-      { id: 'recapitulare', label: 'Recapitulare', badge: String(SRS_TOTAL) },
-      { id: 'simulari', label: 'Simulări' },
-      { id: 'statistici', label: 'Statistici' },
+      { id: 'acasa', label: 'Acasă', icon: faHouse },
+      { id: 'materii', label: 'Materii', icon: faBookOpen },
+      { id: 'grile', label: 'Grile', icon: faListCheck, badge: ramase > 0 ? String(ramase) : undefined },
+      { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft, badge: String(SRS_TOTAL) },
+      { id: 'simulari', label: 'Simulări', icon: faStopwatch },
+      { id: 'statistici', label: 'Statistici', icon: faChartLine },
     ],
     sec: [
-      { id: 'plan', label: 'Planul meu' },
-      { id: 'notite', label: 'Notițe' },
-      { id: 'setari', label: 'Profil și setări' },
-      ...(role === 'admin' ? [{ id: 'admin' as Screen, label: 'Administrare' }] : []),
+      { id: 'plan', label: 'Planul meu', icon: faCalendarDays },
+      { id: 'notite', label: 'Notițe', icon: faNoteSticky },
+      { id: 'setari', label: 'Profil și setări', icon: faGear },
+      ...(role === 'admin' ? [{ id: 'admin' as Screen, label: 'Administrare', icon: faShieldHalved }] : []),
     ],
   };
 }
@@ -36,6 +52,7 @@ export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
 export function Sidebar() {
   const { screen, go } = useApp();
   const { main, sec } = useNavGroups();
+  const zileRamase = daysUntil(EXAM_DATE);
 
   const renderGroup = (title: string, items: NavEntry[]) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -46,15 +63,13 @@ export function Sidebar() {
           <button
             key={n.id}
             type="button"
+            className="nav-item"
             onClick={() => go(n.id)}
             aria-current={active ? 'page' : undefined}
-            style={navItem(active)}
           >
-            <span aria-hidden="true" style={navDot(active)} />
+            <Icon icon={n.icon} className="nav-item__icon" size={15} />
             {n.label}
-            {n.badge && (
-              <span style={{ marginLeft: 'auto', font: `600 11px ${SANS}`, color: 'var(--acc)' }}>{n.badge}</span>
-            )}
+            {n.badge && <span className="nav-badge">{n.badge}</span>}
           </button>
         );
       })}
@@ -71,7 +86,7 @@ export function Sidebar() {
         padding: '22px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 26,
+        gap: 22,
         position: 'sticky',
         top: 0,
         alignSelf: 'flex-start',
@@ -88,42 +103,67 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 26 }} aria-label="Navigare principală">
+      {/* Numărătoarea e singura cifră reală din bară, deci merită să se vadă. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 7,
+          padding: '11px 12px',
+          borderRadius: 11,
+          background: 'var(--brandS)',
+          border: '1px solid var(--brandS2)',
+        }}
+      >
+        <span className="tabular" style={{ font: `600 19px/1 ${SANS}`, color: 'var(--brand)' }}>
+          {zileRamase}
+        </span>
+        <span style={{ font: `400 11.5px/1.3 ${SANS}`, color: 'var(--fg2)' }}>
+          {zileRamase === 1 ? 'zi până la examen' : 'zile până la examen'}
+        </span>
+      </div>
+
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 22 }} aria-label="Navigare principală">
         {renderGroup('Învățare', main)}
         {renderGroup('Contul meu', sec)}
       </nav>
 
-      <div
-        style={{
-          marginTop: 'auto',
-          borderTop: '1px solid var(--line)',
-          paddingTop: 16,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}
-      >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            background: 'var(--brandS)',
-            color: 'var(--brand)',
-            display: 'grid',
-            placeItems: 'center',
-            font: `600 13px ${SANS}`,
-            flex: '0 0 auto',
-          }}
+      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+        <button
+          type="button"
+          className="user-card"
+          onClick={() => go('setari')}
+          aria-label={`Profilul lui ${STUDENT.name} · deschide setările`}
         >
-          {STUDENT.initials}
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div className="truncate" style={{ font: `600 13px/1.2 ${SANS}` }}>
-            {STUDENT.name}
-          </div>
-          <div style={{ font: `400 11px/1.3 ${SANS}`, color: 'var(--fg3)' }}>{STUDENT.liceu}</div>
-        </div>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: 'var(--brandS)',
+              color: 'var(--brand)',
+              display: 'grid',
+              placeItems: 'center',
+              font: `600 13px ${SANS}`,
+              flex: '0 0 auto',
+            }}
+          >
+            {STUDENT.initials}
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <span className="truncate" style={{ display: 'block', font: `600 13px/1.2 ${SANS}`, color: 'var(--fg)' }}>
+              {STUDENT.name}
+            </span>
+            <span
+              className="truncate"
+              style={{ display: 'block', font: `400 11px/1.3 ${SANS}`, color: 'var(--fg3)' }}
+            >
+              {STUDENT.liceu}
+            </span>
+          </span>
+          <Icon icon={faChevronRight} className="user-card__chevron" size={11} />
+        </button>
       </div>
     </aside>
   );

@@ -74,7 +74,13 @@ Changing theme logic in one place without the other causes a flash-of-wrong-them
 - `src/styles.css` — design tokens as CSS custom properties (ported verbatim from `design/MedBuc.dc.html`), with the dark palette under `[data-theme='dark']`, plus utility classes for anything inline styles cannot express: `.card`, `.btn-primary`, `.row-btn`, `.field`, hover/transition/animation states.
 - `src/lib/ui.ts` — typed inline-style helpers (`SX = CSSProperties`) for layout and typography: `pageTitle`, `eyebrow`, `twoCol(isDesktop)`, `autoGrid`, `stack`, `segButton`, `statusChip`, `pctPill`, and the `SANS`/`SERIF` font constants.
 
-Rule of thumb: **`className` for stateful/interactive styling, inline `style` from `lib/ui.ts` for layout and type.** Never hardcode colors — always reference tokens (`var(--brand)`, `var(--fg2)`, `var(--ok)`, `var(--bad)`) so both themes stay correct.
+Rule of thumb: **`className` for stateful/interactive styling, inline `style` from `lib/ui.ts` for layout and type.** Never hardcode colors — always reference tokens (`var(--brand)`, `var(--fg2)`, `var(--ok)`, `var(--bad)`) so both themes stay correct. The sidebar is the worked example: `.nav-item` lives in CSS because hover and the current-screen indicator (an `::before` bar keyed off `aria-current`) cannot be expressed inline.
+
+### Icons — `src/components/Icon.tsx`
+
+Font Awesome artwork, no Font Awesome runtime. Only `@fortawesome/free-solid-svg-icons` is installed — a package of plain data (`[width, height, , , pathData]`) that tree-shakes to just the icons imported. `Icon` renders that data as an inline `<svg>`.
+
+Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontawesome`: they were tried and cost **~100 KB** of runtime (DOM scanning, layers, masks) to draw static SVGs. With `Icon`, the same icons cost ~6 KB. Do not add the Font Awesome CDN either — it ships the whole set from a third-party origin on the critical path, which is both slower and a GDPR concern for EU users.
 
 ### Responsive layout is JS-driven, not CSS-only
 

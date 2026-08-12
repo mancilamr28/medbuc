@@ -1,12 +1,21 @@
+import {
+  faBookOpen,
+  faChartLine,
+  faHouse,
+  faListCheck,
+  type IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
 import type { Screen } from '../lib/router';
-import { mobileNavDot, mobileNavItem } from '../lib/ui';
+import { mobileNavItem } from '../lib/ui';
 import { useApp } from '../state/AppState';
+import { Icon } from './Icon';
 
-const ITEMS: { id: Screen; label: string }[] = [
-  { id: 'acasa', label: 'Acasă' },
-  { id: 'materii', label: 'Materii' },
-  { id: 'grile', label: 'Grile' },
-  { id: 'statistici', label: 'Progres' },
+/** Aceleași iconițe ca în bara laterală, ca cele două navigații să se recunoască. */
+const ITEMS: { id: Screen; label: string; icon: IconDefinition }[] = [
+  { id: 'acasa', label: 'Acasă', icon: faHouse },
+  { id: 'materii', label: 'Materii', icon: faBookOpen },
+  { id: 'grile', label: 'Grile', icon: faListCheck },
+  { id: 'statistici', label: 'Progres', icon: faChartLine },
 ];
 
 /** Navigația de jos, pe telefon. */
@@ -37,7 +46,7 @@ export function MobileNav() {
             aria-current={active ? 'page' : undefined}
             style={mobileNavItem(active)}
           >
-            <span aria-hidden="true" style={mobileNavDot(active)} />
+            <Icon icon={n.icon} size={16} />
             {n.label}
           </button>
         );
