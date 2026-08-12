@@ -3,7 +3,9 @@ import type { OptionKey, Question } from '../data/questions';
 import { scoreOf } from './useSession';
 
 /** Grile de test: doar câmpurile care contează pentru scor. */
+let n = 0;
 const grila = (correct: OptionKey): Question => ({
+  id: `test-${(n += 1)}`,
   tip: 'simplu',
   materie: 'Biologie',
   cap: '01. Test',

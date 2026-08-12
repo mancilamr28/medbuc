@@ -1,5 +1,12 @@
 import { useCallback, useMemo } from 'react';
-import { QUESTIONS, type OptionKey, type Question } from '../data/questions';
+import {
+  QUESTIONS,
+  isQuestionId,
+  questionById,
+  type OptionKey,
+  type Question,
+  type QuestionId,
+} from '../data/questions';
 import { usePersistentState } from '../lib/hooks';
 
 export type SimPhase = 'config' | 'rulare' | 'rezultat';
@@ -35,8 +42,12 @@ export interface SimRun {
    */
   finishedAt: number | null;
   config: SimConfig;
-  /** Ordinea grilelor: pentru fiecare poziție, indexul din banca de întrebări. */
-  order: number[];
+  /**
+   * Ordinea grilelor: pentru fiecare poziție, id-ul grilei. Id-uri, nu indici —
+   * o lucrare salvată nu are voie să-și schimbe conținutul când se adaugă o
+   * grilă nouă în bancă.
+   */
+  order: QuestionId[];
   qi: number;
   answers: Record<number, OptionKey>;
   marks: Record<number, boolean>;
@@ -55,10 +66,12 @@ export interface SimScore {
 const EMPTY_SCORE: SimScore = { corecte: 0, gresite: 0, neraspunse: 0, total: 0, pct: 0, durataMs: 0 };
 
 /** Grila de pe poziția `i` din lucrare (pozițiile indexează `order`, nu banca). */
-export const questionAtPosition = (run: SimRun, i: number): Question =>
-  QUESTIONS[run.order[i] ?? 0] ?? QUESTIONS[0]!;
+export const questionAtPosition = (run: SimRun, i: number): Question => {
+  const id = run.order[i];
+  return (id !== undefined ? questionById(id) : undefined) ?? QUESTIONS[0]!;
+};
 
-function scoreOf(run: SimRun, finishedAt: number): SimScore {
+export function scoreOf(run: SimRun, finishedAt: number): SimScore {
   let corecte = 0;
   let raspunse = 0;
   run.order.forEach((_, i) => {
@@ -94,7 +107,9 @@ const isSimRun = (v: unknown): v is SimRun => {
     typeof r.qi === 'number' &&
     Array.isArray(r.order) &&
     r.order.length > 0 &&
-    r.order.every((i) => typeof i === 'number' && i >= 0 && i < QUESTIONS.length) &&
+    // Id-uri care chiar există în bancă: o lucrare de la o versiune mai veche
+    // (care salva indici) sau cu grile șterse între timp e respinsă, nu crapă.
+    r.order.every(isQuestionId) &&
     r.qi >= 0 &&
     r.qi < r.order.length &&
     typeof r.config === 'object' &&
@@ -140,15 +155,13 @@ const minutesOf = (durata: string): number => Number.parseInt(durata, 10) || 180
  * Banca de întrebări are șase grile; simularea le repetă până la numărul cerut,
  * respectând ordinea aleasă în configurare.
  */
-function buildOrder(count: number, ordine: string): number[] {
-  const base = QUESTIONS.map((_, i) => i);
-  const grouped = [...base].sort((a, b) => {
-    const qa = QUESTIONS[a]!;
-    const qb = QUESTIONS[b]!;
-    return qa.materie.localeCompare(qb.materie, 'ro') || qa.cap.localeCompare(qb.cap, 'ro');
-  });
+export function buildOrder(count: number, ordine: string): QuestionId[] {
+  const base = QUESTIONS.map((q) => q.id);
+  const grouped = [...QUESTIONS]
+    .sort((a, b) => a.materie.localeCompare(b.materie, 'ro') || a.cap.localeCompare(b.cap, 'ro'))
+    .map((q) => q.id);
 
-  const order: number[] = [];
+  const order: QuestionId[] = [];
   for (let i = 0; i < count; i += 1) {
     const pool = ordine === 'Grupate pe materie' ? grouped : base;
     order.push(pool[i % pool.length]!);
@@ -221,10 +234,7 @@ export function useSimulare(now: number): Simulare {
 
   const total = run ? run.order.length : Number.parseInt(config.nr, 10) || 100;
   const qi = run?.qi ?? 0;
-  const question = useMemo(() => {
-    const index = run ? (run.order[qi] ?? 0) : 0;
-    return QUESTIONS[index] ?? QUESTIONS[0]!;
-  }, [qi, run]);
+  const question = useMemo(() => (run ? questionAtPosition(run, qi) : QUESTIONS[0]!), [qi, run]);
 
   const goTo = useCallback(
     (index: number) => patch((prev) => ({ ...prev, qi: Math.max(0, Math.min(index, prev.order.length - 1)) })),
