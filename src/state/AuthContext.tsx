@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { mesajEroare } from './authErrors';
 
 export type AppRole = 'elev' | 'admin';
 
@@ -31,20 +32,6 @@ interface AuthValue {
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
-
-/** Traduce mesajele de eroare ale Supabase — vin în engleză, interfața e în română. */
-function mesajEroare(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err);
-  if (raw.includes('Invalid login credentials')) return 'Email sau parolă greșită.';
-  if (raw.includes('User already registered')) return 'Există deja un cont cu acest email.';
-  if (raw.includes('Email not confirmed')) return 'Confirmă mai întâi adresa de email — verifică inboxul.';
-  if (raw.includes('Password should be at least')) return 'Parola trebuie să aibă cel puțin 6 caractere.';
-  if (raw.toLowerCase().includes('invalid') && raw.toLowerCase().includes('email')) return 'Adresa de email nu e validă.';
-  if (raw.includes('rate limit') || raw.includes('security purposes')) {
-    return 'Prea multe încercări la rând — mai așteaptă puțin.';
-  }
-  return 'A apărut o eroare. Încearcă din nou.';
-}
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
