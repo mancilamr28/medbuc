@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { migrateNoteKeys } from './lib/migrations';
 import { initSentry } from './lib/sentry';
 import { AppProvider } from './state/AppState';
+import { AuthProvider } from './state/AuthContext';
 import { ToastProvider } from './state/ToastContext';
 import './styles.css';
 
@@ -21,9 +22,11 @@ createRoot(root).render(
   <StrictMode>
     <ErrorBoundary>
       <ToastProvider>
-        <AppProvider>
-          <App />
-        </AppProvider>
+        <AuthProvider>
+          <AppProvider>
+            <App />
+          </AppProvider>
+        </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,

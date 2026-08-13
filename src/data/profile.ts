@@ -7,29 +7,15 @@
  * schimbau oricâte grile ai fi rezolvat. Au fost scoase. Se întorc când există
  * `attempts` din care să fie calculate; până atunci ecranele arată stări goale.
  *
- * Ce a rămas e ori configurație (data examenului, punctajul țintă), ori
- * identitatea contului — un profil provizoriu, până la autentificarea reală.
+ * Ce a rămas e configurație: data examenului, punctajul țintă. Identitatea
+ * contului (nume, email, rol) vine acum din `profiles`, prin `useAuth()` —
+ * vezi `src/state/AuthContext.tsx` — nu mai are ce sta aici ca literal.
  */
 
 /** Sesiunea de admitere pentru care se pregătește contul. */
 export const EXAM_DATE = new Date(2027, 6, 25); // 25 iulie 2027
 export const EXAM_DATE_LABEL = '25 iulie 2027';
 export const EXAM_DATE_SHORT = '25 iul 2027';
-
-/** Profil provizoriu: se completează din cont după autentificare. */
-export const STUDENT = {
-  name: 'Andrei Popescu',
-  initials: 'AP',
-  firstName: 'Andrei',
-  liceu: 'Colegiul „Sf. Sava”',
-};
-
-export const CONT_ROWS: { label: string; value: string }[] = [
-  { label: 'Nume', value: 'Andrei Popescu' },
-  { label: 'E-mail', value: 'andrei.popescu@gmail.com' },
-  { label: 'Liceu', value: 'Colegiul Național „Sf. Sava”, București' },
-  { label: 'Clasa', value: 'a XII-a' },
-];
 
 export const EXAMEN_ROWS: { label: string; value: string }[] = [
   { label: 'Facultate', value: 'UMFCD „Carol Davila”, București' },

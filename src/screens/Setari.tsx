@@ -1,6 +1,8 @@
-import { CONT_ROWS, EXAMEN_ROWS, STUDENT } from '../data/profile';
+import { EXAMEN_ROWS } from '../data/profile';
+import { initialeDin } from '../lib/text';
 import { SANS, SERIF, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/AppState';
+import { useAuth } from '../state/AuthContext';
 
 function Rows({ rows }: { rows: { label: string; value: string }[] }) {
   return (
@@ -41,6 +43,16 @@ function Rows({ rows }: { rows: { label: string; value: string }[] }) {
 
 export function Setari() {
   const { theme, toggleTheme } = useApp();
+  const { user, profile, signOut } = useAuth();
+
+  const nume = profile?.fullName || 'Fără nume completat';
+  const email = user?.email ?? '';
+  const initiale = initialeDin(profile?.fullName ?? null, email || '?');
+
+  const contRows: { label: string; value: string }[] = [
+    { label: 'Nume', value: profile?.fullName || '—' },
+    { label: 'E-mail', value: email },
+  ];
 
   return (
     <div className="screen" style={{ maxWidth: 840 }}>
@@ -64,19 +76,22 @@ export function Setari() {
                 font: `600 20px ${SANS}`,
               }}
             >
-              {STUDENT.initials}
+              {initiale}
             </div>
             <div style={{ flex: 1, minWidth: 150 }}>
-              <div style={{ font: `400 21px/1.2 ${SERIF}` }}>{STUDENT.name}</div>
-              <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
-                {STUDENT.liceu}
-              </div>
+              <div style={{ font: `400 21px/1.2 ${SERIF}` }}>{nume}</div>
+              <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>{email}</div>
             </div>
-            <button type="button" className="btn-ghost" style={{ padding: '10px 15px', font: `500 13px ${SANS}` }}>
-              Schimbă fotografia
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => void signOut()}
+              style={{ padding: '10px 15px', font: `500 13px ${SANS}` }}
+            >
+              Deconectare
             </button>
           </div>
-          <Rows rows={CONT_ROWS} />
+          <Rows rows={contRows} />
         </div>
 
         <div className="card" style={{ padding: 22 }}>

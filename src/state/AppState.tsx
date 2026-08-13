@@ -7,7 +7,6 @@ import { useSession, type Session } from './useSession';
 import { useSimulare, type Simulare } from './useSimulare';
 
 export type Theme = 'light' | 'dark';
-export type Role = 'elev' | 'admin';
 
 
 export interface AdminDraft {
@@ -37,8 +36,6 @@ interface AppValue {
   toggleTheme: () => void;
   screen: Screen;
   go: (screen: Screen) => void;
-  role: Role;
-  setRole: (role: Role) => void;
   materie: MaterieId;
   setMaterie: (id: MaterieId) => void;
   admin: AdminDraft;
@@ -57,7 +54,6 @@ const readInitialTheme = (): Theme => {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [screen, go] = useHashRoute();
   const [theme, setTheme] = usePersistentState<Theme>('medbuc.theme', readInitialTheme());
-  const [role, setRole] = useState<Role>('admin');
   const [materie, setMaterie] = useState<MaterieId>('bio');
   const [admin, setAdminState] = useState<AdminDraft>(DEFAULT_ADMIN_DRAFT);
 
@@ -93,8 +89,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleTheme,
       screen,
       go,
-      role,
-      setRole,
       materie,
       setMaterie,
       admin,
@@ -102,7 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       session,
       sim,
     }),
-    [admin, go, materie, role, screen, session, setAdmin, sim, theme, toggleTheme],
+    [admin, go, materie, screen, session, setAdmin, sim, theme, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
