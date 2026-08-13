@@ -2,7 +2,14 @@ import { useEffect } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
-import { OPTION_KEYS, QUESTIONS, tipLabel, type OptionKey } from '../data/questions';
+import {
+  OPTION_KEYS,
+  QUESTIONS,
+  questionCap,
+  questionMaterie,
+  tipLabel,
+  type OptionKey,
+} from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
@@ -63,7 +70,7 @@ function GrileRun() {
           ← Ieși din sesiune
         </button>
         <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ font: `600 13.5px/1.2 ${SANS}` }}>Sesiune rapidă · {question.materie}</div>
+          <div style={{ font: `600 13.5px/1.2 ${SANS}` }}>Sesiune rapidă · {questionMaterie(question)}</div>
           <div style={{ marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
             Capitole mixte · fără limită de timp
           </div>
@@ -149,7 +156,7 @@ function GrileRun() {
                 {tipLabel(question.tip)}
               </span>
               <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
-                {question.materie} · {question.cap}
+                {questionMaterie(question)} · {questionCap(question)}
               </span>
               <button
                 type="button"
@@ -459,7 +466,8 @@ function GrileRezultat() {
 /** Coloana de context: navigatorul sesiunii, notița pe capitol și cifrele capitolului. */
 function ContextColumn() {
   const { session } = useApp();
-  const [note, setNote] = usePersistentState<string>(`medbuc.note.${session.question.cap}`, '');
+  // Cheia ține de id-ul capitolului: o redenumire nu mai orfanizează notița.
+  const [note, setNote] = usePersistentState<string>(`medbuc.note.${session.question.capId}`, '');
 
   return (
     <div style={{ display: 'grid', gap: 16, alignContent: 'start', minWidth: 0 }}>

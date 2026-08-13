@@ -53,11 +53,11 @@ The simulation clock only ticks while its screen is open — `AppState.tsx` pass
 
 ### Persistence — `usePersistentState` in `src/lib/hooks.ts`
 
-The only way state should touch `localStorage`. Keys are namespaced `medbuc.*` (`medbuc.theme`, `medbuc.setari`, `medbuc.sim.run`, and dynamic ones like `medbuc.note.${cap}`). It swallows storage errors, so private-mode/quota failures degrade to in-memory state instead of throwing.
+The only way state should touch `localStorage`. Keys are namespaced `medbuc.*` (`medbuc.theme`, `medbuc.setari`, `medbuc.sim.run`, and dynamic ones like `medbuc.note.${capId}`). It swallows storage errors, so private-mode/quota failures degrade to in-memory state instead of throwing.
 
 Two behaviours to preserve:
 
-- **The key may change while mounted** (`medbuc.note.${cap}` does exactly that). The hook stores `{ key, value }` together and re-reads synchronously when the key changes. Without this, the previous chapter's note stays on screen and the first keystroke overwrites the new chapter's saved note.
+- **The key may change while mounted** (`medbuc.note.${capId}` does exactly that). The hook stores `{ key, value }` together and re-reads synchronously when the key changes. Without this, the previous chapter's note stays on screen and the first keystroke overwrites the new chapter's saved note.
 - **An optional third argument is a type guard** (`Validator<T>`). Anything stored that fails it — an older shape, a hand-edited value — is dropped *and removed from storage*, so a bad value cannot break the app on every reload. `useSimulare` passes `isSimRun` for `medbuc.sim.run`, the one payload complex enough to crash rendering. Add a validator whenever a persisted shape is more than a primitive.
 
 `ErrorBoundary` (`src/components/ErrorBoundary.tsx`) wraps the whole app in `main.tsx` and offers "Șterge datele locale", which clears every `medbuc.*` key — the escape hatch for any persisted state that still manages to break rendering.
@@ -91,6 +91,12 @@ Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontaw
 Typed constants standing in for a future API. `chapters.ts` (`MATERII` keyed by `MaterieId`), `questions.ts` (`QUESTIONS`, `OptionKey`), `profile.ts` (account/exam constants). `EXAM_DATE` in `profile.ts` drives every countdown via `daysUntil()` in `src/lib/time.ts` — dates are computed, never hardcoded in screens.
 
 **Questions have a stable `id`** (`QuestionId`, e.g. `bio-nervos-01`), and anything persisted or passed around must reference that id — never the array position. `QUESTION_BY_ID` / `questionById()` resolve it and `isQuestionId()` validates it. This is why `SimRun.order` stores ids: with positions, inserting one question into the middle of the bank silently rewrote the content of every saved paper. `QUESTION_BY_ID` is built at the bottom of the file, after `QUESTIONS` — building it earlier is a temporal-dead-zone crash at import time. Ids must be unique; a duplicate throws on module load rather than making a question unreachable.
+
+**Chapters have the same treatment** (`ChapterId`, e.g. `bio-nervos`), for two reasons `nr` could not cover: under "Subiecte anterioare" `nr` is a *year* and 2026 holds two sessions, so `nr` repeats; and the note key used to embed the chapter *label* (`medbuc.note.03. Sistemul nervos`), so fixing a typo in a title orphaned the student's note. `CHAPTER_BY_ID` / `chapterById()` / `isChapterId()` mirror the question helpers and are likewise built after `MATERII`. Every `Chapter` also carries its `materie`, so a chapter id alone resolves to both the label (`chapterLabelById`) and the subject name (`materieNameOf`).
+
+**A question stores only `capId`** — its subject and chapter label are derived through `questionMaterie()` / `questionCap()` rather than duplicated as free text, which is what let a question claim a chapter that did not exist.
+
+Renaming a persisted key means the old one must be moved, not abandoned: `src/lib/migrations.ts` runs once from `main.tsx`, before the first render. `noteKeyMoves()` is the pure part and is tested; it never overwrites a newer note and leaves unrecognised keys alone rather than deleting someone's text.
 
 ## TypeScript constraints that bite
 

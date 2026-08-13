@@ -24,7 +24,7 @@ export function Materii() {
   const chapters = mat.list.filter((c: Chapter) => {
     if (filters.neterminate && c.done >= c.total) return false;
     if (filters.greseli && (c.done === 0 || c.pct === 100)) return false;
-    if (filters.bookmark && !isSaved(materie, c)) return false;
+    if (filters.bookmark && !isSaved(c)) return false;
     return true;
   });
 
@@ -130,7 +130,7 @@ export function Materii() {
 
             {chapters.map((c) => (
               <div
-                key={`${c.nr}-${c.name}`}
+                key={c.id}
                 className="list-row"
                 style={{
                   display: 'flex',

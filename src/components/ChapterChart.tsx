@@ -12,7 +12,7 @@ export function ChapterChart() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingBottom: 14 }}>
       {rows.map((c) => (
-        <div key={c.nr} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span
             className="truncate"
             style={{ flex: '0 0 auto', width: 168, font: `400 12.5px ${SANS}`, color: 'var(--fg2)' }}

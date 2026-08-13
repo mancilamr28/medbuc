@@ -3,6 +3,8 @@ import {
   QUESTIONS,
   isQuestionId,
   questionById,
+  questionCap,
+  questionMaterie,
   type OptionKey,
   type Question,
   type QuestionId,
@@ -158,7 +160,11 @@ const minutesOf = (durata: string): number => Number.parseInt(durata, 10) || 180
 export function buildOrder(count: number, ordine: string): QuestionId[] {
   const base = QUESTIONS.map((q) => q.id);
   const grouped = [...QUESTIONS]
-    .sort((a, b) => a.materie.localeCompare(b.materie, 'ro') || a.cap.localeCompare(b.cap, 'ro'))
+    .sort(
+      (a, b) =>
+        questionMaterie(a).localeCompare(questionMaterie(b), 'ro') ||
+        questionCap(a).localeCompare(questionCap(b), 'ro'),
+    )
     .map((q) => q.id);
 
   const order: QuestionId[] = [];
