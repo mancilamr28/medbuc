@@ -1,8 +1,21 @@
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const fisier = (cale: string) => readFileSync(resolve(process.cwd(), cale), 'utf8');
+
+/**
+ * Migrările, citite din director și sortate după nume.
+ *
+ * Erau enumerate una câte una aici. Cu lista scrisă de mână, o migrare nouă se
+ * aplică pe proiectul real dar nu și în teste, iar suita rămâne verde
+ * demonstrând altceva decât ce rulează în producție.
+ */
+const migrari = (): string[] =>
+  readdirSync(resolve(process.cwd(), 'supabase/migrations'))
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((f) => fisier(`supabase/migrations/${f}`));
 
 /**
  * Bucățile pe care le pune Supabase și de care depind migrările noastre:
@@ -57,8 +70,7 @@ export async function bazaDeTest(options: { cuSeed?: boolean } = {}): Promise<Ba
   const db = await PGlite.create();
 
   await db.exec(SUPABASE_STUB);
-  await db.exec(fisier('supabase/migrations/0001_schema.sql'));
-  await db.exec(fisier('supabase/migrations/0002_rls.sql'));
+  for (const sql of migrari()) await db.exec(sql);
   if (options.cuSeed !== false) await db.exec(fisier('supabase/seed.sql'));
 
   /**

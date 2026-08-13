@@ -2,7 +2,7 @@
 
 Schema pentru backend-ul MedBuc, scrisă **înainte** de a exista proiectul Supabase, ca modelul să fie gândit direct în SQL și nu tradus mai târziu din tipuri TypeScript.
 
-Nimic din ce e aici nu e conectat încă la aplicație. Ecranele citesc în continuare din `src/data/`. Pasul următor (Faza 3 din plan) leagă clientul de baza reală.
+Proiectul Supabase există acum (regiune UE) și are schema, politicile și seed-ul aplicate. Din aplicație e legată deocamdată doar autentificarea: `AuthContext` citește sesiunea și `profiles.role` din bază. Ecranele de conținut citesc în continuare din `src/data/` — restul Fazei 3.
 
 ## Fișiere
 
@@ -10,6 +10,7 @@ Nimic din ce e aici nu e conectat încă la aplicație. Ecranele citesc în cont
 |---|---|
 | `migrations/0001_schema.sql` | tabelele, tipurile, constrângerile, indexurile |
 | `migrations/0002_rls.sql` | Row Level Security: cine vede și cine scrie ce |
+| `migrations/0003_functii_private.sql` | funcțiile mutate din `public`, cu drepturi și `search_path` explicite |
 | `seed.sql` | **generat** — materiile, capitolele și grilele din `src/data/` |
 | `harness.ts` | pornește un Postgres gol și aplică tot, pentru teste |
 | `schema.test.ts`, `rls.test.ts` | verifică schema și politicile prin rulare |
@@ -36,7 +37,9 @@ npx vitest run --project unit supabase
 
 Asta contează mai ales pentru RLS: **o politică greșită nu dă eroare, ci arată datele altcuiva.** Un test care doar citește fișierul de politici n-ar prinde nimic, așa că fiecare interogare trece prin rolul `authenticated`, cu un id de utilizator pus în cerere, exact cum ajunge o interogare din browser.
 
-Politicile au fost verificate și invers: slăbind `notes_proprii` la `using (true)`, testele de izolare cad — deci chiar măsoară ceva.
+Politicile au fost verificate și invers: slăbind `notes_proprii` la `using (true)`, testele de izolare cad — deci chiar măsoară ceva. La fel și pentru funcții: scoțând migrarea 0003, cele patru teste din `describe('funcțiile')` cad; scoțând doar `grant execute ... on private.is_admin()`, cad nouă teste de bibliotecă cu `permission denied for function is_admin` — acordarea aceea e portantă, nu decor.
+
+`harness.ts` citește migrările din director și le sortează după nume. Erau enumerate pe rând, iar o migrare nouă s-ar fi aplicat pe proiectul real fără să intre în teste — suita ar fi rămas verde demonstrând altceva decât ce rulează în producție.
 
 `harness.ts` construiește bucățile pe care le pune Supabase și de care depind migrările (schema `auth`, `auth.uid()`, rolurile `anon` și `authenticated`). Sunt puține și ușor de comparat cu documentația — dacă se abat de la ce face Supabase, testele mint.
 
@@ -52,9 +55,14 @@ Politicile au fost verificate și invers: slăbind `notes_proprii` la `using (tr
 
 **Elevii nu văd ciornele.** Grilele au `status`, iar politica de citire lasă la vedere doar `publicata` — pentru toți în afară de administratori.
 
+**Funcțiile stau în schema `private`, nu în `public`.** PostgREST publică `public`, deci orice funcție de acolo e apelabilă din browser la `/rest/v1/rpc/<nume>` — inclusiv cele `security definer`, care rulează cu drepturile proprietarului. Linterul Supabase a semnalat toate trei; `private` nu e publicată, iar `execute` e acordat doar lui `is_admin()`, singura chemată din expresiile politicilor. Cele de declanșator rămân fără drept pentru oricine, fiindcă execuția lor e verificată la `create trigger`, nu la fiecare declanșare.
+
+Aici e și greșeala de reținut: 0002 avea `revoke execute on function public.is_admin() from anon` și nu făcea nimic. Dreptul nu venea de la `anon`, ci de la `public`, pseudo-rolul din care moștenesc toate rolurile — **un `revoke` de la un rol anume nu înseamnă nimic cât timp `public` mai are dreptul.** Testele din `rls.test.ts` întreabă acum `has_function_privilege`, adică dreptul efectiv, nu textul migrării.
+
+**Fiecare funcție are `search_path = ''`.** Fără o cale fixă, cine poate crea obiecte într-o schemă din calea de căutare poate umbri o funcție de sistem, iar un corp `security definer` o execută cu drepturi de proprietar. Corpurile califică deja fiecare referință cu schema ei.
+
 ## Ce lipsește, intenționat
 
-- Proiectul Supabase și cheile — le creezi tu, cu regiune în UE.
-- Legarea clientului de bază, cu stări de încărcare și de eroare.
+- Legarea ecranelor de conținut la bază, cu stări de încărcare și de eroare.
 - Migrarea datelor din `localStorage` la primul login.
 - Validarea răspunsurilor de la API. Se face când există un API: o schemă scrisă acum, pe ghicite, s-ar rescrie la primul contact cu clientul real.

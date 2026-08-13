@@ -162,6 +162,64 @@ describe('profilul', () => {
   });
 });
 
+/**
+ * Funcțiile, după semnalările linterului Supabase.
+ *
+ * Aceeași problemă ca la RLS: nimic nu dă eroare. O funcție `security definer`
+ * lăsată în `public` se publică singură la `/rest/v1/rpc/<nume>` și rulează cu
+ * drepturi de proprietar pentru oricine are cheia din browser — iar aplicația
+ * merge la fel de bine, motiv pentru care a stat așa până a semnalat linterul.
+ */
+describe('funcțiile', () => {
+  it('nu stau în schema pe care o publică PostgREST', async () => {
+    const r = await baza.db.query<{ proname: string }>(`
+      select p.proname
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prosecdef
+    `);
+    expect(r.rows).toHaveLength(0);
+  });
+
+  /**
+   * `revoke ... from anon` singur nu face nimic cât timp `public` are dreptul,
+   * fiindcă `anon` moștenește de acolo — exact greșeala din 0002. De aceea se
+   * întreabă aici drepturile efective, nu textul migrării.
+   */
+  it('de declanșator nu sunt apelabile de nimeni din browser', async () => {
+    const r = await baza.db.query<{ f: string; rol: string; poate: boolean }>(`
+      select f, rol, has_function_privilege(rol, f, 'execute') as poate
+      from unnest(array[
+        'private.handle_new_user()',
+        'private.protect_role()',
+        'private.touch_updated_at()'
+      ]) as f, unnest(array['anon', 'authenticated']) as rol
+    `);
+
+    expect(r.rows).toHaveLength(6);
+    expect(r.rows.filter((x) => x.poate)).toEqual([]);
+  });
+
+  it('is_admin nu e apelabilă de un vizitator neautentificat', async () => {
+    const r = await baza.db.query<{ poate: boolean }>(
+      `select has_function_privilege('anon', 'private.is_admin()', 'execute') as poate`,
+    );
+    expect(r.rows[0]!.poate).toBe(false);
+  });
+
+  it('au toate un search_path fix', async () => {
+    const r = await baza.db.query<{ proname: string; proconfig: string[] | null }>(`
+      select p.proname, p.proconfig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'private'
+    `);
+
+    expect(r.rows).toHaveLength(4);
+    for (const f of r.rows) {
+      expect(f.proconfig?.some((c) => c.startsWith('search_path='))).toBe(true);
+    }
+  });
+});
+
 describe('biblioteca', () => {
   it('e citibilă de orice elev autentificat', async () => {
     const r = await baza.caUtilizator(ana, () =>
