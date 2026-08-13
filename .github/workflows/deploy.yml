@@ -29,6 +29,10 @@ jobs:
           # Opțional: fără el, build-ul reușește la fel, doar fără raportare
           # de erori pe site-ul publicat. Vezi src/lib/sentry.ts.
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          # Obligatorii de la Faza 3 încolo — src/lib/supabase.ts aruncă la
+          # încărcare fără ele, spre deosebire de DSN-ul de mai sus.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
