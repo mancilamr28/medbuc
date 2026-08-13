@@ -1,5 +1,3 @@
-import { supabase } from './supabase';
-
 /**
  * Exportul datelor personale — dreptul GDPR de acces.
  *
@@ -50,8 +48,18 @@ export const cheiLocale = (storage: Storage): Record<string, string> => {
   return out;
 };
 
-/** Strânge din bază tot ce ține de contul curent. */
+/**
+ * Strânge din bază tot ce ține de contul curent.
+ *
+ * Clientul Supabase se cere aici, nu sus de tot, fiindcă `lib/supabase` aruncă la
+ * încărcare când lipsesc variabilele de mediu. Cu importul static, `numeFisier` și
+ * `cheiLocale` — funcții pure, fără nicio treabă cu rețeaua — nu se puteau testa
+ * fără chei: suita trecea local, unde există `.env.local`, și cădea în CI, unde nu.
+ * Același tipar ca la `lib/sentry.ts`, din același motiv.
+ */
 export async function adunaDatele(userId: string, email: string | null): Promise<DateExportate> {
+  const { supabase } = await import('./supabase');
+
   const [profil, sesiuni, simulari, raspunsuri, notite] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabase.from('sessions').select('*'),
