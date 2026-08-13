@@ -9,8 +9,6 @@ import { useSimulare, type Simulare } from './useSimulare';
 export type Theme = 'light' | 'dark';
 export type Role = 'elev' | 'admin';
 
-export type FilterId = 'neterminate' | 'greseli' | 'bookmark' | 'verificate';
-export type SetareId = 'remindere' | 'recap' | 'simulari' | 'email';
 
 export interface AdminDraft {
   materie: string;
@@ -43,10 +41,6 @@ interface AppValue {
   setRole: (role: Role) => void;
   materie: MaterieId;
   setMaterie: (id: MaterieId) => void;
-  filters: Record<FilterId, boolean>;
-  toggleFilter: (id: FilterId) => void;
-  setari: Record<SetareId, boolean>;
-  toggleSetare: (id: SetareId) => void;
   admin: AdminDraft;
   setAdmin: <K extends keyof AdminDraft>(key: K, value: AdminDraft[K]) => void;
   session: Session;
@@ -65,18 +59,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = usePersistentState<Theme>('medbuc.theme', readInitialTheme());
   const [role, setRole] = useState<Role>('admin');
   const [materie, setMaterie] = useState<MaterieId>('bio');
-  const [filters, setFilters] = useState<Record<FilterId, boolean>>({
-    neterminate: true,
-    greseli: false,
-    bookmark: false,
-    verificate: false,
-  });
-  const [setari, setSetari] = usePersistentState<Record<SetareId, boolean>>('medbuc.setari', {
-    remindere: true,
-    recap: true,
-    simulari: false,
-    email: false,
-  });
   const [admin, setAdminState] = useState<AdminDraft>(DEFAULT_ADMIN_DRAFT);
 
   const session = useSession();
@@ -91,16 +73,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, [setTheme]);
-
-  const toggleFilter = useCallback(
-    (id: FilterId) => setFilters((prev) => ({ ...prev, [id]: !prev[id] })),
-    [],
-  );
-
-  const toggleSetare = useCallback(
-    (id: SetareId) => setSetari((prev) => ({ ...prev, [id]: !prev[id] })),
-    [setSetari],
-  );
 
   /** Schimbarea materiei duce capitolul pe prima poziție din noua listă. */
   const setAdmin = useCallback(<K extends keyof AdminDraft>(key: K, value: AdminDraft[K]) => {
@@ -125,16 +97,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setRole,
       materie,
       setMaterie,
-      filters,
-      toggleFilter,
-      setari,
-      toggleSetare,
       admin,
       setAdmin,
       session,
       sim,
     }),
-    [admin, filters, go, materie, role, screen, session, setAdmin, setari, sim, theme, toggleFilter, toggleSetare, toggleTheme],
+    [admin, go, materie, role, screen, session, setAdmin, sim, theme, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -33,6 +33,8 @@ Hash-based, no router dependency. The `SCREENS` tuple is the single source of tr
 - `SCREENS` — every valid `#/route`; an unknown hash falls back to `acasa`.
 - `BUILT_SCREENS` — screens with a real implementation. Anything in `SCREENS` but *not* in `BUILT_SCREENS` automatically renders the `InLucru` ("work in progress") placeholder, labelled from `SCREEN_TITLES`.
 
+`plan` sits in `SCREENS` but not in `BUILT_SCREENS` on purpose: the screen existed but was drawn entirely from fixed data — weeks hardcoded to August–September and "ai rămas în urmă cu 1 zi", against an exam in July 2027. It is a placeholder until a plan can be generated from a real study pace.
+
 **Adding a screen requires coordinated edits**: add the id to `SCREENS`, add it to `BUILT_SCREENS`, add a `case` in `Content()` in `src/App.tsx`, and add nav entries in `src/components/Sidebar.tsx` and `src/components/MobileNav.tsx`.
 
 ### Global state — `src/state/AppState.tsx`
@@ -89,6 +91,12 @@ Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontaw
 ### Data layer — `src/data/`
 
 Typed constants standing in for a future API. `chapters.ts` (`MATERII` keyed by `MaterieId`), `questions.ts` (`QUESTIONS`, `OptionKey`), `profile.ts` (account/exam constants). `EXAM_DATE` in `profile.ts` drives every countdown via `daysUntil()` in `src/lib/time.ts` — dates are computed, never hardcoded in screens.
+
+**No displayed number may be hand-written.** The data files used to carry a full fictional student — a 22-day streak, "1 407 grile rezolvate", per-chapter `done`/`pct`, ten months of score history, an exam history of papers never sat, an admin queue of 37 pending questions. None of it was computed, so none of it moved when you actually answered a question. It is gone, and the rule that replaced it is: **if a figure cannot be derived from what the student did or from the bank itself, the screen shows an empty state instead** (`src/components/EmptyState.tsx`, which says what to do to make data appear).
+
+Concretely: `Chapter` carries no `total` — `chapterQuestionCount()` / `materieQuestionCount()` in `questions.ts` count the real bank, so the figure grows only as content is written and a chapter with nothing in it disables its own "Exersează" button. `ScoreChart` and `ChapterChart` take their data as props and render an empty state when there is none, rather than owning fabricated constants. When adding a screen, derive or omit — do not seed plausible-looking demo values, and do not restore a `pct` field to make a chart look fuller.
+
+Counted figures still need Romanian grammar: `numar()` in `src/lib/text.ts` handles the `de` rule ("6 grile" but "20 de grile"). Use it instead of interpolating a bare number next to a noun.
 
 **Questions have a stable `id`** (`QuestionId`, e.g. `bio-nervos-01`), and anything persisted or passed around must reference that id — never the array position. `QUESTION_BY_ID` / `questionById()` resolve it and `isQuestionId()` validates it. This is why `SimRun.order` stores ids: with positions, inserting one question into the middle of the bank silently rewrote the content of every saved paper. `QUESTION_BY_ID` is built at the bottom of the file, after `QUESTIONS` — building it earlier is a temporal-dead-zone crash at import time. Ids must be unique; a duplicate throws on module load rather than making a question unreachable.
 

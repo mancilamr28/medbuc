@@ -12,7 +12,7 @@ import {
   faStopwatch,
 } from '@fortawesome/free-solid-svg-icons';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
-import { EXAM_DATE, EXAM_DATE_LABEL, SRS_TOTAL, STUDENT } from '../data/profile';
+import { EXAM_DATE, EXAM_DATE_LABEL, STUDENT } from '../data/profile';
 import { daysUntil } from '../lib/time';
 import { SANS, eyebrow } from '../lib/ui';
 import type { Screen } from '../lib/router';
@@ -36,7 +36,7 @@ export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
       { id: 'acasa', label: 'Acasă', icon: faHouse },
       { id: 'materii', label: 'Materii', icon: faBookOpen },
       { id: 'grile', label: 'Grile', icon: faListCheck, badge: ramase > 0 ? String(ramase) : undefined },
-      { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft, badge: String(SRS_TOTAL) },
+      { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft },
       { id: 'simulari', label: 'Simulări', icon: faStopwatch },
       { id: 'statistici', label: 'Statistici', icon: faChartLine },
     ],

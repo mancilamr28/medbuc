@@ -1,4 +1,10 @@
-import { chapterLabelById, materieNameOf, type ChapterId } from './chapters';
+import {
+  chapterById,
+  chapterLabelById,
+  materieNameOf,
+  type ChapterId,
+  type MaterieId,
+} from './chapters';
 
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 export type QuestionType = 'simplu' | 'grupat';
@@ -207,3 +213,22 @@ export const questionById = (id: QuestionId): Question | undefined => QUESTION_B
 /** Un id care chiar există în bancă — folosit la validarea lucrărilor salvate. */
 export const isQuestionId = (v: unknown): v is QuestionId =>
   typeof v === 'string' && QUESTION_BY_ID.has(v);
+
+/**
+ * Câte grile există pe fiecare capitol.
+ *
+ * Capitolele purtau până acum un `total` scris de mână — „60 de grile" la un
+ * capitol în care nu era scrisă niciuna. Numărul se numără acum din bancă, deci
+ * nu poate să mintă: crește exact pe măsură ce se adaugă conținut.
+ */
+export const QUESTION_COUNT_BY_CHAPTER: ReadonlyMap<ChapterId, number> = (() => {
+  const map = new Map<ChapterId, number>();
+  for (const q of QUESTIONS) map.set(q.capId, (map.get(q.capId) ?? 0) + 1);
+  return map;
+})();
+
+export const chapterQuestionCount = (id: ChapterId): number => QUESTION_COUNT_BY_CHAPTER.get(id) ?? 0;
+
+/** Câte grile are o materie, adunate din capitolele ei. */
+export const materieQuestionCount = (materie: MaterieId): number =>
+  QUESTIONS.reduce((n, q) => (chapterById(q.capId)?.materie === materie ? n + 1 : n), 0);
