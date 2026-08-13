@@ -1,41 +1,125 @@
+import { useState } from 'react';
 import { EXAMEN_ROWS } from '../data/profile';
+import { adunaDatele, descarca, numeFisier } from '../lib/exportDate';
 import { initialeDin } from '../lib/text';
 import { SANS, SERIF, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/AppState';
 import { useAuth } from '../state/AuthContext';
+import { useToast } from '../state/ToastContext';
 
-function Rows({ rows }: { rows: { label: string; value: string }[] }) {
+/**
+ * Ce se poate schimba dintr-un rând. Fără `edit`, rândul e doar de citit și **nu
+ * primește buton** — asta e toată diferența față de versiunea de dinainte, unde
+ * fiecare rând avea „Modifică" și niciunul nu făcea nimic, inclusiv cele care nu
+ * aveau ce schimba (facultatea și probele sunt fixe pentru produsul ăsta).
+ */
+interface Editare {
+  tip: 'text' | 'email';
+  initial: string;
+  placeholder?: string;
+  /** Întoarce mesajul de eroare, sau `null` la reușită. */
+  salveaza: (valoare: string) => Promise<string | null>;
+  succes: string;
+}
+
+interface Rand {
+  label: string;
+  value: string;
+  edit?: Editare;
+}
+
+function RandDate({ rand }: { rand: Rand }) {
+  const { notify } = useToast();
+  const [deschis, setDeschis] = useState(false);
+  const [valoare, setValoare] = useState(rand.edit?.initial ?? '');
+  const [seSalveaza, setSeSalveaza] = useState(false);
+
+  const incepe = () => {
+    setValoare(rand.edit?.initial ?? '');
+    setDeschis(true);
+  };
+
+  const trimite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rand.edit || seSalveaza) return;
+    setSeSalveaza(true);
+    const eroare = await rand.edit.salveaza(valoare);
+    setSeSalveaza(false);
+    if (eroare) {
+      notify('eroare', eroare);
+      return;
+    }
+    notify('succes', rand.edit.succes);
+    setDeschis(false);
+  };
+
+  if (deschis && rand.edit) {
+    return (
+      <form
+        onSubmit={(e) => void trimite(e)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}
+      >
+        <label
+          htmlFor={`camp-${rand.label}`}
+          style={{ flex: '0 0 auto', width: 150, font: `500 13px ${SANS}`, color: 'var(--fg3)' }}
+        >
+          {rand.label}
+        </label>
+        <input
+          id={`camp-${rand.label}`}
+          className="field"
+          type={rand.edit.tip}
+          value={valoare}
+          autoFocus
+          placeholder={rand.edit.placeholder}
+          onChange={(e) => setValoare(e.target.value)}
+          style={{ flex: 1, minWidth: 160, padding: '9px 11px', font: `400 13.5px ${SANS}` }}
+        />
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => setDeschis(false)}
+          style={{ padding: '8px 12px', borderRadius: 8, font: `500 12px ${SANS}` }}
+        >
+          Renunță
+        </button>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={seSalveaza}
+          style={{ padding: '8px 14px', borderRadius: 8, font: `600 12px ${SANS}` }}
+        >
+          {seSalveaza ? 'Se salvează…' : 'Salvează'}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderTop: '1px solid var(--line)' }}>
+      <span style={{ flex: '0 0 auto', width: 150, font: `500 13px ${SANS}`, color: 'var(--fg3)' }}>
+        {rand.label}
+      </span>
+      <span style={{ flex: 1, font: `400 13.5px ${SANS}` }}>{rand.value}</span>
+      {rand.edit ? (
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={incepe}
+          style={{ padding: '7px 12px', borderRadius: 8, borderColor: 'var(--line)', font: `500 12px ${SANS}`, color: 'var(--fg2)' }}
+        >
+          Modifică
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function Rows({ rows }: { rows: Rand[] }) {
   return (
     <>
       {rows.map((r) => (
-        <div
-          key={r.label}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            padding: '13px 0',
-            borderTop: '1px solid var(--line)',
-          }}
-        >
-          <span style={{ flex: '0 0 auto', width: 150, font: `500 13px ${SANS}`, color: 'var(--fg3)' }}>
-            {r.label}
-          </span>
-          <span style={{ flex: 1, font: `400 13.5px ${SANS}` }}>{r.value}</span>
-          <button
-            type="button"
-            className="btn-ghost"
-            style={{
-              padding: '7px 12px',
-              borderRadius: 8,
-              borderColor: 'var(--line)',
-              font: `500 12px ${SANS}`,
-              color: 'var(--fg2)',
-            }}
-          >
-            Modifică
-          </button>
-        </div>
+        <RandDate key={r.label} rand={r} />
       ))}
     </>
   );
@@ -43,16 +127,67 @@ function Rows({ rows }: { rows: { label: string; value: string }[] }) {
 
 export function Setari() {
   const { theme, toggleTheme } = useApp();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, updateNume, updateEmail, stergeContul } = useAuth();
+  const { notify } = useToast();
+
+  const [confirmaStergerea, setConfirmaStergerea] = useState(false);
+  const [seExporta, setSeExporta] = useState(false);
+  const [seSterge, setSeSterge] = useState(false);
 
   const nume = profile?.fullName || 'Fără nume completat';
   const email = user?.email ?? '';
   const initiale = initialeDin(profile?.fullName ?? null, email || '?');
 
-  const contRows: { label: string; value: string }[] = [
-    { label: 'Nume', value: profile?.fullName || '—' },
-    { label: 'E-mail', value: email },
+  const contRows: Rand[] = [
+    {
+      label: 'Nume',
+      value: profile?.fullName || '—',
+      edit: {
+        tip: 'text',
+        initial: profile?.fullName ?? '',
+        placeholder: 'Numele tău complet',
+        salveaza: async (v) => (await updateNume(v)).error,
+        succes: 'Numele a fost salvat.',
+      },
+    },
+    {
+      label: 'E-mail',
+      value: email,
+      edit: {
+        tip: 'email',
+        initial: email,
+        salveaza: async (v) => (await updateEmail(v)).error,
+        succes: 'Verifică noua adresă — până confirmi acolo, rămâne cea veche.',
+      },
+    },
   ];
+
+  const exporta = async () => {
+    if (!user || seExporta) return;
+    setSeExporta(true);
+    try {
+      const date = await adunaDatele(user.id, user.email ?? null);
+      descarca(date, numeFisier(new Date()));
+      notify('succes', 'Datele tale au fost descărcate.');
+    } catch {
+      notify('eroare', 'Nu am putut pregăti fișierul. Încearcă din nou.');
+    } finally {
+      setSeExporta(false);
+    }
+  };
+
+  const sterge = async () => {
+    if (seSterge) return;
+    setSeSterge(true);
+    const { error } = await stergeContul();
+    setSeSterge(false);
+    if (error) {
+      notify('eroare', error);
+      setConfirmaStergerea(false);
+    }
+    // La reușită nu se anunță nimic: contul a dispărut, iar `onAuthStateChange`
+    // duce aplicația înapoi la ecranul de autentificare sub notificare.
+  };
 
   return (
     <div className="screen" style={{ maxWidth: 840 }}>
@@ -97,7 +232,8 @@ export function Setari() {
         <div className="card" style={{ padding: 22 }}>
           <div style={{ font: `600 15px ${SANS}` }}>Examenul meu</div>
           <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
-            Datele examenului pentru care te pregătești.
+            Aceleași pentru toți deocamdată — sesiunea și punctajul țintă devin ale tale când
+            planul e generat din ritmul tău real.
           </div>
           <div style={{ marginTop: 14 }}>
             <Rows rows={EXAMEN_ROWS} />
@@ -124,31 +260,68 @@ export function Setari() {
         <div style={{ border: '1px solid var(--bad)', borderRadius: 14, padding: 22, background: 'var(--badS)' }}>
           <div style={{ font: `600 15px ${SANS}`, color: 'var(--fg)' }}>Datele mele</div>
           <p style={{ margin: '8px 0 14px', font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)' }}>
-            Poți descărca tot istoricul de grile și statistici, sau poți șterge definitiv contul.
+            Poți descărca tot ce ține de contul tău, sau poți șterge definitiv contul cu tot cu
+            răspunsuri, simulări și notițe. Ștergerea nu se poate anula.
           </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn-ghost"
-              style={{ padding: '10px 15px', borderRadius: 9, background: 'var(--surf)', font: `500 13px ${SANS}` }}
-            >
-              Descarcă datele
-            </button>
-            <button
-              type="button"
-              style={{
-                padding: '10px 15px',
-                border: '1px solid var(--bad)',
-                borderRadius: 9,
-                background: 'transparent',
-                color: 'var(--bad)',
-                font: `600 13px ${SANS}`,
-                cursor: 'pointer',
-              }}
-            >
-              Șterge contul
-            </button>
-          </div>
+
+          {confirmaStergerea ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ font: `500 13px/1.4 ${SANS}`, color: 'var(--fg)' }}>
+                Ștergem contul și tot ce ai lucrat?
+              </span>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setConfirmaStergerea(false)}
+                style={{ padding: '10px 15px', borderRadius: 9, background: 'var(--surf)', font: `500 13px ${SANS}` }}
+              >
+                Nu, renunț
+              </button>
+              <button
+                type="button"
+                onClick={() => void sterge()}
+                disabled={seSterge}
+                style={{
+                  padding: '10px 15px',
+                  border: 0,
+                  borderRadius: 9,
+                  background: 'var(--bad)',
+                  color: '#fff',
+                  font: `600 13px ${SANS}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {seSterge ? 'Se șterge…' : 'Da, șterge definitiv'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => void exporta()}
+                disabled={seExporta}
+                style={{ padding: '10px 15px', borderRadius: 9, background: 'var(--surf)', font: `500 13px ${SANS}` }}
+              >
+                {seExporta ? 'Se pregătește…' : 'Descarcă datele'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmaStergerea(true)}
+                style={{
+                  padding: '10px 15px',
+                  border: '1px solid var(--bad)',
+                  borderRadius: 9,
+                  background: 'transparent',
+                  color: 'var(--bad)',
+                  font: `600 13px ${SANS}`,
+                  cursor: 'pointer',
+                }}
+              >
+                Șterge contul
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

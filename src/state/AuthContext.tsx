@@ -29,6 +29,11 @@ interface AuthValue {
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<AuthResult>;
   updatePassword: (parolaNoua: string) => Promise<AuthResult>;
+  updateNume: (numeComplet: string) => Promise<AuthResult>;
+  /** Adresa nouă primește un email de confirmare; până la clic, cea veche rămâne. */
+  updateEmail: (email: string) => Promise<AuthResult>;
+  /** Dreptul GDPR de eliminare. Șterge contul și tot ce atârnă de el, apoi deconectează. */
+  stergeContul: () => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -111,6 +116,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.updateUser({ password: parolaNoua });
         if (!error) setRecovery(false);
         return { error: error ? mesajEroare(error) : null };
+      },
+      async updateNume(numeComplet) {
+        if (!user) return { error: 'Nu ești autentificat.' };
+        const nume = numeComplet.trim();
+        const { error } = await supabase
+          .from('profiles')
+          .update({ full_name: nume || null })
+          .eq('id', user.id);
+        if (error) return { error: mesajEroare(error) };
+        // Profilul local se actualizează din răspunsul reușit, nu se recitește:
+        // politica de `update` nu vine cu una de `returning`, iar o a doua cerere
+        // ar face ecranul să pâlpâie cu valoarea veche.
+        setProfile((p) => (p ? { ...p, fullName: nume || null } : p));
+        return { error: null };
+      },
+      async updateEmail(email) {
+        const { error } = await supabase.auth.updateUser({ email: email.trim() });
+        return { error: error ? mesajEroare(error) : null };
+      },
+      async stergeContul() {
+        const { error } = await supabase.rpc('sterge_contul');
+        if (error) return { error: mesajEroare(error) };
+        // Sesiunea rămâne validă în memorie după ce contul a dispărut din bază;
+        // fără deconectare explicită, aplicația ar continua să arate un profil
+        // care nu mai există.
+        await supabase.auth.signOut();
+        return { error: null };
       },
     }),
     [loading, user, profile, recovery],

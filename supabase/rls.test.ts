@@ -171,13 +171,20 @@ describe('profilul', () => {
  * merge la fel de bine, motiv pentru care a stat așa până a semnalat linterul.
  */
 describe('funcțiile', () => {
+  /**
+   * Lista e o alegere, nu o constatare: singurele `security definer` din `public`
+   * sunt cele scrise anume ca să fie chemate din client. Orice altceva ajuns
+   * acolo din neatenție pică testul, care e tot rostul lui.
+   */
+  const RPC_INTENTIONAT = ['sterge_contul'];
+
   it('nu stau în schema pe care o publică PostgREST', async () => {
     const r = await baza.db.query<{ proname: string }>(`
       select p.proname
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and p.prosecdef
     `);
-    expect(r.rows).toHaveLength(0);
+    expect(r.rows.map((x) => x.proname).sort()).toEqual(RPC_INTENTIONAT);
   });
 
   /**
@@ -216,6 +223,85 @@ describe('funcțiile', () => {
     expect(r.rows).toHaveLength(4);
     for (const f of r.rows) {
       expect(f.proconfig?.some((c) => c.startsWith('search_path='))).toBe(true);
+    }
+  });
+});
+
+/**
+ * Ștergerea contului — dreptul GDPR de eliminare, deci trebuie să meargă, nu doar
+ * să existe un buton. Funcția nu ia parametri: șterge `auth.uid()` și atât, așa
+ * că nu există nimic de falsificat din client.
+ */
+describe('ștergerea contului', () => {
+  it('își duce cu ea toate datele proprii', async () => {
+    await baza.caUtilizator(ana, async () => {
+      await baza.db.query('insert into notes (user_id, chapter_id, body) values ($1, $2, $3)', [
+        ana,
+        'bio-nervos',
+        'notița Anei',
+      ]);
+      await baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source)
+         values ($1, 'bio-nervos-01', 'B', true, 'sesiune')`,
+        [ana],
+      );
+      await baza.db.query('select public.sterge_contul()');
+    });
+
+    const profil = await baza.db.query('select 1 from profiles where id = $1', [ana]);
+    const notite = await baza.db.query('select 1 from notes where user_id = $1', [ana]);
+    const raspunsuri = await baza.db.query('select 1 from attempts where user_id = $1', [ana]);
+    const cont = await baza.db.query('select 1 from auth.users where id = $1', [ana]);
+
+    expect(profil.rows).toHaveLength(0);
+    expect(notite.rows).toHaveLength(0);
+    expect(raspunsuri.rows).toHaveLength(0);
+    expect(cont.rows).toHaveLength(0);
+  });
+
+  it('nu atinge datele altcuiva', async () => {
+    await baza.caUtilizator(bogdan, () =>
+      baza.db.query('insert into notes (user_id, chapter_id, body) values ($1, $2, $3)', [
+        bogdan,
+        'bio-nervos',
+        'notița lui Bogdan',
+      ]),
+    );
+
+    await baza.caUtilizator(ana, () => baza.db.query('select public.sterge_contul()'));
+
+    const ale = await baza.db.query('select 1 from notes where user_id = $1', [bogdan]);
+    const cont = await baza.db.query('select 1 from auth.users where id = $1', [bogdan]);
+    expect(ale.rows).toHaveLength(1);
+    expect(cont.rows).toHaveLength(1);
+  });
+
+  /** Grilele scrise rămân: altfel ștergerea unui administrator ar goli biblioteca. */
+  it('lasă în urmă grilele scrise de cont', async () => {
+    await baza.db.query("update questions set created_by = $1 where id = 'bio-nervos-01'", [ana]);
+
+    await baza.caUtilizator(ana, () => baza.db.query('select public.sterge_contul()'));
+
+    const r = await baza.db.query<{ created_by: string | null }>(
+      "select created_by from questions where id = 'bio-nervos-01'",
+    );
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]!.created_by).toBeNull();
+  });
+
+  it('nu e apelabilă de un vizitator neautentificat', async () => {
+    const r = await baza.db.query<{ poate: boolean }>(
+      `select has_function_privilege('anon', 'public.sterge_contul()', 'execute') as poate`,
+    );
+    expect(r.rows[0]!.poate).toBe(false);
+  });
+
+  it('refuză când cererea nu are sesiune', async () => {
+    await baza.db.exec('set role authenticated;');
+    try {
+      await expect(baza.db.query('select public.sterge_contul()')).rejects.toThrow(/autentificat/i);
+    } finally {
+      await baza.db.exec('reset role;');
     }
   });
 });
