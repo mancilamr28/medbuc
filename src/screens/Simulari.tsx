@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
-import { SIMULARI_ANTERIOARE } from '../data/profile';
+import { EmptyState } from '../components/EmptyState';
 import { questionCap, questionMaterie, tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
 import { formatClock } from '../lib/time';
@@ -104,39 +104,15 @@ function SimConfig() {
         </div>
 
         <div style={sideStack}>
+          {/* Istoricul era o listă fixă de trei lucrări care nu fuseseră date
+              niciodată. Se completează când `finish()` chiar salvează rezultate. */}
           <div className="card-flat" style={{ padding: 20 }}>
             <div style={eyebrow(undefined, 11)}>Simulările tale</div>
-            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column' }}>
-              {SIMULARI_ANTERIOARE.map((s) => (
-                <div
-                  key={s.title}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '11px 0',
-                    borderTop: '1px solid var(--line)',
-                  }}
-                >
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', font: `500 13px ${SANS}` }}>{s.title}</span>
-                    <span
-                      style={{ display: 'block', marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}
-                    >
-                      {s.meta}
-                    </span>
-                  </span>
-                  <span style={{ font: `500 15px ${SERIF}`, color: 'var(--fg)' }}>{s.score}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ background: 'var(--brandS)', border: '1px solid var(--brandS2)', borderRadius: 14, padding: 20 }}>
-            <div style={{ font: `400 18px/1.3 ${SERIF}` }}>Următoarea simulare programată</div>
-            <p style={{ margin: '8px 0 0', font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)' }}>
-              Duminică, 6 septembrie, ora 09:00. Se dă în același timp cu ceilalți candidați înscriși.
-            </p>
+            <EmptyState
+              title="Nicio simulare dată încă"
+              hint="Lucrările predate apar aici, cu punctajul și timpul în care le-ai terminat."
+              padding="22px 4px 6px"
+            />
           </div>
         </div>
       </div>

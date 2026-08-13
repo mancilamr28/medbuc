@@ -1,38 +1,27 @@
-import { Progress } from '../components/Progress';
-import { Switch } from '../components/Switch';
-import { MATERII, MATERIE_TABS, isSaved, type Chapter } from '../data/chapters';
+import { MATERII, MATERIE_TABS } from '../data/chapters';
+import { chapterQuestionCount, materieQuestionCount } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
-import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill, sideStack } from '../lib/ui';
-import { useApp, type FilterId } from '../state/AppState';
+import { numar } from '../lib/text';
+import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, sideStack } from '../lib/ui';
+import { useApp } from '../state/AppState';
 
-const FILTERS: { id: FilterId; label: string }[] = [
-  { id: 'neterminate', label: 'Doar capitolele neterminate' },
-  { id: 'greseli', label: 'Doar grilele greșite anterior' },
-  { id: 'bookmark', label: 'Doar capitolele salvate' },
-  { id: 'verificate', label: 'Include grilele neverificate' },
-];
-
+/**
+ * Lista de capitole.
+ *
+ * Filtrele („doar capitolele neterminate", „doar grilele greșite anterior",
+ * „doar capitolele salvate") și barele de progres au fost scoase: se sprijineau
+ * pe `done` și `pct`, cifre scrise de mână care nu se schimbau niciodată. Se
+ * întorc când există răspunsuri înregistrate din care să iasă.
+ */
 export function Materii() {
-  const { materie, setMaterie, filters, toggleFilter, go } = useApp();
+  const { materie, setMaterie, go } = useApp();
   const isDesktop = useIsDesktop();
   const mat = MATERII[materie];
-
-  /**
-   * Primele trei filtre restrâng lista de capitole. Al patrulea lărgește
-   * bazinul de grile al sesiunii, deci nu schimbă ce capitole se văd.
-   */
-  const chapters = mat.list.filter((c: Chapter) => {
-    if (filters.neterminate && c.done >= c.total) return false;
-    if (filters.greseli && (c.done === 0 || c.pct === 100)) return false;
-    if (filters.bookmark && !isSaved(c)) return false;
-    return true;
-  });
+  const chapters = mat.list;
 
   const stats = [
-    { label: 'Grile disponibile', value: mat.count.split(' ').slice(0, -1).join(' '), unit: mat.unit },
-    { label: 'Rezolvate', value: String(mat.rezolvate), unit: 'grile' },
-    { label: 'Corecte', value: String(mat.corecte), unit: '%' },
-    { label: 'Capitole terminate', value: String(mat.terminate), unit: `din ${mat.list.length}` },
+    { label: 'Capitole', value: String(mat.list.length), unit: mat.unit === 'sesiuni' ? 'sesiuni' : 'capitole' },
+    { label: 'Grile scrise', value: String(materieQuestionCount(mat.id)), unit: 'grile' },
   ];
 
   return (
@@ -123,86 +112,67 @@ export function Materii() {
               }}
             >
               <div style={{ font: `600 14px ${SANS}` }}>{mat.name} · capitole</div>
-              <button type="button" className="btn-ghost" style={{ padding: '7px 12px', font: `500 12.5px ${SANS}`, borderRadius: 9 }}>
-                Selectează tot
-              </button>
             </div>
 
-            {chapters.map((c) => (
-              <div
-                key={c.id}
-                className="list-row"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 16,
-                  padding: '14px 20px',
-                  borderBottom: '1px solid var(--line)',
-                }}
-              >
-                <div style={{ width: 30, flex: '0 0 30px', font: `500 13px ${SANS}`, color: 'var(--fg3)' }}>{c.nr}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ font: `500 14px/1.3 ${SANS}` }}>{c.name}</div>
-                  <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1, maxWidth: 220 }}>
-                      <Progress
-                        pct={(c.done / c.total) * 100}
-                        height={5}
-                        color={c.pct >= 80 ? 'var(--ok)' : 'var(--brand)'}
-                        label={`${c.name}: ${c.done} din ${c.total} grile`}
-                      />
-                    </div>
-                    <div style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)', whiteSpace: 'nowrap' }}>
-                      {c.done} / {c.total} grile
+            {/* Un capitol fără grile scrise nu se poate exersa — butonul o spune,
+                în loc să deschidă o sesiune din alt capitol. */}
+            {chapters.map((c) => {
+              const scrise = chapterQuestionCount(c.id);
+              return (
+                <div
+                  key={c.id}
+                  className="list-row"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    padding: '14px 20px',
+                    borderBottom: '1px solid var(--line)',
+                  }}
+                >
+                  <div style={{ width: 30, flex: '0 0 30px', font: `500 13px ${SANS}`, color: 'var(--fg3)' }}>
+                    {c.nr}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ font: `500 14px/1.3 ${SANS}` }}>{c.name}</div>
+                    <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+                      {scrise === 0 ? 'Nicio grilă scrisă încă' : `${numar(scrise, 'grilă', 'grile')} scrise`}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className="practice-btn"
+                    onClick={() => go('grile')}
+                    disabled={scrise === 0}
+                    style={{
+                      padding: '8px 14px',
+                      font: `500 12.5px ${SANS}`,
+                      whiteSpace: 'nowrap',
+                      opacity: scrise === 0 ? 0.45 : 1,
+                      cursor: scrise === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Exersează
+                  </button>
                 </div>
-                <div style={pctPill(c.pct)}>{c.pct}%</div>
-                <button
-                  type="button"
-                  className="practice-btn"
-                  onClick={() => go('grile')}
-                  style={{ padding: '8px 14px', font: `500 12.5px ${SANS}`, whiteSpace: 'nowrap' }}
-                >
-                  Exersează
-                </button>
-              </div>
-            ))}
+              );
+            })}
 
-            {chapters.length === 0 && (
-              <div style={{ padding: '28px 20px', font: `400 13.5px/1.6 ${SANS}`, color: 'var(--fg3)' }}>
-                Niciun capitol nu trece de filtrele active. Oprește un filtru din dreapta ca să vezi din nou lista.
-              </div>
-            )}
           </div>
 
           <div style={sideStack}>
-            <div className="card-flat" style={{ padding: 20 }}>
-              <div style={eyebrow(undefined, 11)}>Filtrează capitolele</div>
-              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {FILTERS.map((f) => (
-                  <Switch key={f.id} on={filters[f.id]} onToggle={() => toggleFilter(f.id)}>
-                    <span style={{ flex: 1, font: `400 13px/1.4 ${SANS}`, color: 'var(--fg2)', textAlign: 'left' }}>
-                      {f.label}
-                    </span>
-                  </Switch>
-                ))}
-              </div>
-            </div>
-
             <div style={{ background: 'var(--brandS)', border: '1px solid var(--brandS2)', borderRadius: 14, padding: 20 }}>
               <div style={{ font: `400 19px/1.3 ${SERIF}`, color: 'var(--fg)' }}>Nu știi de unde să începi?</div>
               <p style={{ margin: '8px 0 14px', font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)' }}>
-                Planul tău de învățare are 3 capitole programate săptămâna asta, alese după cât timp mai e până la
-                examen.
+                Începe cu primul capitol din materie. După câteva sesiuni vei vedea aici unde stai bine și unde nu.
               </p>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => go('plan')}
+                onClick={() => go('grile')}
                 style={{ width: '100%', padding: 11, font: `600 13.5px ${SANS}` }}
               >
-                Vezi planul săptămânii
+                Începe o sesiune
               </button>
             </div>
           </div>

@@ -1,23 +1,16 @@
 import { Segmented } from '../components/Segmented';
 import { Switch } from '../components/Switch';
+import { EmptyState } from '../components/EmptyState';
 import { MATERII, MATERIE_BY_NAME, chapterLabel } from '../data/chapters';
-import { ADMIN_QUEUE, ADMIN_STATS, type QueueStare } from '../data/profile';
-import { OPTION_KEYS, type OptionKey } from '../data/questions';
+import { OPTION_KEYS, QUESTIONS, type OptionKey } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
-import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip, twoCol } from '../lib/ui';
+import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, twoCol } from '../lib/ui';
 import { useApp, type AdminDraft, type Role } from '../state/AppState';
 
 const ROLE_TABS: { id: Role; label: string }[] = [
   { id: 'elev', label: 'Elev' },
   { id: 'admin', label: 'Administrator' },
 ];
-
-const queueChip = (stare: QueueStare) =>
-  stare === 'Publicată'
-    ? statusChip('var(--okS)', 'var(--ok)')
-    : stare === 'Raportată'
-      ? statusChip('var(--badS)', 'var(--bad)')
-      : statusChip('var(--accS)', 'var(--acc)');
 
 function RoleSwitcher() {
   const { role, setRole } = useApp();
@@ -117,8 +110,7 @@ function AdminPanel() {
           style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--acc)', flex: '0 0 auto' }}
         />
         <span style={{ font: `500 13px/1.4 ${SANS}`, color: 'var(--fg)' }}>
-          Zonă restricționată — acțiunile de aici se văd imediat la toți elevii. Fiecare modificare este înregistrată pe
-          contul tău.
+          Zonă restricționată. Formularul nu salvează încă nimic — grilele se scriu deocamdată direct în cod.
         </span>
       </div>
 
@@ -209,43 +201,25 @@ function AdminPanel() {
         </div>
 
         <div style={sideStack}>
+          {/* Statisticile arătau „2 220 publicate, 37 în așteptare, 6 raportate".
+              Singura cifră care se poate demonstra e câte grile există. */}
           <div className="card-flat" style={{ padding: 20 }}>
             <div style={eyebrow(undefined, 11)}>Biblioteca de grile</div>
-            <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              {ADMIN_STATS.map((s) => (
-                <div key={s.label}>
-                  <div style={{ font: `500 22px/1 ${SERIF}` }}>{s.value}</div>
-                  <div style={{ marginTop: 5, font: `400 11.5px/1.3 ${SANS}`, color: 'var(--fg3)' }}>{s.label}</div>
-                </div>
-              ))}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ font: `500 22px/1 ${SERIF}` }}>{QUESTIONS.length}</div>
+              <div style={{ marginTop: 5, font: `400 11.5px/1.4 ${SANS}`, color: 'var(--fg3)' }}>
+                grile scrise în bibliotecă
+              </div>
             </div>
           </div>
 
           <div className="card-flat" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <span style={eyebrow(undefined, 11)}>Coada de verificare</span>
-              <a href="#/admin" style={{ font: `500 12px ${SANS}` }}>
-                Vezi tot
-              </a>
-            </div>
-            <div style={{ marginTop: 6 }}>
-              {ADMIN_QUEUE.map((g) => (
-                <div key={g.text} style={{ padding: '13px 0', borderTop: '1px solid var(--line)' }}>
-                  <div className="truncate" style={{ font: `500 13px/1.4 ${SANS}` }}>
-                    {g.text}
-                  </div>
-                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span
-                      className="truncate"
-                      style={{ flex: 1, minWidth: 0, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}
-                    >
-                      {g.meta}
-                    </span>
-                    <span style={queueChip(g.stare)}>{g.stare}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <span style={eyebrow(undefined, 11)}>Coada de verificare</span>
+            <EmptyState
+              title="Nimic de verificat"
+              hint="Grilele trimise spre verificare apar aici. Deocamdată nu există un flux de trimitere."
+              padding="20px 4px 4px"
+            />
           </div>
         </div>
       </div>

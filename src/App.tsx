@@ -8,7 +8,6 @@ import { Admin } from './screens/Admin';
 import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
 import { Materii } from './screens/Materii';
-import { Plan } from './screens/Plan';
 import { Setari } from './screens/Setari';
 import { Simulari } from './screens/Simulari';
 import { useApp } from './state/AppState';
@@ -23,8 +22,6 @@ function Content() {
       return <Materii />;
     case 'grile':
       return <Grile />;
-    case 'plan':
-      return <Plan />;
     case 'simulari':
       return <Simulari />;
     case 'setari':

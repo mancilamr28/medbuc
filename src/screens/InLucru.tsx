@@ -26,8 +26,8 @@ export function InLucru({ screen }: { screen: Screen }) {
       </div>
       <h1 style={{ margin: '20px 0 0', font: `400 27px/1.2 ${SERIF}` }}>{title}</h1>
       <p style={{ margin: '10px 0 22px', font: `400 14px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
-        Ecran planificat pentru runda următoare. Am construit deocamdată pagina principală, materiile și interfața de
-        rezolvare a grilelor.
+        Ecran planificat pentru runda următoare. Deocamdată sunt gata pagina principală, materiile, rezolvarea de
+        grile și simularea de examen.
       </p>
       <button
         type="button"

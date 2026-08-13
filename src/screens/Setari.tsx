@@ -1,14 +1,6 @@
-import { Switch } from '../components/Switch';
 import { CONT_ROWS, EXAMEN_ROWS, STUDENT } from '../data/profile';
 import { SANS, SERIF, pageLead, pageTitle } from '../lib/ui';
-import { useApp, type SetareId } from '../state/AppState';
-
-const TOGGLES: { id: SetareId; label: string; meta: string }[] = [
-  { id: 'remindere', label: 'Reminder zilnic de studiu', meta: 'În fiecare zi la 18:30' },
-  { id: 'recap', label: 'Anunță-mă când am recapitulări', meta: 'Dimineața, o singură notificare' },
-  { id: 'simulari', label: 'Simulări programate', meta: 'Cu 24 de ore înainte' },
-  { id: 'email', label: 'Rezumat săptămânal pe e-mail', meta: 'Duminică seara' },
-];
+import { useApp } from '../state/AppState';
 
 function Rows({ rows }: { rows: { label: string; value: string }[] }) {
   return (
@@ -48,13 +40,13 @@ function Rows({ rows }: { rows: { label: string; value: string }[] }) {
 }
 
 export function Setari() {
-  const { theme, toggleTheme, setari, toggleSetare } = useApp();
+  const { theme, toggleTheme } = useApp();
 
   return (
     <div className="screen" style={{ maxWidth: 840 }}>
       <h1 style={pageTitle}>Profil și setări</h1>
       <p style={{ ...pageLead, marginBottom: 20 }}>
-        Datele contului, examenul pentru care te pregătești și felul în care te anunțăm.
+        Datele contului și examenul pentru care te pregătești.
       </p>
 
       <div style={{ display: 'grid', gap: 18 }}>
@@ -77,7 +69,7 @@ export function Setari() {
             <div style={{ flex: 1, minWidth: 150 }}>
               <div style={{ font: `400 21px/1.2 ${SERIF}` }}>{STUDENT.name}</div>
               <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
-                Cont creat în septembrie 2025 · {STUDENT.grileRezolvate} grile rezolvate
+                {STUDENT.liceu}
               </div>
             </div>
             <button type="button" className="btn-ghost" style={{ padding: '10px 15px', font: `500 13px ${SANS}` }}>
@@ -90,28 +82,10 @@ export function Setari() {
         <div className="card" style={{ padding: 22 }}>
           <div style={{ font: `600 15px ${SANS}` }}>Examenul meu</div>
           <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
-            Din aceste date se generează planul de învățare și estimarea punctajului.
+            Datele examenului pentru care te pregătești.
           </div>
           <div style={{ marginTop: 14 }}>
             <Rows rows={EXAMEN_ROWS} />
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: 22 }}>
-          <div style={{ font: `600 15px ${SANS}` }}>Notificări și remindere</div>
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {TOGGLES.map((t) => (
-              <Switch key={t.id} on={setari[t.id]} onToggle={() => toggleSetare(t.id)}>
-                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                  <span style={{ display: 'block', font: `500 13.5px/1.3 ${SANS}`, color: 'var(--fg)' }}>
-                    {t.label}
-                  </span>
-                  <span style={{ display: 'block', marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-                    {t.meta}
-                  </span>
-                </span>
-              </Switch>
-            ))}
           </div>
         </div>
 
@@ -127,7 +101,7 @@ export function Setari() {
               {theme === 'dark' ? 'Mod luminos' : 'Mod întunecat'}
             </button>
             <span style={{ font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
-              Tema întunecată se aplică automat seara, dacă o preferi.
+              Alegerea ta se ține minte pe acest dispozitiv.
             </span>
           </div>
         </div>

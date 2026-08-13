@@ -16,11 +16,15 @@ export const SCREENS = [
 export type Screen = (typeof SCREENS)[number];
 
 /** Ecranele care au deja o implementare; restul cad pe pagina „în lucru”. */
-export const BUILT_SCREENS: Screen[] = ['acasa', 'materii', 'grile', 'plan', 'simulari', 'setari', 'admin'];
+export const BUILT_SCREENS: Screen[] = ['acasa', 'materii', 'grile', 'simulari', 'setari', 'admin'];
 
 export const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   recapitulare: 'Repetare inteligentă',
   statistici: 'Statistici și progres',
+  // Planul era desenat integral din date fixe — săptămâni pe august–septembrie
+  // și „ai rămas în urmă cu 1 zi", deși examenul e în iulie 2027. Până când
+  // poate fi generat din ritmul real, e mai onest ca ecran în lucru.
+  plan: 'Planul meu de învățare',
   notite: 'Notițele mele',
 };
 

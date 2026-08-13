@@ -142,28 +142,59 @@ export function useSession(): Session {
     [answers, finishedAt, startedAt],
   );
 
-  return {
-    qi,
-    question,
-    total,
-    answers,
-    revealed,
-    marked,
-    answer,
-    isRevealed,
-    isMarked: !!marked[qi],
-    isCorrect,
-    startedAt,
-    finished: finishedAt !== null,
-    pick,
-    primary,
-    next,
-    prev,
-    goTo,
-    toggleMark,
-    finish,
-    restart,
-    tally,
-    score,
-  };
+  /**
+   * `AppState`'s own `useMemo` can only skip recomputing when `session` keeps
+   * the same identity across renders that changed nothing here. Returning a
+   * fresh object literal every render (as this used to) made that outer memo
+   * inert — every field on it, including `session`, was "new" every time.
+   */
+  return useMemo<Session>(
+    () => ({
+      qi,
+      question,
+      total,
+      answers,
+      revealed,
+      marked,
+      answer,
+      isRevealed,
+      isMarked: !!marked[qi],
+      isCorrect,
+      startedAt,
+      finished: finishedAt !== null,
+      pick,
+      primary,
+      next,
+      prev,
+      goTo,
+      toggleMark,
+      finish,
+      restart,
+      tally,
+      score,
+    }),
+    [
+      answer,
+      answers,
+      finish,
+      finishedAt,
+      goTo,
+      isCorrect,
+      isRevealed,
+      marked,
+      next,
+      pick,
+      prev,
+      primary,
+      qi,
+      question,
+      restart,
+      revealed,
+      score,
+      startedAt,
+      tally,
+      toggleMark,
+      total,
+    ],
+  );
 }

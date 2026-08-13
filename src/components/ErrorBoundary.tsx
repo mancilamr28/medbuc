@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { reportError } from '../lib/sentry';
 import { SANS, SERIF } from '../lib/ui';
 
 interface Props {
@@ -34,6 +35,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('[medbuc] Eroare neprinsă:', error, info.componentStack);
+    // No-op fără `VITE_SENTRY_DSN` configurat — vezi src/lib/sentry.ts.
+    reportError(error, info.componentStack ?? undefined);
   }
 
   override render(): ReactNode {

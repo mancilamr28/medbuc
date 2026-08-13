@@ -1,5 +1,6 @@
+import { EmptyState } from './EmptyState';
 import { SANS, SCORE_LABEL_FILL } from './chartTokens';
-import { SCORES, SCORE_MONTHS, SCORE_TARGET } from '../data/profile';
+import { SCORE_TARGET } from '../data/profile';
 import { useApp } from '../state/AppState';
 
 const W = 720;
@@ -8,13 +9,36 @@ const PAD = 26;
 const MIN = 45;
 const MAX = 100;
 
-/** Evoluția punctajului estimat, cu linia punctată a țintei. */
-export function ScoreChart() {
+/**
+ * Evoluția punctajului estimat, cu linia punctată a țintei.
+ *
+ * Punctajele vin prin `scores`; înainte erau zece valori scrise de mână care nu
+ * se schimbau niciodată. Cu mai puțin de două teste rezolvate nu există evoluție
+ * de desenat, deci graficul spune asta în loc să inventeze o pantă.
+ */
+export function ScoreChart({
+  scores,
+  labels,
+}: {
+  scores: readonly number[];
+  /** Etichetele de pe axa orizontală, ex. lunile. */
+  labels: readonly string[];
+}) {
   const { theme } = useApp();
   const dark = theme === 'dark';
 
-  const pts = SCORES.map((s, i): [number, number] => [
-    PAD + i * ((W - PAD * 2) / (SCORES.length - 1)),
+  if (scores.length < 2) {
+    return (
+      <EmptyState
+        title="Încă nu ai destule teste pentru un grafic"
+        hint="Punctajul estimat apare aici după ce termini cel puțin două simulări sau sesiuni de grile."
+        padding="18px 16px 26px"
+      />
+    );
+  }
+
+  const pts = scores.map((s, i): [number, number] => [
+    PAD + i * ((W - PAD * 2) / (scores.length - 1)),
     H - PAD - ((s - MIN) / (MAX - MIN)) * (H - PAD * 2),
   ]);
   const last = pts[pts.length - 1]!;
@@ -30,7 +54,7 @@ export function ScoreChart() {
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
         role="img"
-        aria-label={`Punctaj estimat, de la ${SCORES[0]} la ${SCORES[SCORES.length - 1]} din 100. Ținta este ${SCORE_TARGET}.`}
+        aria-label={`Punctaj estimat, de la ${scores[0]} la ${scores[scores.length - 1]} din 100. Ținta este ${SCORE_TARGET}.`}
       >
         <defs>
           <linearGradient id="mbFill" x1="0" y1="0" x2="0" y2="1">
@@ -82,7 +106,7 @@ export function ScoreChart() {
           textAnchor="end"
           style={{ font: `600 12px ${SANS}`, fill: SCORE_LABEL_FILL }}
         >
-          {SCORES[SCORES.length - 1]}
+          {scores[scores.length - 1]}
         </text>
       </svg>
       <div
@@ -94,7 +118,7 @@ export function ScoreChart() {
           color: 'var(--fg3)',
         }}
       >
-        {SCORE_MONTHS.map((m) => (
+        {labels.map((m) => (
           <span key={m}>{m}</span>
         ))}
       </div>

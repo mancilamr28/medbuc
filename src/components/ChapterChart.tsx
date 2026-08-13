@@ -1,13 +1,31 @@
-import { MATERII } from '../data/chapters';
+import { EmptyState } from './EmptyState';
 import { SANS } from '../lib/ui';
 import { PRAG_RELUARE, barColor } from './chartTokens';
-import { useApp } from '../state/AppState';
 
-/** Procentul de corecte pe capitolele începute din materia selectată. */
-export function ChapterChart() {
-  const { materie } = useApp();
-  // Subiectele anterioare nu sunt capitole de studiu — arătăm biologia.
-  const rows = MATERII[materie === 'ant' ? 'bio' : materie].list.filter((c) => c.done > 0);
+export interface ChapterProgress {
+  id: string;
+  name: string;
+  /** Procentul de răspunsuri corecte din capitol. */
+  pct: number;
+}
+
+/**
+ * Procentul de corecte pe capitolele începute.
+ *
+ * Datele vin prin `rows`. Capitolele nu mai poartă un `pct` scris de mână — cât
+ * timp nu există răspunsuri înregistrate, graficul spune asta, nu desenează
+ * bare inventate.
+ */
+export function ChapterChart({ rows }: { rows: readonly ChapterProgress[] }) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title="Încă nu ai capitole începute"
+        hint="Rezolvă grile dintr-un capitol și aici apare procentul tău de răspunsuri corecte, capitol cu capitol."
+        padding="18px 16px 26px"
+      />
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingBottom: 14 }}>
