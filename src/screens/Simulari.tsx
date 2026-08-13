@@ -3,7 +3,7 @@ import { AnswerOptions } from '../components/AnswerOptions';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { SIMULARI_ANTERIOARE } from '../data/profile';
-import { tipLabel } from '../data/questions';
+import { questionCap, questionMaterie, tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
 import { formatClock } from '../lib/time';
 import {
@@ -548,7 +548,7 @@ function SimRezultat() {
                         </span>
                         <span style={{ ...statusChip(stare[1], stare[2]) }}>{stare[0]}</span>
                         <span style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-                          {q.materie} · {q.cap}
+                          {questionMaterie(q)} · {questionCap(q)}
                         </span>
                       </div>
 

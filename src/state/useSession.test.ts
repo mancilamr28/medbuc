@@ -7,8 +7,7 @@ let n = 0;
 const grila = (correct: OptionKey): Question => ({
   id: `test-${(n += 1)}`,
   tip: 'simplu',
-  materie: 'Biologie',
-  cap: '01. Test',
+  capId: 'bio-celula',
   text: 'Întrebare de test',
   opts: [
     ['A', 'a'],

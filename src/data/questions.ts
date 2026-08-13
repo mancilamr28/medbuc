@@ -1,3 +1,5 @@
+import { chapterLabelById, materieNameOf, type ChapterId } from './chapters';
+
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 export type QuestionType = 'simplu' | 'grupat';
 
@@ -12,8 +14,8 @@ export type QuestionId = string;
 export interface Question {
   id: QuestionId;
   tip: QuestionType;
-  materie: string;
-  cap: string;
+  /** Capitolul de care ține grila. Materia și eticheta se citesc din el. */
+  capId: ChapterId;
   text: string;
   /** Doar la complement grupat: cele patru afirmații numerotate. */
   enunturi?: string[];
@@ -31,12 +33,17 @@ export const OPTION_KEYS: OptionKey[] = ['A', 'B', 'C', 'D', 'E'];
 export const tipLabel = (tip: QuestionType): string =>
   tip === 'simplu' ? 'Complement simplu' : 'Complement grupat';
 
+/** „Biologie” — pentru antetul grilei. */
+export const questionMaterie = (q: Question): string => materieNameOf(q.capId);
+
+/** „03. Sistemul nervos” — pentru antetul grilei. */
+export const questionCap = (q: Question): string => chapterLabelById(q.capId);
+
 export const QUESTIONS: Question[] = [
   {
     tip: 'simplu',
-    materie: 'Biologie',
     id: 'bio-nervos-01',
-    cap: '03. Sistemul nervos',
+    capId: 'bio-nervos',
     text: 'Substanța cenușie a medulei spinării este dispusă:',
     opts: [
       ['A', 'la periferie, sub forma unui strat continuu'],
@@ -58,9 +65,8 @@ export const QUESTIONS: Question[] = [
   },
   {
     tip: 'grupat',
-    materie: 'Chimie organică',
     id: 'chim-alcooli-01',
-    cap: '05. Alcooli. Fenoli',
+    capId: 'chim-alcooli',
     text: 'Referitor la etanol sunt corecte afirmațiile:',
     enunturi: [
       'are formula moleculară C₂H₆O',
@@ -88,9 +94,8 @@ export const QUESTIONS: Question[] = [
   },
   {
     tip: 'simplu',
-    materie: 'Biologie',
     id: 'bio-endocrin-01',
-    cap: '04. Glandele endocrine',
+    capId: 'bio-endocrin',
     text: 'Insulina este secretată de:',
     opts: [
       ['A', 'celulele alfa ale insulelor pancreatice'],
@@ -112,9 +117,8 @@ export const QUESTIONS: Question[] = [
   },
   {
     tip: 'grupat',
-    materie: 'Biologie',
     id: 'bio-sange-01',
-    cap: '07. Sângele. Hemostaza',
+    capId: 'bio-sange',
     text: 'Despre hematiile adultului sunt adevărate afirmațiile:',
     enunturi: [
       'sunt celule anucleate',
@@ -142,9 +146,8 @@ export const QUESTIONS: Question[] = [
   },
   {
     tip: 'simplu',
-    materie: 'Biologie',
     id: 'bio-osos-01',
-    cap: '05. Sistemul osos',
+    capId: 'bio-osos',
     text: 'Numărul vertebrelor din regiunea toracală a coloanei vertebrale este:',
     opts: [
       ['A', '7'],
@@ -166,9 +169,8 @@ export const QUESTIONS: Question[] = [
   },
   {
     tip: 'simplu',
-    materie: 'Chimie organică',
     id: 'chim-arene-01',
-    cap: '04. Arene',
+    capId: 'chim-arene',
     text: 'Formula moleculară a benzenului este:',
     opts: [
       ['A', 'C₆H₁₂'],
