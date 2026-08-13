@@ -3,9 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { migrateNoteKeys } from './lib/migrations';
+import { initSentry } from './lib/sentry';
 import { AppProvider } from './state/AppState';
 import { ToastProvider } from './state/ToastContext';
 import './styles.css';
+
+// Cât mai devreme posibil, ca să prindă și erorile de la randările timpurii.
+initSentry();
 
 // Înainte de primul render: notițele vechi sunt mutate pe cheile cu id.
 migrateNoteKeys();

@@ -35,7 +35,7 @@ UI strings, code comments, and domain identifiers are **Romanian** (`materie`, `
 
 ## Architecture
 
-Client-side React 19 + TypeScript + Vite SPA. **No backend, no API calls, no environment variables, no secrets.** All content is hardcoded in `src/data/`; all user state lives in React state or `localStorage`.
+Client-side React 19 + TypeScript + Vite SPA. No backend, no API calls yet — that's Faza 3. All content is hardcoded in `src/data/`; all user state lives in React state or `localStorage`. The one environment variable that exists, `VITE_SENTRY_DSN`, is optional and documented below; there are still no secrets checked in or otherwise required for the app to run.
 
 ### Routing — `src/lib/router.ts`
 
@@ -96,6 +96,16 @@ Rule of thumb: **`className` for stateful/interactive styling, inline `style` fr
 Font Awesome artwork, no Font Awesome runtime. Only `@fortawesome/free-solid-svg-icons` is installed — a package of plain data (`[width, height, , , pathData]`) that tree-shakes to just the icons imported. `Icon` renders that data as an inline `<svg>`.
 
 Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontawesome`: they were tried and cost **~100 KB** of runtime (DOM scanning, layers, masks) to draw static SVGs. With `Icon`, the same icons cost ~6 KB. Do not add the Font Awesome CDN either — it ships the whole set from a third-party origin on the critical path, which is both slower and a GDPR concern for EU users.
+
+### Error reporting — `src/lib/sentry.ts`
+
+`@sentry/react` is a real dependency, but it is **never in the main bundle**. `initSentry()` (called once, first line of `main.tsx`) checks `VITE_SENTRY_DSN` and only then does `import('@sentry/react')` — a dynamic import, so without a configured DSN the package is not fetched at all, and Rollup tree-shakes the whole branch away at build time (confirmed: build output has one chunk, same size as before Sentry was added). With a DSN, it becomes a second, separate chunk (~160 KB gzip) fetched asynchronously, after first paint, never blocking it.
+
+`ErrorBoundary.componentDidCatch` calls `reportError(error, info.componentStack)`, not the SDK directly — `reportError` is safe to call unconditionally (no-op until the dynamic import resolves, never throws) so the boundary itself stays free of any Sentry-shaped import.
+
+**Deliberately narrower than Sentry's own setup wizard suggests:** only error monitoring, `sendDefaultPii: false`, no Session Replay, no performance tracing. This project is EU-facing with likely-minor users; Session Replay records real interaction with the page and needs explicit consent before it's turned on, not silent opt-in at install time. Add it later, gated behind the consent flow from Faza 7 — not now.
+
+`VITE_SENTRY_DSN` goes in `.env.local` (gitignored) for local dev, and as a `VITE_SENTRY_DSN` GitHub Actions secret for `deploy.yml` to bake into the published build. It's optional everywhere: CI and any build without it just produce an app with reporting off, not a failure.
 
 ### Responsive layout is JS-driven, not CSS-only
 

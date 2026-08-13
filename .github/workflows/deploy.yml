@@ -25,6 +25,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Opțional: fără el, build-ul reușește la fel, doar fără raportare
+          # de erori pe site-ul publicat. Vezi src/lib/sentry.ts.
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
