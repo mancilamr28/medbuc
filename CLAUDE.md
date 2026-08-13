@@ -10,11 +10,15 @@ npm run dev        # dev server on http://localhost:5173
 npm run build      # tsc -b && vite build → dist/
 npm run preview    # serve the production build
 npm run typecheck  # tsc -b --noEmit
+npm run lint       # eslint .
 npm test           # vitest run
 npm run test:watch # vitest
+npm run seed       # regenerate supabase/seed.sql from src/data/
 ```
 
-**There is no linter** — but there are tests, and CI. `.github/workflows/ci.yml` runs typecheck → tests → build on every pull request and on pushes to `master`; `.github/workflows/deploy.yml` publishes to Pages separately. `npm run build` typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
+There is ESLint, tests, and CI. `.github/workflows/ci.yml` runs lint → typecheck → tests → build on every pull request and on pushes to `master`; `.github/workflows/deploy.yml` publishes to Pages separately. `npm run build` typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
+
+`eslint.config.js` only enables `react-hooks/rules-of-hooks` and `react-hooks/exhaustive-deps`, not the plugin's full `recommended` config. Since v7 that config pulls in the React Compiler ruleset (`purity`, `refs`, `set-state-in-effect`, `immutability`, …), and those rules flag `usePersistentState`'s synchronous re-read on key change — the deliberate, tested fix for the note-overwrite bug — as an anti-pattern. Adopting the full set is a separate initiative (preparing for a compiler this project doesn't use); don't widen `extends` to `reactHooks.configs.recommended` without doing that work first.
 
 Tests live next to their subject, and **the extension picks the runner** (`vitest.config.ts` defines two projects):
 
@@ -46,7 +50,9 @@ Hash-based, no router dependency. The `SCREENS` tuple is the single source of tr
 
 ### Global state — `src/state/AppState.tsx`
 
-One React context provides everything: theme, role, selected `materie`, filters, settings, the admin draft, plus the two quiz engines. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
+One React context provides everything: theme, role, selected `materie`, the admin draft, plus the two quiz engines. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
+
+**`useSession()` and `useSimulare()` memoize their returned object.** `AppProvider`'s own `value` is wrapped in `useMemo`, but that only skips work when every dependency keeps its identity — and `session`/`sim` are two of those dependencies. Returning a fresh object literal from either hook on every render (as both used to) made the outer memo recompute unconditionally, defeating it. Preserve this when touching either hook: any new field returned from `useSession`/`useSimulare` needs a matching entry in that hook's own `useMemo` dependency array, or the fix regresses silently. `react-hooks/exhaustive-deps` (see below) catches a missing dependency but not a memo that's pointless because its inputs are never stable — that part has to be checked by eye, or by measuring, as it was here: instrumenting `addEventListener`/`removeEventListener` for 13 seconds is what showed a related plan claim — that a `Grile` keyboard listener was re-subscribing every second — didn't actually reproduce, since `AppProvider`'s clock is gated per-screen and doesn't tick on that screen at all.
 
 ### Two independent quiz engines (different persistence semantics)
 
@@ -104,6 +110,12 @@ Typed constants standing in for a future API. `chapters.ts` (`MATERII` keyed by 
 Concretely: `Chapter` carries no `total` — `chapterQuestionCount()` / `materieQuestionCount()` in `questions.ts` count the real bank, so the figure grows only as content is written and a chapter with nothing in it disables its own "Exersează" button. `ScoreChart` and `ChapterChart` take their data as props and render an empty state when there is none, rather than owning fabricated constants. When adding a screen, derive or omit — do not seed plausible-looking demo values, and do not restore a `pct` field to make a chart look fuller.
 
 Counted figures still need Romanian grammar: `numar()` in `src/lib/text.ts` handles the `de` rule ("6 grile" but "20 de grile"). Use it instead of interpolating a bare number next to a noun.
+
+### Feedback for actions — `src/state/ToastContext.tsx`
+
+The counterpart to `EmptyState`: `EmptyState` says a screen has nothing yet, `useToast().notify(kind, message)` says an action just succeeded or failed. Before this there was no such mechanism anywhere in the app — a save with no visible result and a save that silently failed looked identical. `ToastProvider` is mounted in `main.tsx` outside `AppProvider`, since transient notifications don't belong in state that also holds session and exam data.
+
+Not wired to a screen yet — there is no real async action to attach it to until Faza 3 adds one (Admin's save, exam submission feedback). It exists now, tested, the same way the Supabase schema was written and verified before anything used it: don't force a demo call onto an existing button just to prove the primitive works, that recreates exactly the fabricated-feedback problem this was built to solve.
 
 **Questions have a stable `id`** (`QuestionId`, e.g. `bio-nervos-01`), and anything persisted or passed around must reference that id — never the array position. `QUESTION_BY_ID` / `questionById()` resolve it and `isQuestionId()` validates it. This is why `SimRun.order` stores ids: with positions, inserting one question into the middle of the bank silently rewrote the content of every saved paper. `QUESTION_BY_ID` is built at the bottom of the file, after `QUESTIONS` — building it earlier is a temporal-dead-zone crash at import time. Ids must be unique; a duplicate throws on module load rather than making a question unreachable.
 

@@ -247,27 +247,78 @@ export function useSimulare(now: number): Simulare {
     [patch],
   );
 
-  return {
-    phase: !run ? 'config' : finishedAt !== null ? 'rezultat' : 'rulare',
-    config,
-    setConfig,
-    start,
-    finish,
-    reset,
-    expired,
-    score,
-    run,
-    question,
-    qi,
-    total,
-    answer: run?.answers[qi],
-    isMarked: !!run?.marks[qi],
-    completed: run ? Object.keys(run.answers).length : 0,
-    secondsLeft,
-    pick: (key) => patch((prev) => ({ ...prev, answers: { ...prev.answers, [prev.qi]: key } })),
-    next: () => patch((prev) => ({ ...prev, qi: Math.min(prev.qi + 1, prev.order.length - 1) })),
-    prev: () => patch((prev) => ({ ...prev, qi: Math.max(prev.qi - 1, 0) })),
-    goTo,
-    toggleMark: () => patch((prev) => ({ ...prev, marks: { ...prev.marks, [prev.qi]: !prev.marks[prev.qi] } })),
-  };
+  // Erau literale inline în obiectul întors, deci o identitate nouă la fiecare
+  // render — asta ar fi anulat memoizarea de mai jos oricum s-ar fi scris ea.
+  const pick = useCallback(
+    (key: OptionKey) => patch((prev) => ({ ...prev, answers: { ...prev.answers, [prev.qi]: key } })),
+    [patch],
+  );
+  const next = useCallback(
+    () => patch((prev) => ({ ...prev, qi: Math.min(prev.qi + 1, prev.order.length - 1) })),
+    [patch],
+  );
+  const prev = useCallback(() => patch((p) => ({ ...p, qi: Math.max(p.qi - 1, 0) })), [patch]);
+  const toggleMark = useCallback(
+    () => patch((p) => ({ ...p, marks: { ...p.marks, [p.qi]: !p.marks[p.qi] } })),
+    [patch],
+  );
+
+  const answer = run?.answers[qi];
+  const isMarked = !!run?.marks[qi];
+  const completed = run ? Object.keys(run.answers).length : 0;
+  const phase = !run ? 'config' : finishedAt !== null ? 'rezultat' : 'rulare';
+
+  /**
+   * Aceeași grijă ca la `useSession`: `AppState` ține `sim` într-un `useMemo`
+   * al lui, care nu poate sări peste recalcul dacă `sim` are o identitate nouă
+   * la fiecare render, indiferent ce s-a schimbat de fapt aici.
+   */
+  return useMemo<Simulare>(
+    () => ({
+      phase,
+      config,
+      setConfig,
+      start,
+      finish,
+      reset,
+      expired,
+      score,
+      run,
+      question,
+      qi,
+      total,
+      answer,
+      isMarked,
+      completed,
+      secondsLeft,
+      pick,
+      next,
+      prev,
+      goTo,
+      toggleMark,
+    }),
+    [
+      answer,
+      completed,
+      config,
+      expired,
+      finish,
+      goTo,
+      isMarked,
+      phase,
+      pick,
+      next,
+      prev,
+      qi,
+      question,
+      reset,
+      run,
+      score,
+      secondsLeft,
+      setConfig,
+      start,
+      toggleMark,
+      total,
+    ],
+  );
 }
