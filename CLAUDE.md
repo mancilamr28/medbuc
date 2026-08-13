@@ -16,7 +16,14 @@ npm run test:watch # vitest
 
 **There is no linter** — but there are tests, and CI. `.github/workflows/ci.yml` runs typecheck → tests → build on every pull request and on pushes to `master`; `.github/workflows/deploy.yml` publishes to Pages separately. `npm run build` typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
 
-Tests live next to their subject as `*.test.ts` and cover **pure functions only** — no DOM, no React renderer, so `vitest` is the sole test dependency. They are inside `include`, so `npm run typecheck` checks them too, and they are never imported by the app, so they stay out of the bundle. To keep logic testable, extract it as a pure function taking its inputs as arguments (as `scoreOf` in `useSession.ts` does) rather than reading `Date.now()`, `Math.random()` or hook state directly.
+Tests live next to their subject, and **the extension picks the runner** (`vitest.config.ts` defines two projects):
+
+- **`*.test.ts` — pure functions, `node` environment.** No DOM, no renderer; these stay in the millisecond range. Keep logic testable by extracting it as a pure function over its inputs (as `scoreOf` in `useSession.ts` does) rather than reading `Date.now()`, `Math.random()` or hook state directly.
+- **`*.test.tsx` — components, `jsdom` + Testing Library.** `src/test/setup.ts` runs first: it clears `localStorage` and the theme attribute between tests, and supplies the `matchMedia` that jsdom lacks but `useIsDesktop()` calls on nearly every screen (it reads `window.innerWidth`, so a test can render the phone layout by setting it).
+
+Both are inside `include`, so `npm run typecheck` checks them, and neither is imported by the app, so they stay out of the bundle.
+
+The render tests are not there for coverage — each one pins a bug that actually shipped: the chapter note overwritten when the question changed (data loss), "Predă lucrarea" deleting the whole exam, the theme saved as JSON but compared unquoted, a corrupt `localStorage` payload whitening the page. Each was confirmed by reintroducing the original bug and watching the test fail. **When you fix a user-visible bug, add the test the same way** — and if a new test passes against the broken code, it is not testing what you think.
 
 ## Language
 
