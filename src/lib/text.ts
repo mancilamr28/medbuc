@@ -18,3 +18,22 @@ export const numar = (n: number, singular: string, plural: string): string => {
   if (Math.abs(n) === 1) return `${n} ${singular}`;
   return `${n} ${needsDe(n) ? 'de ' : ''}${plural}`;
 };
+
+/** Primul prenume dintr-un nume complet; fără nume, partea dinaintea @ din email. */
+export const primulNume = (nume: string | null, email: string): string => {
+  const prim = nume?.trim().split(/\s+/)[0];
+  if (prim) return prim;
+  return email.split('@')[0] ?? email;
+};
+
+/** Inițialele unui nume, ex. „Andrei Popescu" → „AP". Fără nume, un singur caracter din email. */
+export const initialeDin = (nume: string | null, email: string): string => {
+  const cuvinte = nume?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (cuvinte.length > 0) {
+    return cuvinte
+      .slice(0, 2)
+      .map((c) => c[0]!.toUpperCase())
+      .join('');
+  }
+  return email[0]?.toUpperCase() ?? '?';
+};

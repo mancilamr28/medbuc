@@ -52,9 +52,23 @@ Hash-based, no router dependency. The `SCREENS` tuple is the single source of tr
 
 ### Global state — `src/state/AppState.tsx`
 
-One React context provides everything: theme, role, selected `materie`, the admin draft, plus the two quiz engines. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
+One React context provides everything: theme, screen, selected `materie`, the admin draft, plus the two quiz engines. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
+
+Account identity and role are deliberately **not** here — see the next section. `AppProvider` has no dependency on being logged in; it mounts and works the same whether `AuthContext` reports a user or not, the same way `ToastProvider` stays independent so transient notifications don't share a context with session/exam data.
 
 **`useSession()` and `useSimulare()` memoize their returned object.** `AppProvider`'s own `value` is wrapped in `useMemo`, but that only skips work when every dependency keeps its identity — and `session`/`sim` are two of those dependencies. Returning a fresh object literal from either hook on every render (as both used to) made the outer memo recompute unconditionally, defeating it. Preserve this when touching either hook: any new field returned from `useSession`/`useSimulare` needs a matching entry in that hook's own `useMemo` dependency array, or the fix regresses silently. `react-hooks/exhaustive-deps` (see below) catches a missing dependency but not a memo that's pointless because its inputs are never stable — that part has to be checked by eye, or by measuring, as it was here: instrumenting `addEventListener`/`removeEventListener` for 13 seconds is what showed a related plan claim — that a `Grile` keyboard listener was re-subscribing every second — didn't actually reproduce, since `AppProvider`'s clock is gated per-screen and doesn't tick on that screen at all.
+
+### Authentication — `src/state/AuthContext.tsx`
+
+Wraps Supabase Auth: `signIn`, `signUp`, `signOut`, `requestPasswordReset`, `updatePassword`, plus `user`/`profile`/`role`/`loading`/`recovery`, all sourced from `supabase.auth.getSession()` and `onAuthStateChange`, never from client state. `role` reads `profiles.role` (fetched after the user is known) and defaults to `'elev'` while there is no session — there is no client-settable role anymore. This replaced a `useState<Role>('admin')` that started every visitor as admin and flipped with one click on a switcher rendered *inside* the access-denied screen, so a student became an administrator with a single tap; `AdminBlocat` (`src/screens/Admin.tsx`) no longer renders any switcher at all.
+
+`App.tsx` gates on this before rendering anything else: `loading` → a bare themed placeholder (no spinner, no fabricated progress bar), `recovery` → `ResetareParolaFinalizare` (a forced new-password form), no `user` → `Autentificare` (login/register/forgot-password, one component with a `mode` field, not three routes — there is nothing to route to before a session exists). Only past that gate does the normal `Sidebar`/`Topbar`/`Content` shell mount.
+
+**`recovery` is how the reset-password link is detected**, not a URL path. Supabase's reset email signs the user into a temporary session and fires `onAuthStateChange('PASSWORD_RECOVERY', …)`; the context sets `recovery = true` on that event and clears it once `updatePassword` succeeds. This coexists with the app's own hash router because supabase-js consumes the `#access_token=…&type=recovery` fragment itself on load, before the router's own `hashchange` handling ever sees a screen name in it.
+
+**Supabase's auth errors are English; the UI is Romanian.** `mesajEroare()` in `AuthContext.tsx` translates the handful that actually surface in the UI (bad credentials, unconfirmed email, duplicate signup, weak password, rate limiting) and falls back to a generic message for anything else — extend that map rather than let raw Supabase text leak into a Romanian screen.
+
+Provider order in `main.tsx` matters: `ErrorBoundary > ToastProvider > AuthProvider > AppProvider > App`. `AuthProvider` sits above `AppProvider` because `Sidebar`/`Admin` need both `useApp()` (navigation) and `useAuth()` (role) at once — but `AppProvider` itself never calls `useAuth()`, which is what keeps `AppState.test.tsx` able to render `<AppProvider>` alone with no `<AuthProvider>` ancestor and no network access.
 
 ### Two independent quiz engines (different persistence semantics)
 

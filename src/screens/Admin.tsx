@@ -1,21 +1,11 @@
-import { Segmented } from '../components/Segmented';
 import { Switch } from '../components/Switch';
 import { EmptyState } from '../components/EmptyState';
 import { MATERII, MATERIE_BY_NAME, chapterLabel } from '../data/chapters';
 import { OPTION_KEYS, QUESTIONS, type OptionKey } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
 import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, twoCol } from '../lib/ui';
-import { useApp, type AdminDraft, type Role } from '../state/AppState';
-
-const ROLE_TABS: { id: Role; label: string }[] = [
-  { id: 'elev', label: 'Elev' },
-  { id: 'admin', label: 'Administrator' },
-];
-
-function RoleSwitcher() {
-  const { role, setRole } = useApp();
-  return <Segmented items={ROLE_TABS} value={role} onChange={setRole} ariaLabel="Rolul cu care vizualizezi" />;
-}
+import { useApp, type AdminDraft } from '../state/AppState';
+import { useAuth } from '../state/AuthContext';
 
 /** Ce vede un cont fără drepturi de administrare. */
 export function AdminBlocat() {
@@ -40,15 +30,12 @@ export function AdminBlocat() {
       <p style={{ margin: '10px 0 22px', font: `400 14px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
         Panoul de administrare este disponibil doar conturilor cu rol de administrator sau redactor de conținut.
       </p>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <RoleSwitcher />
-      </div>
     </div>
   );
 }
 
 export function Admin() {
-  const { role } = useApp();
+  const { role } = useAuth();
   return role === 'admin' ? <AdminPanel /> : <AdminBlocat />;
 }
 
@@ -86,10 +73,6 @@ function AdminPanel() {
         <div>
           <h1 style={pageTitle}>Administrare conținut</h1>
           <p style={pageLead}>Adaugi grile în bibliotecă și decizi ce se publică pentru elevi.</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>Vizualizezi ca</span>
-          <RoleSwitcher />
         </div>
       </div>
 

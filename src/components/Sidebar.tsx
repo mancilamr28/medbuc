@@ -12,11 +12,13 @@ import {
   faStopwatch,
 } from '@fortawesome/free-solid-svg-icons';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
-import { EXAM_DATE, EXAM_DATE_LABEL, STUDENT } from '../data/profile';
+import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
 import { daysUntil } from '../lib/time';
+import { initialeDin } from '../lib/text';
 import { SANS, eyebrow } from '../lib/ui';
 import type { Screen } from '../lib/router';
 import { useApp } from '../state/AppState';
+import { useAuth } from '../state/AuthContext';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 
@@ -28,7 +30,8 @@ interface NavEntry {
 }
 
 export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
-  const { role, session } = useApp();
+  const { session } = useApp();
+  const { role } = useAuth();
   const ramase = session.total - Object.keys(session.revealed).length;
 
   return {
@@ -51,8 +54,11 @@ export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
 
 export function Sidebar() {
   const { screen, go } = useApp();
+  const { user, profile } = useAuth();
   const { main, sec } = useNavGroups();
   const zileRamase = daysUntil(EXAM_DATE);
+  const nume = profile?.fullName || user?.email || 'Contul meu';
+  const initiale = initialeDin(profile?.fullName ?? null, user?.email ?? '?');
 
   const renderGroup = (title: string, items: NavEntry[]) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -133,7 +139,7 @@ export function Sidebar() {
           type="button"
           className="user-card"
           onClick={() => go('setari')}
-          aria-label={`Profilul lui ${STUDENT.name} · deschide setările`}
+          aria-label={`Profilul lui ${nume} · deschide setările`}
         >
           <span
             aria-hidden="true"
@@ -149,17 +155,17 @@ export function Sidebar() {
               flex: '0 0 auto',
             }}
           >
-            {STUDENT.initials}
+            {initiale}
           </span>
           <span style={{ minWidth: 0 }}>
             <span className="truncate" style={{ display: 'block', font: `600 13px/1.2 ${SANS}`, color: 'var(--fg)' }}>
-              {STUDENT.name}
+              {nume}
             </span>
             <span
               className="truncate"
               style={{ display: 'block', font: `400 11px/1.3 ${SANS}`, color: 'var(--fg3)' }}
             >
-              {STUDENT.liceu}
+              {user?.email}
             </span>
           </span>
           <Icon icon={faChevronRight} className="user-card__chevron" size={11} />

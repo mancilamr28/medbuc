@@ -3,12 +3,13 @@ import { EmptyState } from '../components/EmptyState';
 import { ScoreChart } from '../components/ScoreChart';
 import { Segmented } from '../components/Segmented';
 import { QUESTIONS } from '../data/questions';
-import { EXAM_DATE, EXAM_DATE_LABEL, STUDENT } from '../data/profile';
+import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
 import { usePersistentState } from '../lib/hooks';
-import { numar } from '../lib/text';
+import { numar, primulNume } from '../lib/text';
 import { daysUntil } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/AppState';
+import { useAuth } from '../state/AuthContext';
 
 type Variant = 'a' | 'b';
 
@@ -26,16 +27,18 @@ const cardSub = { marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' 
  */
 export function Acasa() {
   const { go, session } = useApp();
+  const { user, profile } = useAuth();
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
   const daysLeft = daysUntil(EXAM_DATE);
   const raspunse = Object.keys(session.answers).length;
   const inSesiune = raspunse > 0 && !session.finished;
+  const prenume = primulNume(profile?.fullName ?? null, user?.email ?? '');
 
   return (
     <div className="screen">
       <div style={{ marginBottom: 22 }}>
-        <h1 style={pageTitle}>Bună, {STUDENT.firstName}</h1>
+        <h1 style={pageTitle}>Bună, {prenume}</h1>
         <p style={pageLead}>
           Mai sunt {numar(daysLeft, 'zi', 'zile')} până la examen. Biblioteca are{' '}
           {numar(QUESTIONS.length, 'grilă', 'grile')} scrise deocamdată.
