@@ -18,6 +18,8 @@ npm run seed       # regenerate supabase/seed.sql from src/data/
 
 There is ESLint, tests, and CI. `.github/workflows/ci.yml` runs lint → typecheck → tests → build on every pull request and on pushes to `master`; `.github/workflows/deploy.yml` publishes to Pages separately. `npm run build` typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
 
+**Node ≥ 22.19 is required** (`package.json` `engines`, both workflows pinned to Node 24) — `jsdom` (`*.test.tsx`) requires `^22.22.2 || ^24.15.0 || >=26.0.0`, and its `undici` dependency requires `>=22.19.0`. On an older Node, every jsdom-environment test file fails to even start its worker (`webidl.util.markAsUncloneable is not a function`) while the `node`-environment tests still pass — a confusing split failure that looks like broken code rather than a runtime mismatch. This bit CI once already, pinned at Node 20.
+
 `eslint.config.js` only enables `react-hooks/rules-of-hooks` and `react-hooks/exhaustive-deps`, not the plugin's full `recommended` config. Since v7 that config pulls in the React Compiler ruleset (`purity`, `refs`, `set-state-in-effect`, `immutability`, …), and those rules flag `usePersistentState`'s synchronous re-read on key change — the deliberate, tested fix for the note-overwrite bug — as an anti-pattern. Adopting the full set is a separate initiative (preparing for a compiler this project doesn't use); don't widen `extends` to `reactHooks.configs.recommended` without doing that work first.
 
 Tests live next to their subject, and **the extension picks the runner** (`vitest.config.ts` defines two projects):
