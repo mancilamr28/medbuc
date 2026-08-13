@@ -113,6 +113,18 @@ Counted figures still need Romanian grammar: `numar()` in `src/lib/text.ts` hand
 
 Renaming a persisted key means the old one must be moved, not abandoned: `src/lib/migrations.ts` runs once from `main.tsx`, before the first render. `noteKeyMoves()` is the pure part and is tested; it never overwrites a newer note and leaves unrecognised keys alone rather than deleting someone's text.
 
+### Database schema — `supabase/`
+
+SQL for a backend that does not exist yet: the app still reads from `src/data/`, and nothing here is wired to it. The schema was written first, in SQL, so the model would be designed rather than translated from TypeScript types later. `supabase/README.md` carries the design decisions; the ones that constrain future work:
+
+- **Content ids are human-written `text`** (`bio-nervos`, `bio-nervos-01`), not `uuid` — they are already the app's identity and are embedded in saved exam papers, so a simulation started before the migration stays valid after it.
+- **`attempts` is a journal, not state.** One row per answer, the single source for progress, statistics and spaced repetition. Nothing stores a denormalised `pct` or `done` — that is exactly how the fabricated figures appeared. There are deliberately no `update`/`delete` policies on it.
+- **`seed.sql` is generated** by `npm run seed` from `src/data/` and must never be hand-edited. Regenerate it after changing chapters or questions.
+
+`schema.test.ts` and `rls.test.ts` run the migrations on a real Postgres in-process (PGlite, Postgres 18 in WebAssembly) rather than asserting on the SQL text. This matters most for RLS: **a wrong policy raises no error, it just shows someone else's data.** Every query in those tests goes through the `authenticated` role with a user id set on the request, the way a browser query arrives — `harness.ts` builds the Supabase-provided pieces the migrations depend on (`auth` schema, `auth.uid()`, the `anon`/`authenticated` roles). When adding a policy, add the test that fails without it; weakening `notes_proprii` to `using (true)` must break the isolation tests.
+
+Note the harness detail that already bit once: it uses session-level `set role`, not `set local role`. Outside a transaction `set local` is silently ignored, queries keep running as the table owner, RLS is bypassed, and every isolation test passes while proving nothing.
+
 ## TypeScript constraints that bite
 
 `tsconfig.json` is aggressive; these cause build failures that may be surprising:
