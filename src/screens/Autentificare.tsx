@@ -3,9 +3,10 @@ import { SANS, SERIF, label } from '../lib/ui';
 import { useAuth } from '../state/AuthContext';
 import { useToast } from '../state/ToastContext';
 
-type Mod = 'login' | 'inregistrare' | 'uitat';
+/** Exportat pentru că `App` alege modul din ruta publică (`#/inregistrare`). */
+export type ModAutentificare = 'login' | 'inregistrare' | 'uitat';
 
-const TITLURI: Record<Mod, { titlu: string; sub: string }> = {
+const TITLURI: Record<ModAutentificare, { titlu: string; sub: string }> = {
   login: { titlu: 'Bine ai revenit', sub: 'Autentifică-te ca să continui pregătirea.' },
   inregistrare: { titlu: 'Creează-ți contul', sub: 'Câteva secunde, apoi poți începe să exersezi.' },
   uitat: { titlu: 'Recuperează parola', sub: 'Îți trimitem un link de resetare pe email.' },
@@ -15,9 +16,14 @@ const TITLURI: Record<Mod, { titlu: string; sub: string }> = {
  * Ecranul de autentificare. Nu se sprijină pe `AppState` — nu are ce naviga
  * înainte să existe o sesiune, iar rolul (elev/admin) vine mereu din `profiles`
  * după autentificare, nu dintr-un comutator din interfață.
+ *
+ * `modInitial` vine din ruta publică, dar legătura e într-un singur sens: doar
+ * punctul de intrare se citește din hash. Comutatoarele din card rămân stare
+ * internă — o sincronizare în ambele sensuri ar rescrie URL-ul la fiecare
+ * „Ai uitat parola?" și ar pierde ce e deja tastat.
  */
-export function Autentificare() {
-  const [mod, setMod] = useState<Mod>('login');
+export function Autentificare({ modInitial = 'login' }: { modInitial?: ModAutentificare }) {
+  const [mod, setMod] = useState<ModAutentificare>(modInitial);
   const [email, setEmail] = useState('');
   const [parola, setParola] = useState('');
   const [numeComplet, setNumeComplet] = useState('');
@@ -28,7 +34,7 @@ export function Autentificare() {
   const { signIn, signUp, requestPasswordReset } = useAuth();
   const { notify } = useToast();
 
-  const schimbaMod = (next: Mod) => {
+  const schimbaMod = (next: ModAutentificare) => {
     setMod(next);
     setEroare(null);
     setEmailTrimis(false);
@@ -75,14 +81,25 @@ export function Autentificare() {
       }}
     >
       <div className="card" style={{ width: '100%', maxWidth: 400, padding: 30 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
+        {/* Marca duce înapoi la pagina de prezentare — altfel cardul e o fundătură
+            pentru cine a intrat aici dintr-un buton și vrea să se mai uite o dată. */}
+        <a
+          href="#/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 22,
+            color: 'var(--fg)',
+          }}
+        >
           <img
             src={`${import.meta.env.BASE_URL}logo-kitty.svg`}
             alt=""
             style={{ width: 34, height: 34, display: 'block' }}
           />
           <span style={{ font: `600 16px/1 ${SANS}`, letterSpacing: '-.01em' }}>MedBuc</span>
-        </div>
+        </a>
 
         <h1 style={{ margin: 0, font: `400 24px/1.2 ${SERIF}` }}>{titlu}</h1>
         <p style={{ margin: '7px 0 22px', font: `400 13.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>{sub}</p>

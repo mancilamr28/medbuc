@@ -39,6 +39,17 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+/**
+ * Deconectarea pleacă mereu dintr-un ecran al aplicației, deci hash-ul rămâne
+ * pe el — `#/setari`. Fără resetare, `publicViewFor('setari')` cere
+ * autentificare și ieșirea din cont aterizează pe formularul de login în loc de
+ * pagina de prezentare. Se schimbă înaintea deconectării, cât încă nu s-a
+ * randat nimic public.
+ */
+const laPaginaPublica = (): void => {
+  window.location.hash = '/';
+};
+
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
@@ -105,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: null, confirmareEmail: data.session === null };
       },
       async signOut() {
+        laPaginaPublica();
         await supabase.auth.signOut();
       },
       async requestPasswordReset(email) {
@@ -148,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sesiunea rămâne validă în memorie după ce contul a dispărut din bază;
         // fără deconectare explicită, aplicația ar continua să arate un profil
         // care nu mai există.
+        laPaginaPublica();
         await supabase.auth.signOut();
         return { error: null };
       },
