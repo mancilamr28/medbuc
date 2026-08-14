@@ -50,6 +50,8 @@ Hash-based, no router dependency. The `SCREENS` tuple is the single source of tr
 
 **Adding a screen requires coordinated edits**: add the id to `SCREENS`, add it to `BUILT_SCREENS`, add a `case` in `Content()` in `src/App.tsx`, and add nav entries in `src/components/Sidebar.tsx` and `src/components/MobileNav.tsx`.
 
+The same module also carries a second, disjoint route space for visitors without a session — see "The public route space" below. A page meant for logged-out visitors does **not** go in `SCREENS`.
+
 ### Global state — `src/state/AppState.tsx`
 
 One React context provides everything: theme, screen, selected `materie`, the admin draft, plus the two quiz engines. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
@@ -69,6 +71,34 @@ Wraps Supabase Auth: `signIn`, `signUp`, `signOut`, `requestPasswordReset`, `upd
 **Supabase's auth errors are English; the UI is Romanian.** `mesajEroare()` in `AuthContext.tsx` translates the handful that actually surface in the UI (bad credentials, unconfirmed email, duplicate signup, weak password, rate limiting) and falls back to a generic message for anything else — extend that map rather than let raw Supabase text leak into a Romanian screen.
 
 Provider order in `main.tsx` matters: `ErrorBoundary > ToastProvider > AuthProvider > AppProvider > App`. `AuthProvider` sits above `AppProvider` because `Sidebar`/`Admin` need both `useApp()` (navigation) and `useAuth()` (role) at once — but `AppProvider` itself never calls `useAuth()`, which is what keeps `AppState.test.tsx` able to render `<AppProvider>` alone with no `<AuthProvider>` ancestor and no network access.
+
+### The public route space — `landing` is deliberately not a `Screen`
+
+Anonymous visitors used to get the 400px login card and nothing else; there was no public page at all. There is now a marketing page at `#/`, and it lives in a **second route union that does not intersect `Screen`**:
+
+- `SCREENS` / `Screen` — the authenticated shell's routes, consumed by `BUILT_SCREENS`, `Content()`, `Sidebar`, `MobileNav` and `go()`. Unchanged.
+- `PUBLIC_ROUTES` / `PublicView` (`'landing' | 'autentificare' | 'inregistrare' | 'parola-uitata'`) — what a visitor without a session can see, resolved by the pure `publicViewFor()` and watched by `usePublicView()`.
+
+Putting `'landing'` in `SCREENS` would make `go('landing')` callable from every component inside the shell, and the two spaces need opposite fallbacks anyway (unknown hash → `acasa` there, → `landing` here). Keeping them disjoint makes "a logged-in user never sees the landing" a **type error** rather than a convention. `router.test.ts` asserts the two never overlap.
+
+`publicViewFor` sends any valid `Screen` to `autentificare` **without touching the hash**, so `#/grile` shared by a friend lands on login and, once the session exists, `readHash()` finds `grile` on its own — there is no post-login redirect logic anywhere, and there should not be. Conversely no `PublicRoute` is a `Screen`, so after login the hash falls back to `acasa` by itself; `App` only rewrites the address bar with `history.replaceState` so it stops lying.
+
+`signOut()` and `stergeContul()` in `AuthContext` reset the hash to `/` *before* dropping the session. Without that, signing out from `#/setari` resolves to `autentificare` and dumps you on the login form instead of the landing page.
+
+### The landing page — `src/screens/Landing/`
+
+Two invariants hold the whole thing up, and `Landing.test.ts` pins both on the file contents because neither would fail a render test:
+
+1. **Nothing inside imports `useApp` or `useAuth`.** The page only renders when there is no session, and `go()` targets routes that require one — a `go('acasa')` in there (e.g. by reusing `<Logo />`, which calls it) throws the visitor into the login card on a logo click. That is why `parts/Marca.tsx` renders the `<img>` directly, as `Autentificare.tsx` already does. Navigation goes through `parts/CtaAuth.tsx`, the only file that knows the public routes.
+2. **Nothing outside the directory imports from it.** `App.tsx` loads it with `lazy` + a `LandingBoundary` that falls back to `<Autentificare />` when the chunk 404s (stale `index.html` on Pages after a deploy). One static import from anywhere would merge the whole chunk — page, styles, mockups — back into the main bundle that authenticated students download. It is currently ~8.5 KB + 6 KB gzip, entirely separate; keep it that way.
+
+It is the one screen with its own palette: `--lp-*` tokens on `.lp` in `landing.css`, dark unconditionally, independent of the theme toggle — it is a composition, and a visitor has no theme yet. Same rule as everywhere else though: **no colour is written inline in TSX**, and every class is prefixed `lp-`.
+
+**No animation library was added.** `motion.ts` holds the whole vocabulary — `useInView`, `useReducedMotion`, `useHasPointer`, `usePointerGlow`, `useTilt`, `useParallax`, `useScrollSteps`, `useContorAnimat` — and everything animates only `transform`/`opacity`. Pointer effects write CSS custom properties from a `requestAnimationFrame`, never through `setState`; blur is always static, never animated. `useInView` defaults to `threshold: 0` on purpose: the large panels are taller than the viewport, so a percentage threshold would fire only after they were half past.
+
+The global `prefers-reduced-motion` block in `styles.css` only kills `.screen`/`.logo`, so `landing.css` carries its own — **every new `@keyframes` here must be added to it**, and the hooks short-circuit themselves as well.
+
+**The honesty rule applies hardest here.** A landing page is exactly where "1000+ grile" and student counts want to appear. Every figure shown is derived: days from `EXAM_DATE`, chapters and past sessions counted from `MATERII`, per-chapter counts from `chapterQuestionCount()`. The bank's size is deliberately *not* used as a selling point, and only shipped features are promoted — no `statistici`, `plan`, `recapitulare` or `notite`, which are all `InLucru`. The interactive question in the mockup is a real one out of `QUESTIONS`, with its real explanation. Counted nouns still go through `numar()`: "1 grilă", not "1 grile".
 
 ### Two independent quiz engines (different persistence semantics)
 

@@ -1,0 +1,1781 @@
+/*
+ * Sistemul vizual al paginii de prezentare.
+ *
+ * E singurul ecran cu paletă proprie. Restul aplicației are două teme și
+ * comută între ele; pagina asta e întunecată necondiționat, pentru că e o
+ * compoziție, nu o suprafață de lucru — un elev o vede o dată, înainte să aibă
+ * un cont, iar tema lui nici nu există încă. De aceea toți tokenii de aici sunt
+ * `--lp-*`, definiți pe `.lp`, și niciunul nu se scrie inline în TSX: aceeași
+ * regulă ca în `styles.css`, doar cu alt set.
+ *
+ * Toate clasele sunt prefixate `lp-`, deci nu pot atinge aplicația, iar
+ * fișierul e importat exclusiv din `Landing.tsx`, deci pleacă în chunk-ul lazy.
+ */
+
+.lp {
+  /* Fundal: navy aproape negru, cu două trepte peste el pentru adâncime. */
+  --lp-bg: oklch(0.145 0.028 262);
+  --lp-bg2: oklch(0.185 0.032 262);
+  --lp-surf: oklch(0.225 0.034 262);
+  --lp-surf2: oklch(0.275 0.038 262);
+
+  /* Marginile sunt lumină translucidă, nu o culoare: așa prind fundalul de sub ele. */
+  --lp-line: oklch(1 0 0 / 0.08);
+  --lp-line2: oklch(1 0 0 / 0.15);
+  --lp-line3: oklch(1 0 0 / 0.24);
+
+  --lp-fg: oklch(0.975 0.006 250);
+  --lp-fg2: oklch(0.815 0.018 250);
+  --lp-fg3: oklch(0.655 0.024 255);
+
+  /* Albastrul medical electric — lumina principală a paginii. */
+  --lp-cyan: oklch(0.845 0.132 213);
+  --lp-cyan2: oklch(0.72 0.155 233);
+  --lp-cyan3: oklch(0.575 0.168 248);
+  /* Turcoazul apare punctual, ca al doilea accent, niciodată pe suprafețe mari. */
+  --lp-teal: oklch(0.855 0.125 178);
+  /* Indigoul e lumina rece din spate, aproape niciodată text. */
+  --lp-indigo: oklch(0.62 0.165 282);
+
+  --lp-ok: oklch(0.82 0.14 158);
+  --lp-bad: oklch(0.72 0.16 22);
+
+  --lp-sans: 'Public Sans', system-ui, sans-serif;
+  --lp-serif: Newsreader, Georgia, serif;
+
+  /* O singură scară de raze, ca să nu apară cinci rotunjimi apropiate. */
+  --lp-r1: 8px;
+  --lp-r2: 12px;
+  --lp-r3: 18px;
+  --lp-r4: 26px;
+
+  --lp-curba: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --lp-latime: 1200px;
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: var(--lp-bg);
+  color: var(--lp-fg);
+  font-family: var(--lp-sans);
+  /* Gradientele radiale și obiectul din erou depășesc lățimea intenționat;
+     `clip` taie fără să creeze un context de derulare, cum ar face `hidden`. */
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lp ::selection {
+  background: oklch(0.575 0.168 248 / 0.45);
+  color: var(--lp-fg);
+}
+
+.lp :focus-visible {
+  outline: 2px solid var(--lp-cyan);
+  outline-offset: 3px;
+  border-radius: var(--lp-r1);
+}
+
+/* Bara de derulare a documentului, cât timp pagina asta e montată. */
+html:has(.lp) {
+  scrollbar-color: oklch(0.35 0.04 262) oklch(0.145 0.028 262);
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.lp) {
+    scroll-behavior: auto;
+  }
+}
+
+/* ------------------------------------------------------------------ Layout */
+
+.lp-wrap {
+  width: 100%;
+  max-width: var(--lp-latime);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* `padding-block`, nu `padding`: secțiunile poartă și clasa `lp-wrap`, iar
+   scurtătura ar șterge marginile laterale și ar lipi textul de ecran. */
+.lp-sectiune {
+  position: relative;
+  z-index: 1;
+  padding-block: 112px;
+}
+
+/* -------------------------------------------------------------- Fundaluri */
+
+/*
+ * Un singur strat fix pentru toate luminile mari: sunt gradiente statice, deci
+ * pictate o dată. Nimic de aici nu se animează cu `filter` — un blur animat
+ * repictează tot ecranul la fiecare cadru și e primul lucru care rupe 60fps.
+ */
+.lp-fundal {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.lp-fundal__lumini {
+  position: absolute;
+  inset: -20% -10%;
+  background:
+    radial-gradient(46% 38% at 18% 8%, oklch(0.575 0.168 248 / 0.28), transparent 70%),
+    radial-gradient(38% 32% at 88% 22%, oklch(0.62 0.165 282 / 0.2), transparent 72%),
+    radial-gradient(52% 40% at 62% 96%, oklch(0.72 0.155 233 / 0.16), transparent 72%);
+}
+
+/* Plasa se mișcă foarte lent, cât să nu fie o buclă observabilă. */
+.lp-fundal__plasa {
+  position: absolute;
+  inset: -35%;
+  background:
+    radial-gradient(28% 24% at 30% 34%, oklch(0.72 0.155 233 / 0.16), transparent 70%),
+    radial-gradient(26% 22% at 72% 62%, oklch(0.855 0.125 178 / 0.1), transparent 70%);
+  animation: lpPlasa 42s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes lpPlasa {
+  from {
+    transform: translate3d(-2.5%, -1.5%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.5%, 2%, 0) scale(1.08);
+  }
+}
+
+/* Grila științifică: fină, decolorată spre margini ca să nu devină un caiet de matematică. */
+.lp-fundal__grila {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(oklch(1 0 0 / 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.028) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(76% 60% at 50% 34%, #000 20%, transparent 78%);
+}
+
+/*
+ * Granulația: o textură SVG inline, sub 1 KB, la opacitate foarte mică. Rupe
+ * benzile din gradientele mari, care pe ecrane de 8 biți se văd ca inele.
+ */
+.lp-fundal__granulatie {
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.34'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------- Tipografie */
+
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px 7px 11px;
+  border: 1px solid var(--lp-line2);
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.04);
+  color: var(--lp-fg2);
+  font: 500 12px/1 var(--lp-sans);
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+}
+
+.lp-eyebrow__punct {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lp-cyan);
+  box-shadow: 0 0 0 3px oklch(0.845 0.132 213 / 0.18);
+  animation: lpPuls 2.6s ease-in-out infinite;
+}
+
+@keyframes lpPuls {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+}
+
+/* Marcajul de secțiune: cifră cu serif + etichetă, legate de o linie scurtă. */
+.lp-marcaj {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  color: var(--lp-fg3);
+  font: 500 12px/1 var(--lp-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lp-marcaj__nr {
+  color: var(--lp-cyan);
+  font: 400 15px/1 var(--lp-serif);
+  letter-spacing: 0;
+}
+
+.lp-marcaj__linie {
+  flex: 1;
+  max-width: 84px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--lp-line3), transparent);
+}
+
+.lp-h2 {
+  margin: 0;
+  max-width: 17ch;
+  font: 300 clamp(30px, 4.2vw, 50px) / 1.08 var(--lp-sans);
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.lp-h3 {
+  margin: 0;
+  font: 500 19px/1.25 var(--lp-sans);
+  letter-spacing: -0.015em;
+}
+
+.lp-lead {
+  margin: 18px 0 0;
+  max-width: 46ch;
+  color: var(--lp-fg2);
+  font: 400 16px/1.6 var(--lp-sans);
+  text-wrap: pretty;
+}
+
+.lp-corp {
+  margin: 0;
+  color: var(--lp-fg2);
+  font: 400 14.5px/1.62 var(--lp-sans);
+  text-wrap: pretty;
+}
+
+/*
+ * Fraza luminoasă. Gradientul e tăiat pe text, iar strălucirea vine dintr-un
+ * dublu al textului așezat dedesubt și blurat — `text-shadow` peste un
+ * `background-clip: text` nu se vede, pentru că textul e transparent.
+ */
+.lp-luminos {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(96deg, var(--lp-cyan) 4%, var(--lp-teal) 42%, var(--lp-cyan2) 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 400;
+}
+
+.lp-luminos::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--lp-cyan2);
+  opacity: 0.42;
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- Butoane */
+
+.lp-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 14px 24px;
+  border: 1px solid transparent;
+  border-radius: var(--lp-r2);
+  font: 600 14.5px/1 var(--lp-sans);
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.22s var(--lp-curba),
+    box-shadow 0.22s var(--lp-curba),
+    border-color 0.22s var(--lp-curba),
+    background-color 0.22s var(--lp-curba);
+}
+
+.lp-btn:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 0.06s;
+}
+
+.lp-btn__sageata {
+  transition: transform 0.22s var(--lp-curba);
+}
+
+.lp-btn:hover .lp-btn__sageata {
+  transform: translateX(3px);
+}
+
+/* Primar: suprafață albastră cu o lumină internă care se mișcă la hover. */
+.lp-btn--primar {
+  background: linear-gradient(180deg, var(--lp-cyan2), var(--lp-cyan3));
+  color: oklch(0.16 0.03 262);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.35),
+    0 10px 30px -12px oklch(0.575 0.168 248 / 0.8);
+}
+
+.lp-btn--primar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 140% at var(--lp-mx, 50%) var(--lp-my, 50%), oklch(1 0 0 / 0.32), transparent 62%);
+  opacity: 0;
+  transition: opacity 0.22s var(--lp-curba);
+  pointer-events: none;
+}
+
+.lp-btn--primar:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.4),
+    0 16px 40px -12px oklch(0.575 0.168 248 / 0.95);
+}
+
+.lp-btn--primar:hover::after {
+  opacity: 1;
+}
+
+/* Secundar: mai liniștit, se aprinde doar cât să arate că e apăsabil. */
+.lp-btn--discret {
+  border-color: var(--lp-line2);
+  background: oklch(1 0 0 / 0.035);
+  color: var(--lp-fg);
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+}
+
+.lp-btn--discret:hover {
+  transform: translateY(-2px);
+  border-color: var(--lp-line3);
+  background-color: oklch(1 0 0 / 0.075);
+}
+
+.lp-btn--mic {
+  padding: 10px 17px;
+  font-size: 13.5px;
+}
+
+.lp-btn--mare {
+  padding: 17px 30px;
+  font-size: 15.5px;
+}
+
+/* ------------------------------------------------------------- Suprafețe */
+
+/*
+ * Panoul de bază. Nu tot ce e pe pagină stă într-un panou — se folosesc doar
+ * acolo unde chiar există un obiect de arătat, altfel pagina devine o grilă de
+ * dreptunghiuri identice.
+ */
+.lp-panou {
+  position: relative;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-r4);
+  background: linear-gradient(168deg, oklch(1 0 0 / 0.055), oklch(1 0 0 / 0.014));
+  overflow: hidden;
+  transition:
+    transform 0.32s var(--lp-curba),
+    border-color 0.32s var(--lp-curba);
+}
+
+/* Reflexia de sus: 1px de lumină care face suprafața să pară înclinată. */
+.lp-panou::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.28) 28%, oklch(1 0 0 / 0.28) 72%, transparent);
+}
+
+/* Lumina care urmărește cursorul. Sub conținut, fără evenimente de pointer. */
+.lp-panou--viu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    38% 52% at var(--lp-mx, 50%) var(--lp-my, 0%),
+    oklch(0.72 0.155 233 / 0.18),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.34s var(--lp-curba);
+  pointer-events: none;
+}
+
+.lp-panou--viu:hover::after {
+  opacity: 1;
+}
+
+.lp-panou--viu:hover {
+  border-color: var(--lp-line2);
+}
+
+/* Înclinarea spre cursor, alimentată de `useTilt`. */
+.lp-panou--inclinat {
+  transform: perspective(1100px) rotateX(var(--lp-rx, 0deg)) rotateY(var(--lp-ry, 0deg));
+  transform-style: preserve-3d;
+}
+
+.lp-panou__continut {
+  position: relative;
+  z-index: 1;
+  padding: 30px;
+}
+
+/* Eticheta mică din colț sau de deasupra unui titlu de panou. */
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid var(--lp-line2);
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.04);
+  color: var(--lp-fg3);
+  font: 500 11.5px/1 var(--lp-sans);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.lp-chip--cyan {
+  border-color: oklch(0.72 0.155 233 / 0.4);
+  background: oklch(0.575 0.168 248 / 0.16);
+  color: var(--lp-cyan);
+}
+
+/* ------------------------------------------------------------ Dezvăluiri */
+
+/*
+ * Un singur mecanism pentru tot ce apare la derulare: `data-vazut` pus de
+ * `useInView`. Variantele există ca secțiunile să nu intre toate identic —
+ * o pagină în care fiecare element urcă 20px e la fel de monotonă ca una fără
+ * nicio mișcare.
+ */
+.lp-rev {
+  opacity: 0;
+  transition:
+    opacity 0.62s var(--lp-curba),
+    transform 0.62s var(--lp-curba),
+    clip-path 0.72s var(--lp-curba);
+  transition-delay: calc(var(--i, 0) * 80ms);
+  will-change: transform, opacity;
+}
+
+.lp-rev--sus {
+  transform: translateY(22px);
+}
+.lp-rev--stanga {
+  transform: translateX(-26px);
+}
+.lp-rev--dreapta {
+  transform: translateX(26px);
+}
+.lp-rev--scala {
+  transform: scale(0.94);
+}
+.lp-rev--linie {
+  clip-path: inset(0 100% 0 0);
+}
+/* Pentru rândurile de titlu: se ridică din spatele unei margini invizibile. */
+.lp-rev--rand {
+  transform: translateY(0.5em);
+  clip-path: inset(-25% 0 -6% 0);
+}
+
+.lp-rev[data-vazut='true'] {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(-25% 0 -25% 0);
+}
+
+.lp-rev--linie[data-vazut='true'] {
+  clip-path: inset(0 0 0 0);
+}
+
+/* --------------------------------------------------- Intrarea la încărcare */
+
+/*
+ * Eroul e deja în ecran la încărcare, deci nu așteaptă un observator: apare pe
+ * o scară de întârzieri, în ordinea în care se citește. Tot staggerul se
+ * consumă în ~1,2s — cât să se vadă că e o intrare compusă, nu cât să aștepte
+ * cineva după ea.
+ */
+.lp-intro {
+  animation: lpIntro 0.72s var(--lp-curba) both;
+  animation-delay: calc(120ms + var(--i, 0) * 105ms);
+}
+
+/* Bara de sus vine de sus, nu de jos: intră din afara ecranului, nu din pagină. */
+.lp-nav {
+  animation: lpIntroNav 0.66s var(--lp-curba) both;
+}
+
+/* Obiectul se rezolvă în loc să urce: apare din ceață, cu un pic de scară. */
+.lp-intro--obiect {
+  animation-name: lpIntroObiect;
+  animation-duration: 1.15s;
+}
+
+@keyframes lpIntro {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lpIntroNav {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lpIntroObiect {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ Erou */
+
+.lp-erou {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+  align-items: center;
+  gap: 48px;
+  min-height: min(100svh, 940px);
+  padding-block: 132px 76px;
+}
+
+/* Reflectorul care urmărește cursorul peste erou. Deasupra fundalului, sub text. */
+.lp-erou__reflector {
+  position: absolute;
+  inset: -12% -30%;
+  z-index: -1;
+  background: radial-gradient(
+    26% 34% at var(--lp-mx, 50%) var(--lp-my, 42%),
+    oklch(0.72 0.155 233 / 0.16),
+    transparent 68%
+  );
+  opacity: 0;
+  transition: opacity 0.6s var(--lp-curba);
+  pointer-events: none;
+}
+
+.lp-erou:hover .lp-erou__reflector {
+  opacity: 1;
+}
+
+.lp-erou__titlu {
+  margin: 26px 0 0;
+  font: 300 clamp(38px, 5.9vw, 76px) / 1.03 var(--lp-sans);
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+
+.lp-erou__titlu strong {
+  font-weight: 600;
+}
+
+.lp-erou__lead {
+  margin: 22px 0 0;
+  max-width: 44ch;
+  color: var(--lp-fg2);
+  font: 400 16.5px/1.62 var(--lp-sans);
+  text-wrap: pretty;
+}
+
+.lp-erou__actiuni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.lp-erou__nota {
+  margin: 18px 0 0;
+  color: var(--lp-fg3);
+  font: 400 13px/1.5 var(--lp-sans);
+}
+
+/* Indiciul de derulare: o linie prin care coboară un punct, fără text. */
+.lp-scroll {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  translate: -50% 0;
+  width: 1px;
+  height: 54px;
+  background: linear-gradient(180deg, transparent, var(--lp-line3));
+  overflow: hidden;
+}
+
+.lp-scroll::after {
+  content: '';
+  position: absolute;
+  left: -1.5px;
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--lp-cyan);
+  box-shadow: 0 0 10px 2px oklch(0.845 0.132 213 / 0.55);
+  animation: lpScroll 2.4s var(--lp-curba) infinite;
+}
+
+@keyframes lpScroll {
+  0% {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+  28% {
+    opacity: 1;
+  }
+  74% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(56px);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------- Obiectul central (SVG) */
+
+.lp-obiect {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: 560px;
+  margin-left: auto;
+}
+
+.lp-obiect__aura {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, oklch(0.575 0.168 248 / 0.5), transparent 68%);
+}
+
+.lp-obiect__svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/*
+ * Straturile plutesc cu viteze diferite și se deplasează spre cursor cu
+ * amplitudini diferite — de acolo vine senzația de adâncime. Totul e
+ * `translate`/`rotate`, deci rămâne pe compozitor.
+ *
+ * Paralaxa de mouse și plutirea stau pe elemente diferite pentru că ambele sunt
+ * `transform` și s-ar suprascrie una pe alta. Exteriorul urmărește cursorul,
+ * interiorul plutește.
+ */
+.lp-paralax {
+  transform: translate(calc(var(--lp-dx, 0) * var(--f, 10) * 1px), calc(var(--lp-dy, 0) * var(--f, 10) * 1px));
+  transition: transform 0.5s var(--lp-curba);
+  will-change: transform;
+}
+
+.lp-strat {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lpPluta var(--durata, 12s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.lp-strat--1 {
+  --durata: 13s;
+}
+.lp-strat--2 {
+  --durata: 17s;
+  animation-direction: alternate-reverse;
+}
+.lp-strat--3 {
+  --durata: 21s;
+}
+
+@keyframes lpPluta {
+  from {
+    transform: translateY(-7px) rotate(-0.6deg);
+  }
+  to {
+    transform: translateY(7px) rotate(0.6deg);
+  }
+}
+
+.lp-orbita {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lpOrbita var(--durata, 34s) linear infinite;
+}
+
+.lp-orbita--invers {
+  animation-direction: reverse;
+}
+
+@keyframes lpOrbita {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Traseele neurale se desenează la încărcare. `pathLength="1"` e pus ca atribut
+   pe fiecare cale, deci lungimile diferite se desenează în același timp. */
+.lp-traseu {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lpTraseu 2.2s var(--lp-curba) forwards;
+  animation-delay: var(--intarziere, 0s);
+}
+
+@keyframes lpTraseu {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.lp-particula {
+  animation: lpParticula var(--durata, 9s) ease-in-out infinite alternate;
+  animation-delay: var(--intarziere, 0s);
+}
+
+@keyframes lpParticula {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ Cifre */
+
+.lp-cifre {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--lp-line);
+  border-bottom: 1px solid var(--lp-line);
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.025), transparent);
+}
+
+.lp-cifre__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.lp-cifra {
+  position: relative;
+  padding: 40px 28px;
+}
+
+/* Separatoarele sunt gradiente, ca să nu taie sec marginea de sus și de jos. */
+.lp-cifra + .lp-cifra::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--lp-line2), transparent);
+}
+
+.lp-cifra__valoare {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font: 300 clamp(34px, 3.4vw, 46px) / 1 var(--lp-sans);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-cifra__unitate {
+  color: var(--lp-fg3);
+  font: 400 14px/1 var(--lp-sans);
+  letter-spacing: 0;
+}
+
+.lp-cifra__eticheta {
+  margin-top: 12px;
+  color: var(--lp-fg2);
+  font: 500 13.5px/1.4 var(--lp-sans);
+}
+
+.lp-cifra__nota {
+  margin-top: 5px;
+  color: var(--lp-fg3);
+  font: 400 12.5px/1.45 var(--lp-sans);
+}
+
+/* --------------------------------------------------------- Capabilități */
+
+.lp-cap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 52px;
+}
+
+/* Panoul mare ocupă ambele rânduri din stânga; dreapta se împarte în două. */
+.lp-cap__mare {
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-cap__mic .lp-panou__continut {
+  padding: 26px;
+}
+
+/* Trei cifre mici într-un rând, cu separatoare — textura care deosebește
+   panoul „Materii" de vecinul lui pur editorial. */
+.lp-mini {
+  display: flex;
+  gap: 18px;
+  margin-top: 20px;
+  padding: 16px 0 4px;
+  border-top: 1px solid var(--lp-line);
+}
+
+.lp-mini > div {
+  display: grid;
+  gap: 4px;
+}
+
+.lp-mini > div + div {
+  padding-left: 18px;
+  border-left: 1px solid var(--lp-line);
+}
+
+.lp-mini__n {
+  font: 300 26px/1 var(--lp-sans);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-mini__e {
+  color: var(--lp-fg3);
+  font: 400 11.5px/1.35 var(--lp-sans);
+}
+
+.lp-cap__lista {
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 11px;
+}
+
+.lp-cap__lista li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  color: var(--lp-fg2);
+  font: 400 14px/1.5 var(--lp-sans);
+}
+
+.lp-cap__bifa {
+  flex: none;
+  margin-top: 1px;
+  color: var(--lp-cyan);
+}
+
+/* ------------------------------------------------ Previzualizări de produs */
+
+/*
+ * Machete ale interfeței reale, la scară mică. Conținutul lor vine din
+ * `src/data/` — o grilă din bancă, capitolele adevărate — nu din text inventat
+ * pentru poză.
+ */
+.lp-preview {
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-r3);
+  background: linear-gradient(180deg, oklch(0.225 0.034 262 / 0.9), oklch(0.185 0.032 262 / 0.9));
+  overflow: hidden;
+  box-shadow: 0 24px 60px -30px oklch(0.08 0.02 262 / 0.9);
+}
+
+.lp-preview__bara {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lp-line);
+  background: oklch(1 0 0 / 0.028);
+  color: var(--lp-fg3);
+  font: 500 11.5px/1 var(--lp-sans);
+}
+
+.lp-preview__bec {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lp-line3);
+}
+
+.lp-preview__corp {
+  padding: 18px;
+}
+
+.lp-preview__intrebare {
+  color: var(--lp-fg);
+  font: 500 14px/1.5 var(--lp-sans);
+}
+
+.lp-preview__sursa {
+  margin-top: 6px;
+  color: var(--lp-fg3);
+  font: 400 11.5px/1.4 var(--lp-sans);
+}
+
+.lp-optiuni {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.lp-optiune {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-r2);
+  background: oklch(1 0 0 / 0.022);
+  color: var(--lp-fg2);
+  font: 400 13px/1.35 var(--lp-sans);
+  text-align: left;
+  transition:
+    border-color 0.2s var(--lp-curba),
+    background-color 0.2s var(--lp-curba),
+    transform 0.2s var(--lp-curba);
+}
+
+.lp-optiune__litera {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--lp-line2);
+  border-radius: 7px;
+  color: var(--lp-fg3);
+  font: 600 11.5px/1 var(--lp-sans);
+}
+
+.lp-optiune--corect {
+  border-color: oklch(0.82 0.14 158 / 0.5);
+  background: oklch(0.82 0.14 158 / 0.12);
+  color: var(--lp-fg);
+}
+
+.lp-optiune--corect .lp-optiune__litera {
+  border-color: transparent;
+  background: var(--lp-ok);
+  color: oklch(0.18 0.03 158);
+}
+
+.lp-optiune--gresit {
+  border-color: oklch(0.72 0.16 22 / 0.42);
+  background: oklch(0.72 0.16 22 / 0.1);
+}
+
+.lp-optiune--gresit .lp-optiune__litera {
+  border-color: transparent;
+  background: var(--lp-bad);
+  color: oklch(0.18 0.03 22);
+}
+
+.lp-explicatie strong {
+  color: var(--lp-fg);
+  font-weight: 600;
+}
+
+.lp-explicatie {
+  margin-top: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--lp-line);
+  border-left: 2px solid var(--lp-cyan);
+  border-radius: 0 var(--lp-r2) var(--lp-r2) 0;
+  background: oklch(0.575 0.168 248 / 0.09);
+  color: var(--lp-fg2);
+  font: 400 12.5px/1.55 var(--lp-sans);
+}
+
+/* Cronometrul din simulare. */
+.lp-cronometru {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 300 30px/1 var(--lp-sans);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-cronometru__unitate {
+  color: var(--lp-fg3);
+  font: 400 12.5px/1 var(--lp-sans);
+  letter-spacing: 0;
+}
+
+.lp-navigator {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 16px;
+}
+
+.lp-navigator span {
+  aspect-ratio: 1;
+  border: 1px solid var(--lp-line);
+  border-radius: 5px;
+  background: oklch(1 0 0 / 0.02);
+}
+
+.lp-navigator span[data-stare='raspuns'] {
+  border-color: transparent;
+  background: oklch(0.72 0.155 233 / 0.55);
+}
+
+.lp-navigator span[data-stare='marcat'] {
+  border-color: oklch(0.855 0.125 178 / 0.6);
+  background: oklch(0.855 0.125 178 / 0.18);
+}
+
+.lp-navigator span[data-stare='curent'] {
+  border-color: var(--lp-cyan);
+  background: oklch(0.845 0.132 213 / 0.28);
+}
+
+/* Lista de capitole. */
+.lp-capitole {
+  display: grid;
+  gap: 7px;
+}
+
+.lp-capitol {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-r2);
+  background: oklch(1 0 0 / 0.022);
+}
+
+.lp-capitol__nr {
+  color: var(--lp-fg3);
+  font: 400 12px/1 var(--lp-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-capitol__nume {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lp-fg2);
+  font: 400 13px/1.35 var(--lp-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-capitol__nr-grile {
+  flex: none;
+  color: var(--lp-fg3);
+  font: 500 11.5px/1 var(--lp-sans);
+}
+
+/* --------------------------------------------------------------- Parcurs */
+
+.lp-parcurs {
+  position: relative;
+}
+
+.lp-parcurs__lipit {
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: 56px;
+  min-height: 100svh;
+  padding: 88px 0;
+}
+
+.lp-pas {
+  position: relative;
+  display: flex;
+  gap: 18px;
+  width: 100%;
+  padding: 20px 0;
+  /* `border: 0` întâi: fără el, butonul păstrează chenarul implicit al
+     browserului pe celelalte trei laturi și pasul apare într-o cutie. */
+  border: 0;
+  border-top: 1px solid var(--lp-line);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  transition: opacity 0.42s var(--lp-curba);
+}
+
+.lp-pas[data-activ='false'] {
+  opacity: 0.34;
+}
+
+.lp-pas[data-activ='false']:hover {
+  opacity: 0.62;
+}
+
+.lp-pas__nr {
+  flex: none;
+  width: 30px;
+  color: var(--lp-fg3);
+  font: 400 13px/1.7 var(--lp-serif);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.42s var(--lp-curba);
+}
+
+.lp-pas[data-activ='true'] .lp-pas__nr {
+  color: var(--lp-cyan);
+}
+
+.lp-pas__titlu {
+  margin: 0;
+  font: 400 clamp(21px, 2.1vw, 27px) / 1.2 var(--lp-sans);
+  letter-spacing: -0.024em;
+}
+
+.lp-pas__text {
+  margin: 9px 0 0;
+  max-width: 40ch;
+  color: var(--lp-fg2);
+  font: 400 14px/1.6 var(--lp-sans);
+  /* Se închide când pasul nu e activ: lista rămâne scurtă și lizibilă. */
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.42s var(--lp-curba),
+    opacity 0.42s var(--lp-curba),
+    margin-top 0.42s var(--lp-curba);
+}
+
+.lp-pas__text > span {
+  overflow: hidden;
+}
+
+.lp-pas[data-activ='true'] .lp-pas__text {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/* Bara de progres a pasului activ, pe marginea de sus. */
+.lp-pas__progres {
+  position: absolute;
+  left: 0;
+  top: -1px;
+  height: 1px;
+  background: var(--lp-cyan);
+  box-shadow: 0 0 8px oklch(0.845 0.132 213 / 0.7);
+  transition: width 0.2s linear;
+}
+
+.lp-parcurs__scena {
+  position: relative;
+}
+
+.lp-scena__cadru {
+  transition:
+    opacity 0.44s var(--lp-curba),
+    transform 0.44s var(--lp-curba);
+}
+
+.lp-scena__cadru[data-activ='false'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  pointer-events: none;
+}
+
+.lp-scena__cadru[data-activ='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* ------------------------------------------------------------------ Drum */
+
+/* Antetul pe două coloane: titlul stânga, introducerea dreapta, aliniate jos. */
+.lp-antet2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 20px 56px;
+}
+
+.lp-drum {
+  position: relative;
+  margin-top: 40px;
+}
+
+.lp-drum__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.lp-drum__traseu-fund {
+  fill: none;
+  stroke: var(--lp-line2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* Linia luminoasă se desenează pe măsură ce secțiunea intră în ecran. */
+.lp-drum__traseu {
+  fill: none;
+  stroke: url(#lpDrumGradient);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 2.2s var(--lp-curba);
+}
+
+.lp-drum[data-vazut='true'] .lp-drum__traseu {
+  stroke-dashoffset: 0;
+}
+
+/* Etichetele stau lipite sub reperele care coboară din puncte, nu la distanță:
+   coloanele sunt egale, iar x-urile punctelor sunt fix centrele lor. */
+.lp-drum__etape {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 4px;
+}
+
+.lp-etapa {
+  text-align: center;
+}
+
+.lp-etapa__nume {
+  color: var(--lp-fg);
+  font: 500 15px/1.3 var(--lp-sans);
+}
+
+.lp-etapa__text {
+  margin-top: 6px;
+  color: var(--lp-fg3);
+  font: 400 12.5px/1.5 var(--lp-sans);
+}
+
+/* ------------------------------------------------------------- CTA final */
+
+.lp-final {
+  position: relative;
+  padding: 132px 0 124px;
+  text-align: center;
+}
+
+/* Haloul mare din spate: static, doar scalat la intrare. */
+.lp-final__halou {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  translate: -50% -50%;
+  width: min(1080px, 130%);
+  aspect-ratio: 1.6;
+  background: radial-gradient(50% 50% at 50% 50%, oklch(0.575 0.168 248 / 0.42), transparent 66%);
+  pointer-events: none;
+  transform: scale(0.82);
+  opacity: 0;
+  transition:
+    transform 1.5s var(--lp-curba),
+    opacity 1.5s var(--lp-curba);
+}
+
+.lp-final[data-vazut='true'] .lp-final__halou {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.lp-final__titlu {
+  margin: 22px auto 0;
+  max-width: 15ch;
+  font: 300 clamp(34px, 5.2vw, 62px) / 1.06 var(--lp-sans);
+  letter-spacing: -0.036em;
+  text-wrap: balance;
+}
+
+.lp-final__lead {
+  margin: 20px auto 0;
+  max-width: 44ch;
+  color: var(--lp-fg2);
+  font: 400 16px/1.6 var(--lp-sans);
+  text-wrap: pretty;
+}
+
+.lp-final__actiuni {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+/* --------------------------------------------------------------- Navbar */
+
+.lp-nav {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 40;
+  width: calc(100% - 32px);
+  max-width: var(--lp-latime);
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-r3);
+  background: oklch(0.145 0.028 262 / 0.55);
+  backdrop-filter: blur(14px) saturate(1.3);
+  transition:
+    background-color 0.3s var(--lp-curba),
+    border-color 0.3s var(--lp-curba),
+    box-shadow 0.3s var(--lp-curba);
+}
+
+/* La derulare devine mai opac, ca textul de sub el să nu se citească prin. */
+.lp-nav[data-derulat='true'] {
+  background: oklch(0.145 0.028 262 / 0.82);
+  border-color: var(--lp-line2);
+  box-shadow: 0 16px 40px -24px oklch(0.05 0.02 262 / 0.9);
+}
+
+/* Cu meniul deschis nu se mai negociază: un panou de navigare translucid peste
+   titlul eroului face ambele texte ilizibile. */
+.lp-nav[data-deschis='true'] {
+  background: oklch(0.135 0.026 262 / 0.97);
+  border-color: var(--lp-line2);
+  box-shadow: 0 22px 50px -26px oklch(0.05 0.02 262 / 0.95);
+}
+
+.lp-nav__rand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 14px 11px 18px;
+}
+
+.lp-nav__marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lp-fg);
+  font: 600 15.5px/1 var(--lp-sans);
+  letter-spacing: -0.015em;
+  text-decoration: none;
+}
+
+.lp-nav__marca img {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.lp-nav__linkuri {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.lp-nav__link {
+  position: relative;
+  padding: 9px 13px;
+  border-radius: var(--lp-r1);
+  color: var(--lp-fg2);
+  font: 500 13.5px/1 var(--lp-sans);
+  text-decoration: none;
+  transition: color 0.2s var(--lp-curba);
+}
+
+.lp-nav__link:hover {
+  color: var(--lp-fg);
+}
+
+/* Indicatorul: o linie scurtă care crește din centru. */
+.lp-nav__link::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 4px;
+  height: 1px;
+  background: var(--lp-cyan);
+  box-shadow: 0 0 8px oklch(0.845 0.132 213 / 0.6);
+  transform: scaleX(0);
+  transition: transform 0.28s var(--lp-curba);
+}
+
+.lp-nav__link:hover::after,
+.lp-nav__link[aria-current='true']::after {
+  transform: scaleX(1);
+}
+
+.lp-nav__actiuni {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+  margin-left: 4px;
+  border-left: 1px solid var(--lp-line);
+}
+
+/* Butonul de meniu, doar sub 900px. */
+.lp-nav__meniu {
+  display: none;
+  margin-left: auto;
+  padding: 9px;
+  border: 1px solid var(--lp-line2);
+  border-radius: var(--lp-r1);
+  background: oklch(1 0 0 / 0.04);
+  color: var(--lp-fg);
+  cursor: pointer;
+}
+
+.lp-nav__panou {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px 14px;
+  border-top: 1px solid var(--lp-line);
+}
+
+.lp-nav__panou .lp-nav__link {
+  padding: 12px 6px;
+  font-size: 15px;
+}
+
+.lp-nav__panou .lp-nav__link::after {
+  display: none;
+}
+
+.lp-nav__panou-actiuni {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* --------------------------------------------------------------- Subsol */
+
+.lp-subsol {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--lp-line);
+  background: oklch(0.125 0.026 262 / 0.6);
+}
+
+.lp-subsol__rand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 48px 0 36px;
+}
+
+.lp-subsol__marca {
+  flex: 1 1 260px;
+}
+
+.lp-subsol__grup {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.lp-subsol__titlu {
+  color: var(--lp-fg3);
+  font: 500 11.5px/1 var(--lp-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lp-subsol__link {
+  color: var(--lp-fg2);
+  font: 400 13.5px/1 var(--lp-sans);
+  text-decoration: none;
+  transition: color 0.16s var(--lp-curba);
+}
+
+.lp-subsol__link:hover {
+  color: var(--lp-cyan);
+}
+
+.lp-subsol__jos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 18px 0 34px;
+  border-top: 1px solid var(--lp-line);
+  color: var(--lp-fg3);
+  font: 400 12.5px/1.5 var(--lp-sans);
+}
+
+/* --------------------------------------------------------- Responsivitate */
+
+@media (max-width: 1040px) {
+  .lp-erou {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    min-height: 0;
+    padding-block: 118px 68px;
+    text-align: left;
+  }
+
+  /* Obiectul trece sub text și se micșorează — nu se scalează întreaga machetă. */
+  .lp-obiect {
+    max-width: 420px;
+    margin: 20px auto 0;
+  }
+
+  .lp-scroll {
+    display: none;
+  }
+
+  .lp-cap {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-cap__mare {
+    grid-row: auto;
+  }
+
+  .lp-parcurs__lipit {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    min-height: 0;
+  }
+
+  .lp-antet2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Intrările laterale au sens într-o compoziție pe două coloane. Într-una pe o
+     singură coloană alunecă din marginea tăiată a ecranului, deci devin
+     verticale ca restul. */
+  .lp-rev--stanga,
+  .lp-rev--dreapta {
+    transform: translateY(22px);
+  }
+}
+
+@media (max-width: 900px) {
+  .lp-nav__linkuri,
+  .lp-nav__actiuni {
+    display: none;
+  }
+
+  .lp-nav__meniu {
+    display: block;
+  }
+
+  .lp-sectiune {
+    padding-block: 84px;
+  }
+
+  .lp-cifre__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Cu două coloane, separatoarele verticale trebuie recalculate. */
+  .lp-cifra + .lp-cifra::before {
+    display: none;
+  }
+
+  .lp-cifra {
+    padding: 30px 20px;
+    border-top: 1px solid var(--lp-line);
+  }
+
+  .lp-cifra:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .lp-cifra:nth-child(2n)::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 16%;
+    bottom: 16%;
+    width: 1px;
+    background: linear-gradient(180deg, transparent, var(--lp-line2), transparent);
+  }
+
+  /* Cu două coloane etichetele nu mai cad sub punctele lor, deci reperele
+     verticale ar arăta greșit: linia rămâne, dar doar ca imagine. */
+  .lp-drum__etape {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 26px 18px;
+    margin-top: 22px;
+  }
+
+  .lp-drum__reper {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .lp-wrap {
+    padding: 0 18px;
+  }
+
+  .lp-sectiune {
+    padding-block: 68px;
+  }
+
+  .lp-erou {
+    padding-block: 104px 56px;
+  }
+
+  .lp-erou__actiuni {
+    margin-top: 28px;
+  }
+
+  /* Pe telefon acțiunile ocupă toată lățimea: ținte mari, ușor de atins. */
+  .lp-erou__actiuni .lp-btn,
+  .lp-final__actiuni .lp-btn {
+    flex: 1 1 100%;
+  }
+
+  .lp-panou__continut,
+  .lp-cap__mic .lp-panou__continut {
+    padding: 22px;
+  }
+
+  .lp-final {
+    padding: 92px 0 88px;
+  }
+
+  .lp-subsol__rand {
+    gap: 30px;
+    padding: 38px 0 28px;
+  }
+
+  /* Efectele care depind de blur sunt scumpe pe mobil și aproape invizibile. */
+  .lp-fundal__plasa {
+    animation: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .lp-navigator {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+/* ------------------------------------------------------- Mișcare redusă */
+
+/*
+ * Blocul global din `styles.css` scurtează tranzițiile peste tot, dar nu
+ * oprește animațiile de aici — fiecare `@keyframes` nou trebuie oprit explicit.
+ * Ce dispare: plutirea, orbitele, pulsul, indiciul de derulare, desenarea
+ * traseelor. Ce rămâne: aparițiile în opacitate, fără deplasare.
+ */
+@media (prefers-reduced-motion: reduce) {
+  /* Intrarea rămâne, dar doar ca opacitate: nimic nu se mai deplasează. */
+  .lp-intro,
+  .lp-nav,
+  .lp-intro--obiect {
+    animation-name: lpIntroSimplu;
+    animation-duration: 0.3s;
+  }
+
+  @keyframes lpIntroSimplu {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .lp-paralax {
+    transform: none !important;
+    transition: none;
+  }
+
+  .lp-fundal__plasa,
+  .lp-eyebrow__punct,
+  .lp-scroll::after,
+  .lp-strat,
+  .lp-orbita,
+  .lp-particula,
+  .lp-traseu {
+    animation: none !important;
+  }
+
+  .lp-traseu {
+    stroke-dashoffset: 0;
+  }
+
+  .lp-rev {
+    transform: none !important;
+    clip-path: none !important;
+    transition-delay: 0ms !important;
+  }
+
+  .lp-drum__traseu {
+    stroke-dashoffset: 0;
+    transition: none;
+  }
+
+  .lp-final__halou {
+    transform: none;
+    opacity: 1;
+    transition: none;
+  }
+
+  .lp-btn:hover,
+  .lp-panou:hover {
+    transform: none;
+  }
+}
