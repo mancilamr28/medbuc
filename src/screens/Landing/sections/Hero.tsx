@@ -34,7 +34,7 @@ export function Hero() {
 
         <h1 className="lp-erou__titlu lp-intro" style={{ '--i': 1 } as CSSProperties}>
           Pregătirea pentru medicină,{' '}
-          <span className="lp-luminos" data-text="pusă în ordine">
+          <span className="lp-luminos" data-text="pusă în ordine" aria-label="pusă în ordine">
             pusă în ordine
           </span>
           .
