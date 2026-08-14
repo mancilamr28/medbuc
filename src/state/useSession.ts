@@ -44,6 +44,8 @@ export function scoreOf(
 }
 
 export interface Session {
+  /** Identificator stabil pentru sincronizarea sesiunii finalizate. */
+  id: string;
   /** Indexul grilei curente. */
   qi: number;
   question: Question;
@@ -56,6 +58,8 @@ export interface Session {
   isMarked: boolean;
   isCorrect: boolean;
   startedAt: number;
+  /** Momentul finalizării; rămâne stabil pentru sincronizare și scor. */
+  finishedAt: number | null;
   /** Sesiunea a fost încheiată: ecranul de grile arată panoul de rezultat. */
   finished: boolean;
   pick: (key: OptionKey) => void;
@@ -76,6 +80,7 @@ export interface Session {
 }
 
 export function useSession(): Session {
+  const [id, setId] = useState(() => crypto.randomUUID());
   const [qi, setQi] = useState(0);
   const [answers, setAnswers] = useState<Record<number, OptionKey>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
@@ -107,6 +112,7 @@ export function useSession(): Session {
   const finish = useCallback(() => setFinishedAt((f) => f ?? Date.now()), []);
 
   const restart = useCallback(() => {
+    setId(crypto.randomUUID());
     setQi(0);
     setAnswers({});
     setRevealed({});
@@ -150,6 +156,7 @@ export function useSession(): Session {
    */
   return useMemo<Session>(
     () => ({
+      id,
       qi,
       question,
       total,
@@ -161,6 +168,7 @@ export function useSession(): Session {
       isMarked: !!marked[qi],
       isCorrect,
       startedAt,
+      finishedAt,
       finished: finishedAt !== null,
       pick,
       primary,
@@ -179,6 +187,7 @@ export function useSession(): Session {
       finish,
       finishedAt,
       goTo,
+      id,
       isCorrect,
       isRevealed,
       marked,
