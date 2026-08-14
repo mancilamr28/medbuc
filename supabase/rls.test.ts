@@ -176,7 +176,7 @@ describe('funcțiile', () => {
    * sunt cele scrise anume ca să fie chemate din client. Orice altceva ajuns
    * acolo din neatenție pică testul, care e tot rostul lui.
    */
-  const RPC_INTENTIONAT = ['sterge_contul'];
+  const RPC_INTENTIONAT = ['salveaza_grila', 'sterge_contul', 'sterge_grila'];
 
   it('nu stau în schema pe care o publică PostgREST', async () => {
     const r = await baza.db.query<{ proname: string }>(`
@@ -303,6 +303,192 @@ describe('ștergerea contului', () => {
     } finally {
       await baza.db.exec('reset role;');
     }
+  });
+});
+
+/**
+ * Scrierea conținutului, prin `salveaza_grila`.
+ *
+ * Funcția rulează `security definer`, deci ocolește RLS prin construcție: poarta
+ * e verificarea de rol din prima ei instrucțiune, nu o politică. De aceea testele
+ * de aici insistă pe cine o poate chema, nu doar pe ce face.
+ *
+ * Validările sunt duplicate în formular, dar formularul e o sugestie — cererea
+ * poate veni de oriunde cu cheia publicabilă, care e publică prin proiectare.
+ */
+describe('scrierea grilelor', () => {
+  const grila = (peste: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      id: 'bio-nervos-99',
+      capId: 'bio-nervos',
+      tip: 'simplu',
+      status: 'publicata',
+      text: 'Enunțul grilei de test',
+      correct: 'B',
+      expl: 'Explicația generală',
+      src: 'Test',
+      opts: [
+        { key: 'A', text: 'varianta A', why: 'de ce cade A' },
+        { key: 'B', text: 'varianta B', why: 'de ce ține B' },
+        { key: 'C', text: 'varianta C' },
+      ],
+      ...peste,
+    });
+
+  const salveaza = (payload: string) =>
+    baza.db.query('select public.salveaza_grila($1::jsonb)', [payload]);
+
+  it('scrie grila și variantele ei', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () => salveaza(grila()));
+
+    const q = await baza.db.query<{ text: string; correct: string; created_by: string }>(
+      "select text, correct, created_by from questions where id = 'bio-nervos-99'",
+    );
+    const o = await baza.db.query<{ key: string; why: string | null }>(
+      "select key, why from question_options where question_id = 'bio-nervos-99' order by key",
+    );
+
+    expect(q.rows[0]!.text).toBe('Enunțul grilei de test');
+    expect(q.rows[0]!.correct).toBe('B');
+    expect(q.rows[0]!.created_by).toBe(ana);
+    expect(o.rows.map((r) => r.key)).toEqual(['A', 'B', 'C']);
+    expect(o.rows[2]!.why).toBeNull();
+  });
+
+  /** Exact constrângerea amânată care a impus RPC-ul; merită verificată prin rulare. */
+  it('refuză un răspuns corect care nu e printre variante', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () => salveaza(grila({ correct: 'E' }))),
+    ).rejects.toThrow(/dintre variantele scrise/i);
+  });
+
+  it('refuză complementul grupat fără patru afirmații', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () => salveaza(grila({ tip: 'grupat', enunturi: ['una', 'două'] }))),
+    ).rejects.toThrow(/patru afirmații/i);
+  });
+
+  it('golește afirmațiile când grila nu mai e grupată', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      salveaza(grila({ tip: 'grupat', enunturi: ['a', 'b', 'c', 'd'] })),
+    );
+    await baza.caUtilizator(ana, () => salveaza(grila({ tip: 'simplu' })));
+
+    const r = await baza.db.query<{ enunturi: string[] | null }>(
+      "select enunturi from questions where id = 'bio-nervos-99'",
+    );
+    expect(r.rows[0]!.enunturi).toBeNull();
+  });
+
+  /** Înlocuire completă: o variantă scoasă din formular trebuie să dispară din bază. */
+  it('nu lasă în urmă variante scoase la editare', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () => salveaza(grila()));
+    await baza.caUtilizator(ana, () =>
+      salveaza(
+        grila({
+          correct: 'A',
+          opts: [
+            { key: 'A', text: 'singura rămasă' },
+            { key: 'B', text: 'și încă una' },
+          ],
+        }),
+      ),
+    );
+
+    const o = await baza.db.query<{ key: string }>(
+      "select key from question_options where question_id = 'bio-nervos-99' order by key",
+    );
+    expect(o.rows.map((r) => r.key)).toEqual(['A', 'B']);
+  });
+
+  it('refuză variante cu litere duplicate', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () =>
+        salveaza(
+          grila({
+            correct: 'A',
+            opts: [
+              { key: 'A', text: 'una' },
+              { key: 'A', text: 'alta' },
+            ],
+          }),
+        ),
+      ),
+    ).rejects.toThrow(/duplicate/i);
+  });
+
+  it('refuză un capitol care nu există', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () => salveaza(grila({ capId: 'nu-exista' }))),
+    ).rejects.toThrow(/capitolul nu există/i);
+  });
+
+  it('nu se lasă chemată de un elev', async () => {
+    await expect(baza.caUtilizator(ana, () => salveaza(grila()))).rejects.toThrow(
+      /administrator/i,
+    );
+
+    const r = await baza.db.query("select 1 from questions where id = 'bio-nervos-99'");
+    expect(r.rows).toHaveLength(0);
+  });
+
+  it('nu e apelabilă de un vizitator neautentificat', async () => {
+    const r = await baza.db.query<{ poate: boolean }>(
+      `select has_function_privilege('anon', 'public.salveaza_grila(jsonb)', 'execute') as poate`,
+    );
+    expect(r.rows[0]!.poate).toBe(false);
+  });
+});
+
+describe('ștergerea grilelor', () => {
+  it('scoate grila și variantele ei', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("select public.sterge_grila('bio-nervos-01')"),
+    );
+
+    const q = await baza.db.query("select 1 from questions where id = 'bio-nervos-01'");
+    const o = await baza.db.query(
+      "select 1 from question_options where question_id = 'bio-nervos-01'",
+    );
+    expect(q.rows).toHaveLength(0);
+    expect(o.rows).toHaveLength(0);
+  });
+
+  /**
+   * `attempts` e jurnal: ștergerea unei grile la care s-a răspuns ar rescrie
+   * retroactiv istoricul cuiva. Schema refuză oricum prin cheia externă, dar
+   * mesajul brut de Postgres nu spune elevului ce să facă în schimb.
+   */
+  it('refuză o grilă la care s-a răspuns și trimite spre retragere', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source)
+         values ($1, 'bio-nervos-01', 'B', true, 'sesiune')`,
+        [ana],
+      ),
+    );
+    await baza.faAdmin(ana);
+
+    await expect(
+      baza.caUtilizator(ana, () => baza.db.query("select public.sterge_grila('bio-nervos-01')")),
+    ).rejects.toThrow(/retrage-o/i);
+
+    const q = await baza.db.query("select 1 from questions where id = 'bio-nervos-01'");
+    expect(q.rows).toHaveLength(1);
+  });
+
+  it('nu se lasă chemată de un elev', async () => {
+    await expect(
+      baza.caUtilizator(ana, () => baza.db.query("select public.sterge_grila('bio-nervos-01')")),
+    ).rejects.toThrow(/administrator/i);
   });
 });
 

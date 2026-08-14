@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { QUESTIONS } from './data/questions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { AppProvider } from './state/AppState';
@@ -59,7 +60,7 @@ function monteaza() {
   return render(
     <ToastProvider>
       <AuthProvider>
-        <AppProvider>
+        <AppProvider questions={QUESTIONS}>
           <App />
         </AppProvider>
       </AuthProvider>

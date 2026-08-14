@@ -1,13 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Grile } from './Grile';
 import { QUESTIONS } from '../data/questions';
 import { AppProvider } from '../state/AppState';
 
+vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
+
 const deschide = () =>
   render(
-    <AppProvider>
+    <AppProvider questions={QUESTIONS}>
       <Grile />
     </AppProvider>,
   );

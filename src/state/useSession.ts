@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { QUESTIONS, type OptionKey, type Question } from '../data/questions';
+import type { OptionKey, Question } from '../data/questions';
 
 export interface SessionScore {
   corecte: number;
@@ -48,7 +48,14 @@ export interface Session {
   id: string;
   /** Indexul grilei curente. */
   qi: number;
-  question: Question;
+  /**
+   * Grila curentă. Poate lipsi: banca vine acum din bază, deci există momentul
+   * de dinaintea încărcării și cazul unei biblioteci încă goale. Ecranul de
+   * grile tratează amândouă înainte să randeze rezolvarea.
+   */
+  question: Question | undefined;
+  /** Banca sesiunii, ca ecranele să nu mai importe una proprie. */
+  questions: Question[];
   total: number;
   answers: Record<number, OptionKey>;
   revealed: Record<number, boolean>;
@@ -79,7 +86,14 @@ export interface Session {
   score: SessionScore;
 }
 
-export function useSession(): Session {
+/**
+ * Sesiunea de exersare, peste banca primită.
+ *
+ * Banca vine prin parametru, nu dintr-un import: din Faza 4 grilele se citesc
+ * din Supabase, iar `AppProvider` le pasează din `ContentContext`. Testele trec
+ * `QUESTIONS` din `src/data/`, care rămâne fixtură.
+ */
+export function useSession(questions: Question[]): Session {
   const [id, setId] = useState(() => crypto.randomUUID());
   const [qi, setQi] = useState(0);
   const [answers, setAnswers] = useState<Record<number, OptionKey>>({});
@@ -88,11 +102,11 @@ export function useSession(): Session {
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
-  const total = QUESTIONS.length;
-  const question = QUESTIONS[qi] ?? QUESTIONS[0]!;
+  const total = questions.length;
+  const question = questions[qi];
   const answer = answers[qi];
   const isRevealed = !!revealed[qi];
-  const isCorrect = answer === question.correct;
+  const isCorrect = question !== undefined && answer === question.correct;
 
   /** Odată verificată grila, răspunsul rămâne blocat. */
   const pick = useCallback(
@@ -135,17 +149,17 @@ export function useSession(): Session {
   const tally = useMemo(() => {
     let corecte = 0;
     let gresite = 0;
-    QUESTIONS.forEach((q, i) => {
+    questions.forEach((q, i) => {
       if (!revealed[i]) return;
       if (answers[i] === q.correct) corecte += 1;
       else gresite += 1;
     });
     return { corecte, gresite, marcate: Object.values(marked).filter(Boolean).length };
-  }, [answers, marked, revealed]);
+  }, [answers, marked, questions, revealed]);
 
   const score = useMemo<SessionScore>(
-    () => scoreOf(QUESTIONS, answers, (finishedAt ?? Date.now()) - startedAt),
-    [answers, finishedAt, startedAt],
+    () => scoreOf(questions, answers, (finishedAt ?? Date.now()) - startedAt),
+    [answers, finishedAt, questions, startedAt],
   );
 
   /**
@@ -159,6 +173,7 @@ export function useSession(): Session {
       id,
       qi,
       question,
+      questions,
       total,
       answers,
       revealed,
@@ -197,6 +212,7 @@ export function useSession(): Session {
       primary,
       qi,
       question,
+      questions,
       restart,
       revealed,
       score,

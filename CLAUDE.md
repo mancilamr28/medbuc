@@ -159,7 +159,13 @@ Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontaw
 
 ### Data layer — `src/data/`
 
-Typed constants standing in for a future API. `chapters.ts` (`MATERII` keyed by `MaterieId`), `questions.ts` (`QUESTIONS`, `OptionKey`), `profile.ts` (account/exam constants). `EXAM_DATE` in `profile.ts` drives every countdown via `daysUntil()` in `src/lib/time.ts` — dates are computed, never hardcoded in screens.
+Typed constants. `chapters.ts` (`MATERII` keyed by `MaterieId`), `questions.ts` (`QUESTIONS`, `OptionKey`), `profile.ts` (account/exam constants). `EXAM_DATE` in `profile.ts` drives every countdown via `daysUntil()` in `src/lib/time.ts` — dates are computed, never hardcoded in screens.
+
+**`QUESTIONS` is no longer the runtime truth.** Since Faza 4 the question bank is read from Supabase (`src/lib/continut.ts` → `src/state/ContentContext.tsx`), so **adding a question to `questions.ts` does not make it appear in the app** — it appears in `seed.sql` for a fresh project, and in tests as a fixture. Real content is written from Admin, which calls the `salveaza_grila` RPC. The file stays because `npm run seed` generates from it and because the Landing page needs a question it can render with no session.
+
+**Chapters deliberately did not move.** `MATERII` stays a compiled constant: the public Landing page counts chapters (`Cifre`, `Capabilitati`, `PreviewCapitole`) and renders with no session, while the `chapters` select policy is granted to `authenticated` only — a fetched chapter list would be empty there. Chapters are ~30 and change rarely; add them in a migration *and* in `chapters.ts`, keeping the two in step (`seed.test.ts` enforces it). A `capId` that reaches the database without a match in the file renders its raw id rather than a label, which is visible and fixable instead of silent.
+
+The bank flows in as a **parameter, not an import**: `AppProvider` takes `questions` as a prop and passes it to `useSession`/`useSimulare`, which is what keeps `AppState.test.tsx` able to mount the provider alone with no network. `numaraGrile()` in `continut.ts` replaces the old module-level count maps, since a bank that changes at runtime cannot be counted once at import time.
 
 **No displayed number may be hand-written.** The data files used to carry a full fictional student — a 22-day streak, "1 407 grile rezolvate", per-chapter `done`/`pct`, ten months of score history, an exam history of papers never sat, an admin queue of 37 pending questions. None of it was computed, so none of it moved when you actually answered a question. It is gone, and the rule that replaced it is: **if a figure cannot be derived from what the student did or from the bank itself, the screen shows an empty state instead** (`src/components/EmptyState.tsx`, which says what to do to make data appear).
 

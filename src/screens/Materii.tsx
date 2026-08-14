@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import { MATERII, MATERIE_TABS } from '../data/chapters';
-import { chapterQuestionCount, materieQuestionCount } from '../data/questions';
+import { numaraGrile } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, sideStack } from '../lib/ui';
 import { useApp } from '../state/AppState';
+import { useContentOptional } from '../state/ContentContext';
 
 /**
  * Lista de capitole.
@@ -14,14 +16,18 @@ import { useApp } from '../state/AppState';
  * întorc când există răspunsuri înregistrate din care să iasă.
  */
 export function Materii() {
-  const { materie, setMaterie, go } = useApp();
+  const { materie, setMaterie, go, session } = useApp();
   const isDesktop = useIsDesktop();
+  // Capitolele sunt statice, deci ecranul se desenează întreg imediat; doar
+  // numărătorile așteaptă biblioteca, iar cât timp o așteaptă arată „—", nu 0.
+  const loading = useContentOptional()?.loading ?? false;
+  const { peCapitol, peMaterie } = useMemo(() => numaraGrile(session.questions), [session.questions]);
   const mat = MATERII[materie];
   const chapters = mat.list;
 
   const stats = [
     { label: 'Capitole', value: String(mat.list.length), unit: mat.unit === 'sesiuni' ? 'sesiuni' : 'capitole' },
-    { label: 'Grile scrise', value: String(materieQuestionCount(mat.id)), unit: 'grile' },
+    { label: 'Grile scrise', value: loading ? '—' : String(peMaterie.get(mat.id) ?? 0), unit: 'grile' },
   ];
 
   return (
@@ -117,7 +123,7 @@ export function Materii() {
             {/* Un capitol fără grile scrise nu se poate exersa — butonul o spune,
                 în loc să deschidă o sesiune din alt capitol. */}
             {chapters.map((c) => {
-              const scrise = chapterQuestionCount(c.id);
+              const scrise = peCapitol.get(c.id) ?? 0;
               return (
                 <div
                   key={c.id}
