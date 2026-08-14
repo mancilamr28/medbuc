@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { syncFinishedSession } from '../lib/attempts';
+import { syncFinishedSession } from '../lib/syncAttempts';
 import { useApp } from '../state/AppState';
 import { useAuth } from '../state/AuthContext';
 
