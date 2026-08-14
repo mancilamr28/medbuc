@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PoartaContinut } from './PoartaContinut';
 import { QUESTIONS } from '../data/questions';
 import { AppProvider } from '../state/AppState';
+import { AuthProvider } from '../state/AuthContext';
 import { ContentProvider } from '../state/ContentContext';
 import type { GrilaCuStare } from '../lib/continut';
 
@@ -23,15 +24,32 @@ vi.mock('../lib/continut', async (original) => ({
   incarcaGrile: () => incarca(),
 }));
 
+/** Biblioteca se cere abia când există sesiune, deci testul trebuie să aibă una. */
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: { user: { id: 'u1', email: 'a@b.ro' } } } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({ single: async () => ({ data: { id: 'u1', full_name: 'A', role: 'elev' }, error: null }) }),
+      }),
+    }),
+  },
+}));
+
 function monteaza(banca = QUESTIONS) {
   return render(
-    <ContentProvider>
-      <AppProvider questions={banca}>
-        <PoartaContinut>
-          <div>grilele sunt aici</div>
-        </PoartaContinut>
-      </AppProvider>
-    </ContentProvider>,
+    <AuthProvider>
+      <ContentProvider>
+        <AppProvider questions={banca}>
+          <PoartaContinut>
+            <div>grilele sunt aici</div>
+          </PoartaContinut>
+        </AppProvider>
+      </ContentProvider>
+    </AuthProvider>,
   );
 }
 

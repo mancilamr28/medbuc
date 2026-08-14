@@ -165,7 +165,7 @@ describe('Administrare', () => {
     monteaza();
     await gata();
 
-    await user.click(screen.getAllByRole('button', { name: 'Șterge' })[0]!);
+    await user.click((await screen.findAllByRole('button', { name: 'Șterge' }))[0]!);
 
     expect(sterge).not.toHaveBeenCalled();
     expect(screen.getByText('Ștergi definitiv?')).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('Administrare', () => {
     monteaza();
     await gata();
 
-    await user.click(screen.getAllByRole('button', { name: 'Editează' })[0]!);
+    await user.click((await screen.findAllByRole('button', { name: 'Editează' }))[0]!);
 
     expect(screen.getByLabelText('Enunțul grilei')).toHaveValue(GRILE[0]!.text);
     // Identitatea nu se schimbă la editare: id-ul e cheia din `attempts` și din

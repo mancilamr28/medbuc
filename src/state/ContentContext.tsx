@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Question } from '../data/questions';
 import { incarcaGrile, type GrilaCuStare } from '../lib/continut';
+import { useAuth } from './AuthContext';
 
 /**
  * Biblioteca de grile, la runtime.
@@ -41,12 +42,13 @@ export function useContentOptional(): ContentValue | null {
 }
 
 export function ContentProvider({ children }: { children: ReactNode }) {
+  const { user, loading: sesiuneaSeIncarca } = useAuth();
   const [grile, setGrile] = useState<GrilaCuStare[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [seIncarca, setSeIncarca] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const incarca = useCallback(async () => {
-    setLoading(true);
+    setSeIncarca(true);
     setError(null);
     try {
       setGrile(await incarcaGrile());
@@ -56,13 +58,30 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       setError('Nu am putut încărca biblioteca de grile.');
       console.warn('[medbuc] Încărcarea bibliotecii a eșuat.', e);
     } finally {
-      setLoading(false);
+      setSeIncarca(false);
     }
   }, []);
 
+  /**
+   * Se cere abia când există sesiune.
+   *
+   * Provider-ul stă deasupra întregii aplicații, inclusiv a paginii publice de
+   * prezentare, care se randează fără cont. Fără condiția asta pleca o cerere la
+   * fiecare vizitator anonim — respinsă oricum de `questions_citire`, care e dată
+   * lui `authenticated` — și lăsa în urmă o eroare în consolă pe o pagină care
+   * n-are nevoie de nicio grilă.
+   */
   useEffect(() => {
+    if (!user) {
+      setGrile([]);
+      return;
+    }
     void incarca();
-  }, [incarca]);
+  }, [incarca, user]);
+
+  // Cât timp sesiunea încă se rezolvă, biblioteca e „în curs", nu „goală": altfel
+  // ecranele ar apuca să anunțe o bibliotecă fără grile înainte să fi cerut una.
+  const loading = sesiuneaSeIncarca || seIncarca;
 
   const value = useMemo<ContentValue>(
     () => ({
