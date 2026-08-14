@@ -142,7 +142,11 @@ export function Materii() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ font: `500 14px/1.3 ${SANS}` }}>{c.name}</div>
                     <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-                      {scrise === 0 ? 'Nicio grilă scrisă încă' : `${numar(scrise, 'grilă', 'grile')} scrise`}
+                      {/* Adjectivul intră în `numar()`, nu se lipește după: altfel iese
+                          „1 grilă scrise", fiindcă acordul se face cu numărul, nu cu substantivul. */}
+                      {scrise === 0
+                        ? 'Nicio grilă scrisă încă'
+                        : numar(scrise, 'grilă scrisă', 'grile scrise')}
                     </div>
                   </div>
                   <button

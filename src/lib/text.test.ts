@@ -44,3 +44,22 @@ describe('numar', () => {
     expect(numar(0, 'grilă', 'grile')).toBe('0 grile');
   });
 });
+
+/**
+ * Acordul nu se oprește la substantiv.
+ *
+ * „1 grilă scrise" a ajuns pe site: `numar()` întorcea corect „1 grilă", dar
+ * adjectivul era lipit după, deci rămânea la plural. Când numeralul e urmat de
+ * un adjectiv, adjectivul intră în argumente — inclusiv regula lui „de".
+ */
+describe('numar cu adjectiv', () => {
+  it('acordă adjectivul, nu doar substantivul', () => {
+    expect(numar(1, 'grilă scrisă', 'grile scrise')).toBe('1 grilă scrisă');
+    expect(numar(2, 'grilă scrisă', 'grile scrise')).toBe('2 grile scrise');
+  });
+
+  it('păstrează „de" în fața grupului', () => {
+    expect(numar(20, 'grilă scrisă', 'grile scrise')).toBe('20 de grile scrise');
+    expect(numar(0, 'grilă scrisă', 'grile scrise')).toBe('0 grile scrise');
+  });
+});

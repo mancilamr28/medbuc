@@ -44,7 +44,9 @@ export function Acasa() {
           Mai sunt {numar(daysLeft, 'zi', 'zile')} până la examen.{' '}
           {/* Cifra vine din bibliotecă, deci se spune abia după ce se știe.
               Un „0 grile" cât timp se încarcă ar fi o afirmație falsă, nu o stare. */}
-          {loading ? 'Se încarcă biblioteca…' : `Biblioteca are ${numar(session.questions.length, 'grilă', 'grile')} publicate.`}
+          {loading
+            ? 'Se încarcă biblioteca…'
+            : `Biblioteca are ${numar(session.questions.length, 'grilă publicată', 'grile publicate')}.`}
         </p>
       </div>
 
