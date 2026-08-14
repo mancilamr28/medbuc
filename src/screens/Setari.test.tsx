@@ -141,6 +141,29 @@ describe('Profil și setări', () => {
     await waitFor(() => expect(signOut).toHaveBeenCalled());
   });
 
+  /**
+   * Cheile `medbuc.*` sunt indexate pe conținut, nu pe utilizator. Rămase pe
+   * dispozitiv după ce contul a dispărut din bază, următorul cont făcut pe
+   * același browser le citește ca pe ale lui — pe un laptop de familie, notițele
+   * și lucrarea altcuiva. Ecranul promite „cu tot cu răspunsuri, simulări și
+   * notițe", deci promisiunea are și o parte locală.
+   */
+  it('nu lasă notițele și lucrarea pe dispozitiv', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('medbuc.note.bio-nervos', '"mnemonicul meu"');
+    localStorage.setItem('medbuc.sim.run', '{"order":[]}');
+    localStorage.setItem('alt-site.token', 'nu se atinge');
+
+    monteaza();
+    await gata();
+    await user.click(screen.getByRole('button', { name: 'Șterge contul' }));
+    await user.click(screen.getByRole('button', { name: 'Da, șterge definitiv' }));
+
+    await waitFor(() => expect(localStorage.getItem('medbuc.note.bio-nervos')).toBeNull());
+    expect(localStorage.getItem('medbuc.sim.run')).toBeNull();
+    expect(localStorage.getItem('alt-site.token')).toBe('nu se atinge');
+  });
+
   it('se poate renunța la ștergere', async () => {
     const user = userEvent.setup();
     monteaza();

@@ -273,6 +273,10 @@ export function Setari() {
                 type="button"
                 className="btn-ghost"
                 onClick={() => setConfirmaStergerea(false)}
+                // Cererea e deja plecată și nu se poate opri: lăsat activ, „renunț"
+                // ar închide dialogul ca și cum s-ar fi anulat ceva, iar contul ar
+                // dispărea oricum o clipă mai târziu.
+                disabled={seSterge}
                 style={{ padding: '10px 15px', borderRadius: 9, background: 'var(--surf)', font: `500 13px ${SANS}` }}
               >
                 Nu, renunț
@@ -286,7 +290,9 @@ export function Setari() {
                   border: 0,
                   borderRadius: 9,
                   background: 'var(--bad)',
-                  color: '#fff',
+                  // `--bad` e mai deschis pe tema întunecată, unde alb pe el abia
+                  // se citește; `--onBrand` se întoarce cu tema, ca la `.btn-primary`.
+                  color: 'var(--onBrand)',
                   font: `600 13px ${SANS}`,
                   cursor: 'pointer',
                 }}

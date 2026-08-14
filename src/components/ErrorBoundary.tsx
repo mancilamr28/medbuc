@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { stergeDateleLocale } from '../lib/dateLocale';
 import { reportError } from '../lib/sentry';
 import { SANS, SERIF } from '../lib/ui';
 
@@ -12,13 +13,7 @@ interface State {
 
 /** Șterge tot ce a salvat aplicația, ca o stare stricată să nu blocheze la nesfârșit. */
 function resetDateLocale(): void {
-  try {
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith('medbuc.'))
-      .forEach((k) => localStorage.removeItem(k));
-  } catch {
-    /* storage indisponibil — reîncărcarea rămâne singura opțiune */
-  }
+  stergeDateleLocale();
   window.location.reload();
 }
 
