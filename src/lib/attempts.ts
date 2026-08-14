@@ -31,4 +31,3 @@ export function attemptsFromSession(session: Session, userId: string, finishedAt
     ];
   });
 }
-
