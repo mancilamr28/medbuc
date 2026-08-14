@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { FK_VARIANTE } from '../src/lib/continut';
 import { bazaDeTest, type Baza } from './harness';
 
 /**
@@ -128,5 +129,44 @@ describe('contul', () => {
       [id],
     );
     expect(r.rows[0]!.n).toBe(0);
+  });
+});
+
+/**
+ * Numele cheii externe pe care se sprijină `continut.ts`.
+ *
+ * Între `questions` și `question_options` sunt două relații — cea normală și
+ * `questions_correct_exists`, care merge invers — deci PostgREST refuză un embed
+ * neanunțat cu „more than one relationship was found". Interogarea numește
+ * relația, iar numele ăla e un șir liber într-un fișier de TypeScript: dacă o
+ * migrare viitoare redenumește constrângerea, aplicația cade abia în producție.
+ *
+ * Bug-ul s-a întâmplat deja o dată, exact așa. PGlite nu-l putea prinde — rulează
+ * SQL direct, fără PostgREST — dar poate cel puțin să țină numele legat de schemă.
+ */
+describe('embed-ul folosit de aplicație', () => {
+  it('numește o cheie externă care chiar există', async () => {
+    const r = await baza.db.query<{ def: string }>(
+      'select pg_get_constraintdef(oid) as def from pg_constraint where conname = $1',
+      [FK_VARIANTE],
+    );
+
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]!.def).toContain('FOREIGN KEY (question_id) REFERENCES questions(id)');
+  });
+
+  /** Motivul pentru care embed-ul trebuie numit: relația nu e singura. */
+  it('confirmă că sunt două relații între grile și variante', async () => {
+    const r = await baza.db.query<{ conname: string }>(`
+      select conname from pg_constraint
+      where contype = 'f'
+        and (conrelid = 'public.question_options'::regclass
+          or confrelid = 'public.question_options'::regclass)
+    `);
+
+    expect(r.rows.map((x) => x.conname).sort()).toEqual([
+      FK_VARIANTE,
+      'questions_correct_exists',
+    ]);
   });
 });

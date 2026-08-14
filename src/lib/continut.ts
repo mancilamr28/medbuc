@@ -38,8 +38,20 @@ export interface RandGrila {
   question_options: { key: string; text: string; why: string | null }[] | null;
 }
 
-const CAMPURI =
-  'id, chapter_id, tip, status, text, enunturi, correct, expl, src, question_options(key, text, why)';
+/**
+ * Între `questions` și `question_options` sunt **două** chei externe: cea
+ * obișnuită, de mai jos, și `questions_correct_exists`, care merge invers —
+ * `questions (id, correct)` → `question_options (question_id, key)`, constrângerea
+ * amânată care apără răspunsul corect. PostgREST nu poate alege singur și refuză
+ * cererea cu „more than one relationship was found", deci relația se numește.
+ *
+ * Nu se putea prinde în teste: PGlite rulează SQL direct, fără PostgREST, deci
+ * ambiguitatea nu există acolo. A ieșit la iveală abia pe site-ul publicat.
+ * `schema.test.ts` verifică acum că numele de mai jos chiar există în schemă.
+ */
+export const FK_VARIANTE = 'question_options_question_id_fkey';
+
+const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, question_options!${FK_VARIANTE}(key, text, why)`;
 
 /**
  * Pură peste rândul primit, ca să poată fi testată fără rețea.

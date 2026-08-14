@@ -21,7 +21,10 @@ import tseslint from 'typescript-eslint';
  * for, so only the two classic rules are enabled.
  */
 export default tseslint.config(
-  { ignores: ['dist', 'coverage'] },
+  // `.claude` ține worktree-uri pentru sarcinile rulate în paralel — copii
+  // întregi ale proiectului. Nescoase, ESLint le vede ca pe cod al depozitului
+  // și cade cu „multiple candidate TSConfigRootDirs" pe fiecare fișier dublat.
+  { ignores: ['dist', 'coverage', '.claude'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
