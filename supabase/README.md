@@ -59,6 +59,10 @@ Politicile au fost verificate și invers: slăbind `notes_proprii` la `using (tr
 
 Aici e și greșeala de reținut: 0002 avea `revoke execute on function public.is_admin() from anon` și nu făcea nimic. Dreptul nu venea de la `anon`, ci de la `public`, pseudo-rolul din care moștenesc toate rolurile — **un `revoke` de la un rol anume nu înseamnă nimic cât timp `public` mai are dreptul.** Testele din `rls.test.ts` întreabă acum `has_function_privilege`, adică dreptul efectiv, nu textul migrării.
 
+**`public.sterge_contul()` e excepția deliberată.** E singura funcție rămasă în schema publicată, fiindcă e un RPC scris anume ca să fie chemat din client: dreptul GDPR de eliminare nu se poate exercita altfel, `auth.users` cerând drepturi pe care browserul nu are voie să le aibă. E sigură prin construcție — nu ia niciun parametru și șterge exact `auth.uid()`, deci nu există nimic de falsificat în cerere; `anon` nu o poate chema, iar fără sesiune ridică excepție.
+
+Linterul Supabase **o va semnala** la `authenticated_security_definer_function_executable`. Semnalarea aia se lasă așa: e intenția, nu o scăpare. Testul din `rls.test.ts` ține o listă explicită a RPC-urilor admise în `public`, deci orice altă funcție ajunsă acolo din neatenție pică suita.
+
 **Fiecare funcție are `search_path = ''`.** Fără o cale fixă, cine poate crea obiecte într-o schemă din calea de căutare poate umbri o funcție de sistem, iar un corp `security definer` o execută cu drepturi de proprietar. Corpurile califică deja fiecare referință cu schema ei.
 
 ## Ce lipsește, intenționat
