@@ -1,11 +1,23 @@
-import { Switch } from '../components/Switch';
+import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
-import { MATERII, MATERIE_BY_NAME, chapterLabel } from '../data/chapters';
-import { OPTION_KEYS, QUESTIONS, type OptionKey } from '../data/questions';
+import { MATERII, chapterLabel, chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
+import { OPTION_KEYS, tipLabel, type OptionKey, type QuestionType } from '../data/questions';
+import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
-import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, twoCol } from '../lib/ui';
-import { useApp, type AdminDraft } from '../state/AppState';
+import { numar } from '../lib/text';
+import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip, twoCol } from '../lib/ui';
 import { useAuth } from '../state/AuthContext';
+import { useContent } from '../state/ContentContext';
+import { useToast } from '../state/ToastContext';
+import {
+  catreSalvare,
+  ciornaGoala,
+  dinGrila,
+  idSugerat,
+  valideaza,
+  variantScrise,
+  type Ciorna,
+} from './adminCiorna';
 
 /** Ce vede un cont fără drepturi de administrare. */
 export function AdminBlocat() {
@@ -39,105 +51,330 @@ export function Admin() {
   return role === 'admin' ? <AdminPanel /> : <AdminBlocat />;
 }
 
+const STARI: { id: QuestionStatus; eticheta: string; culoare: [string, string] }[] = [
+  { id: 'ciorna', eticheta: 'Ciornă', culoare: ['var(--surf3)', 'var(--fg3)'] },
+  { id: 'publicata', eticheta: 'Publicată', culoare: ['var(--okS)', 'var(--ok)'] },
+  { id: 'retrasa', eticheta: 'Retrasă', culoare: ['var(--badS)', 'var(--bad)'] },
+];
+
+const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[0]!;
+
+/**
+ * Administrarea conținutului.
+ *
+ * Era o machetă: nouă câmpuri necontrolate, o ciornă în `useState` neserializat
+ * și două butoane fără handler, sub un mesaj care promitea că „fiecare modificare
+ * este înregistrată pe contul tău". Acum scrie în bază, prin `salveaza_grila`.
+ *
+ * Ciorna nu se ține în `localStorage`: schema are `status = 'ciorna'`, deci locul
+ * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
+ */
 function AdminPanel() {
-  const { admin, setAdmin } = useApp();
+  const { grile, loading, error, reload } = useContent();
+  const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
-  const materieId = MATERIE_BY_NAME[admin.materie] ?? 'bio';
+  const [ciorna, setCiorna] = useState<Ciorna>(() => ciornaGoala());
+  const [editez, setEditez] = useState<string | null>(null);
+  const [cautare, setCautare] = useState('');
+  const [filtru, setFiltru] = useState<'toate' | QuestionStatus>('toate');
+  const [seSalveaza, setSeSalveaza] = useState(false);
+  const [deSters, setDeSters] = useState<string | null>(null);
+  const [aratatProbleme, setAratatProbleme] = useState(false);
 
-  const fields: { key: keyof AdminDraft; label: string; options: string[] }[] = [
-    { key: 'materie', label: 'Materie', options: ['Biologie', 'Chimie organică', 'Subiecte anterioare'] },
-    { key: 'capitol', label: 'Capitol', options: MATERII[materieId].list.map(chapterLabel) },
-    { key: 'tip', label: 'Tipul întrebării', options: ['Complement simplu', 'Complement grupat', 'Flashcard'] },
-    { key: 'dificultate', label: 'Dificultate', options: ['Ușoară', 'Medie', 'Dificilă'] },
-    {
-      key: 'sursa',
-      label: 'Sursa grilei',
-      options: ['Redactată intern', 'Admitere UMFCD', 'Simulare oficială', 'Manual clasa a XI-a', 'Manual clasa a X-a'],
-    },
-    { key: 'an', label: 'An bibliografie', options: ['2027', '2026', '2025', '2024', '2023'] },
-  ];
+  const probleme = valideaza(ciorna);
+  const scrise = variantScrise(ciorna);
+
+  const lista = useMemo(() => {
+    const q = cautare.trim().toLowerCase();
+    return grile.filter((g) => {
+      if (filtru !== 'toate' && g.status !== filtru) return false;
+      if (q === '') return true;
+      return (
+        g.id.toLowerCase().includes(q) ||
+        g.text.toLowerCase().includes(q) ||
+        chapterLabelById(g.capId).toLowerCase().includes(q)
+      );
+    });
+  }, [cautare, filtru, grile]);
+
+  const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) =>
+    setCiorna((prev) => ({ ...prev, [key]: value }));
+
+  const setVarianta = (k: OptionKey, parte: 'text' | 'why', value: string) =>
+    setCiorna((prev) => ({ ...prev, opts: { ...prev.opts, [k]: { ...prev.opts[k], [parte]: value } } }));
+
+  const reseteaza = () => {
+    setCiorna(ciornaGoala(ciorna.capId));
+    setEditez(null);
+    setAratatProbleme(false);
+  };
+
+  const incarcaPentruEditare = (g: GrilaCuStare) => {
+    setCiorna(dinGrila(g));
+    setEditez(g.id);
+    setAratatProbleme(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const salveaza = async (status: QuestionStatus) => {
+    if (seSalveaza) return;
+    if (probleme.length > 0) {
+      setAratatProbleme(true);
+      notify('eroare', probleme[0]!);
+      return;
+    }
+
+    setSeSalveaza(true);
+    try {
+      await salveazaGrila(catreSalvare(ciorna, status));
+      await reload();
+      notify('succes', status === 'publicata' ? 'Grila e publicată.' : 'Ciorna a fost salvată.');
+      reseteaza();
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Nu am putut salva grila.');
+    } finally {
+      setSeSalveaza(false);
+    }
+  };
+
+  /**
+   * Schimbă doar starea unei grile din listă, fără să treacă prin formular.
+   *
+   * Retragerea e alternativa la ștergere pentru o grilă la care s-a răspuns deja:
+   * iese din fața elevilor, dar `attempts` rămâne întreg — pe el se sprijină tot
+   * progresul, iar o ștergere ar rescrie retroactiv istoricul cuiva.
+   */
+  const schimbaStarea = async (g: GrilaCuStare, status: QuestionStatus) => {
+    try {
+      await salveazaGrila(catreSalvare(dinGrila(g), status));
+      await reload();
+      notify('info', status === 'retrasa' ? 'Grila a fost retrasă din fața elevilor.' : 'Grila e publicată.');
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Nu am putut schimba starea grilei.');
+    }
+  };
+
+  const sterge = async (id: string) => {
+    try {
+      await stergeGrila(id);
+      await reload();
+      notify('succes', 'Grila a fost ștearsă.');
+      if (editez === id) reseteaza();
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Nu am putut șterge grila.');
+    } finally {
+      setDeSters(null);
+    }
+  };
 
   return (
     <div className="screen">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-          marginBottom: 8,
-        }}
-      >
-        <div>
-          <h1 style={pageTitle}>Administrare conținut</h1>
-          <p style={pageLead}>Adaugi grile în bibliotecă și decizi ce se publică pentru elevi.</p>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '12px 16px',
-          border: '1px solid var(--acc)',
-          background: 'var(--accS)',
-          borderRadius: 11,
-          margin: '14px 0 20px',
-        }}
-      >
-        <span
-          aria-hidden="true"
-          style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--acc)', flex: '0 0 auto' }}
-        />
-        <span style={{ font: `500 13px/1.4 ${SANS}`, color: 'var(--fg)' }}>
-          Zonă restricționată. Formularul nu salvează încă nimic — grilele se scriu deocamdată direct în cod.
-        </span>
+      <div style={{ marginBottom: 18 }}>
+        <h1 style={pageTitle}>Administrare conținut</h1>
+        <p style={pageLead}>Adaugi grile în bibliotecă și decizi ce se publică pentru elevi.</p>
       </div>
 
       <div style={twoCol(isDesktop)}>
         <div className="card" style={{ padding: 22 }}>
-          <div style={{ font: `600 15px ${SANS}` }}>Adaugă o grilă</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ font: `600 15px ${SANS}` }}>{editez ? 'Editezi o grilă' : 'Adaugă o grilă'}</div>
+            {editez && (
+              <>
+                <span className="tabular" style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
+                  {editez}
+                </span>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={reseteaza}
+                  style={{ marginLeft: 'auto', padding: '7px 12px', font: `500 12px ${SANS}` }}
+                >
+                  Renunță la editare
+                </button>
+              </>
+            )}
+          </div>
 
           <div style={{ marginTop: 18, ...autoGrid(200, 14) }}>
-            {fields.map((f) => (
-              <label key={f.key} style={{ display: 'block' }}>
-                <span style={label}>{f.label}</span>
-                <select
+            <label style={{ display: 'block' }}>
+              <span style={label}>Capitol</span>
+              <select
+                className="field"
+                value={ciorna.capId}
+                onChange={(e) => camp('capId', e.target.value as ChapterId)}
+                style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
+              >
+                {Object.values(MATERII).map((m) => (
+                  <optgroup key={m.id} label={m.name}>
+                    {m.list.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {chapterLabel(c)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: 'block' }}>
+              <span style={label}>Tipul întrebării</span>
+              <select
+                className="field"
+                value={ciorna.tip}
+                onChange={(e) => camp('tip', e.target.value as QuestionType)}
+                style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
+              >
+                {(['simplu', 'grupat'] as QuestionType[]).map((t) => (
+                  <option key={t} value={t}>
+                    {tipLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: 'block' }}>
+              <span style={label}>Identificator</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
                   className="field"
-                  value={String(admin[f.key])}
-                  onChange={(e) => setAdmin(f.key, e.target.value as never)}
-                  style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
-                >
-                  {f.options.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
+                  value={ciorna.id}
+                  onChange={(e) => camp('id', e.target.value)}
+                  placeholder="bio-nervos-07"
+                  disabled={editez !== null}
+                  style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
+                />
+                {editez === null && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => camp('id', idSugerat(ciorna.capId, grile))}
+                    style={{ flex: '0 0 auto', padding: '0 12px', font: `500 12px ${SANS}` }}
+                  >
+                    Sugerează
+                  </button>
+                )}
+              </div>
+            </label>
           </div>
 
           <label style={{ display: 'block', marginTop: 18 }}>
             <span style={label}>Enunțul grilei</span>
             <textarea
               className="field"
+              value={ciorna.text}
+              onChange={(e) => camp('text', e.target.value)}
               placeholder="Scrie enunțul exact cum apare la examen…"
               style={{ minHeight: 84, resize: 'vertical', padding: 12, font: `400 14px/1.5 ${SANS}` }}
             />
           </label>
 
-          {admin.tip === 'Complement grupat' && <Grupat />}
-          {admin.tip === 'Complement simplu' && <Simplu />}
-          {admin.tip === 'Flashcard' && <Flashcard />}
+          {ciorna.tip === 'grupat' && (
+            <div style={{ marginTop: 18 }}>
+              <span style={label}>Cele patru afirmații</span>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {ciorna.enunturi.map((e, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span
+                      aria-hidden="true"
+                      style={{ width: 18, font: `500 12.5px ${SANS}`, color: 'var(--fg3)' }}
+                    >
+                      {i + 1}.
+                    </span>
+                    <input
+                      className="field"
+                      value={e}
+                      aria-label={`Afirmația ${i + 1}`}
+                      onChange={(ev) => {
+                        const next = [...ciorna.enunturi];
+                        next[i] = ev.target.value;
+                        camp('enunturi', next);
+                      }}
+                      style={{ padding: '10px 12px', font: `400 13.5px ${SANS}` }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 20 }}>
+            <span style={label}>Variantele și explicațiile lor</span>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {OPTION_KEYS.map((k) => {
+                const activa = ciorna.correct === k;
+                const completata = ciorna.opts[k].text.trim() !== '';
+                return (
+                  <div
+                    key={k}
+                    style={{
+                      display: 'grid',
+                      gap: 8,
+                      padding: 12,
+                      border: `1px solid ${activa ? 'var(--ok)' : 'var(--line)'}`,
+                      borderRadius: 11,
+                      background: activa ? 'var(--okS)' : 'transparent',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => camp('correct', k)}
+                        aria-pressed={activa}
+                        aria-label={`Varianta ${k} e răspunsul corect`}
+                        disabled={!completata}
+                        title={completata ? 'Marchează ca răspuns corect' : 'Scrie întâi varianta'}
+                        style={{
+                          flex: '0 0 auto',
+                          width: 34,
+                          height: 34,
+                          borderRadius: 9,
+                          border: `1px solid ${activa ? 'var(--ok)' : 'var(--line)'}`,
+                          background: activa ? 'var(--ok)' : 'var(--surf)',
+                          color: activa ? 'var(--onBrand)' : 'var(--fg3)',
+                          font: `600 13px ${SANS}`,
+                          cursor: completata ? 'pointer' : 'not-allowed',
+                          opacity: completata ? 1 : 0.5,
+                        }}
+                      >
+                        {k}
+                      </button>
+                      <input
+                        className="field"
+                        value={ciorna.opts[k].text}
+                        aria-label={`Varianta ${k}`}
+                        onChange={(e) => setVarianta(k, 'text', e.target.value)}
+                        placeholder={k === 'A' || k === 'B' ? 'Textul variantei' : 'Textul variantei (opțional)'}
+                        style={{ padding: '10px 12px', font: `400 13.5px ${SANS}` }}
+                      />
+                    </div>
+                    {completata && (
+                      <textarea
+                        className="field"
+                        value={ciorna.opts[k].why}
+                        aria-label={`De ce ${activa ? 'ține' : 'cade'} varianta ${k}`}
+                        onChange={(e) => setVarianta(k, 'why', e.target.value)}
+                        placeholder={activa ? 'De ce e corectă…' : 'De ce cade varianta asta…'}
+                        style={{ minHeight: 52, resize: 'vertical', padding: 10, font: `400 13px/1.5 ${SANS}` }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 8, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+              {/* Explicația per variantă e ce deosebește o bancă de grile de o
+                  listă de răspunsuri — cele șase grile scrise au toate treizeci. */}
+              Explicația fiecărei variante e opțională tehnic, dar e ce face grila utilă.
+            </div>
+          </div>
 
           <label style={{ display: 'block', marginTop: 18 }}>
             <span style={label}>Explicația generală</span>
             <textarea
               className="field"
+              value={ciorna.expl}
+              onChange={(e) => camp('expl', e.target.value)}
               placeholder="Ideea de fond a grilei, în două-trei fraze…"
               style={{ minHeight: 84, resize: 'vertical', padding: 12, font: `400 14px/1.5 ${SANS}` }}
             />
@@ -147,10 +384,30 @@ function AdminPanel() {
             <span style={label}>Referință bibliografică</span>
             <input
               className="field"
+              value={ciorna.src}
+              onChange={(e) => camp('src', e.target.value)}
               placeholder="ex. Biologie, manual clasa a XI-a, cap. Glandele endocrine, p. 84"
               style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
             />
           </label>
+
+          {aratatProbleme && probleme.length > 0 && (
+            <ul
+              style={{
+                margin: '16px 0 0',
+                padding: '12px 16px 12px 30px',
+                border: '1px solid var(--bad)',
+                background: 'var(--badS)',
+                borderRadius: 11,
+                font: `400 12.5px/1.7 ${SANS}`,
+                color: 'var(--fg)',
+              }}
+            >
+              {probleme.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          )}
 
           <div
             style={{
@@ -159,212 +416,209 @@ function AdminPanel() {
               borderTop: '1px solid var(--line)',
               display: 'flex',
               alignItems: 'center',
-              gap: 14,
+              gap: 12,
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ width: 'auto' }}>
-              <Switch on={admin.publica} onToggle={() => setAdmin('publica', !admin.publica)}>
-                <span style={{ font: `400 13px ${SANS}`, color: 'var(--fg2)', whiteSpace: 'nowrap' }}>
-                  Publică imediat, fără verificare
-                </span>
-              </Switch>
-            </div>
+            <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
+              {numar(scrise.length, 'variantă scrisă', 'variante scrise')}
+            </span>
             <button
               type="button"
               className="btn-ghost"
+              onClick={() => void salveaza('ciorna')}
+              disabled={seSalveaza}
               style={{ marginLeft: 'auto', padding: '11px 16px', font: `500 13.5px ${SANS}` }}
             >
               Salvează ca ciornă
             </button>
-            <button type="button" className="btn-primary" style={{ padding: '11px 18px', font: `600 13.5px ${SANS}` }}>
-              Adaugă grila
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void salveaza('publicata')}
+              disabled={seSalveaza}
+              style={{ padding: '11px 18px', font: `600 13.5px ${SANS}` }}
+            >
+              {seSalveaza ? 'Se salvează…' : editez ? 'Salvează și publică' : 'Publică grila'}
             </button>
           </div>
         </div>
 
         <div style={sideStack}>
-          {/* Statisticile arătau „2 220 publicate, 37 în așteptare, 6 raportate".
-              Singura cifră care se poate demonstra e câte grile există. */}
           <div className="card-flat" style={{ padding: 20 }}>
             <div style={eyebrow(undefined, 11)}>Biblioteca de grile</div>
-            <div style={{ marginTop: 14 }}>
-              <div style={{ font: `500 22px/1 ${SERIF}` }}>{QUESTIONS.length}</div>
-              <div style={{ marginTop: 5, font: `400 11.5px/1.4 ${SANS}`, color: 'var(--fg3)' }}>
-                grile scrise în bibliotecă
-              </div>
+            <div style={{ marginTop: 14, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+              {STARI.map((s) => (
+                <div key={s.id}>
+                  <div style={{ font: `500 22px/1 ${SERIF}` }}>
+                    {loading ? '—' : grile.filter((g) => g.status === s.id).length}
+                  </div>
+                  <div style={{ marginTop: 5, font: `400 11.5px/1.4 ${SANS}`, color: 'var(--fg3)' }}>
+                    {s.eticheta.toLowerCase()}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="card-flat" style={{ padding: 20 }}>
-            <span style={eyebrow(undefined, 11)}>Coada de verificare</span>
-            <EmptyState
-              title="Nimic de verificat"
-              hint="Grilele trimise spre verificare apar aici. Deocamdată nu există un flux de trimitere."
-              padding="20px 4px 4px"
-            />
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--line)', display: 'grid', gap: 10 }}>
+              <input
+                className="field"
+                value={cautare}
+                onChange={(e) => setCautare(e.target.value)}
+                placeholder="Caută după enunț, capitol sau id…"
+                aria-label="Caută în bibliotecă"
+                style={{ padding: '10px 12px', font: `400 13px ${SANS}` }}
+              />
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(['toate', ...STARI.map((s) => s.id)] as const).map((f) => {
+                  const activ = filtru === f;
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setFiltru(f)}
+                      aria-pressed={activ}
+                      style={{
+                        padding: '6px 11px',
+                        border: `1px solid ${activ ? 'var(--brand)' : 'var(--line)'}`,
+                        borderRadius: 8,
+                        background: activ ? 'var(--brand)' : 'transparent',
+                        color: activ ? 'var(--onBrand)' : 'var(--fg2)',
+                        font: `500 12px ${SANS}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {f === 'toate' ? 'Toate' : stareaLui(f).eticheta}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {error ? (
+              <EmptyState
+                title={error}
+                action={
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => void reload()}
+                    style={{ padding: '9px 14px', font: `500 12.5px ${SANS}` }}
+                  >
+                    Încearcă din nou
+                  </button>
+                }
+              />
+            ) : loading ? (
+              <div style={{ padding: 22, font: `400 13px ${SANS}`, color: 'var(--fg3)' }}>
+                Se încarcă biblioteca…
+              </div>
+            ) : lista.length === 0 ? (
+              <EmptyState
+                title={grile.length === 0 ? 'Biblioteca e goală' : 'Nimic pe filtrul ăsta'}
+                hint={
+                  grile.length === 0
+                    ? 'Prima grilă scrisă din formularul de alături apare aici.'
+                    : 'Schimbă filtrul sau șterge căutarea.'
+                }
+              />
+            ) : (
+              <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+                {lista.map((g) => {
+                  const stare = stareaLui(g.status);
+                  return (
+                    <div
+                      key={g.id}
+                      className="list-row"
+                      style={{ padding: '12px 18px', borderBottom: '1px solid var(--line)', display: 'grid', gap: 7 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={statusChip(stare.culoare[0], stare.culoare[1])}>{stare.eticheta}</span>
+                        <span className="tabular" style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
+                          {g.id}
+                        </span>
+                      </div>
+                      <div style={{ font: `400 13px/1.45 ${SANS}`, color: 'var(--fg)' }}>
+                        {g.text.length > 110 ? `${g.text.slice(0, 110)}…` : g.text}
+                      </div>
+                      <div style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
+                        {materieNameOf(g.capId)} · {chapterLabelById(g.capId)}
+                      </div>
+
+                      {deSters === g.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ font: `500 12px ${SANS}`, color: 'var(--bad)' }}>Ștergi definitiv?</span>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            onClick={() => setDeSters(null)}
+                            style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
+                          >
+                            Nu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void sterge(g.id)}
+                            style={{
+                              padding: '6px 11px',
+                              border: 0,
+                              borderRadius: 8,
+                              background: 'var(--bad)',
+                              color: 'var(--onBrand)',
+                              font: `600 12px ${SANS}`,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Da, șterge
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            onClick={() => incarcaPentruEditare(g)}
+                            style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
+                          >
+                            Editează
+                          </button>
+                          {g.status !== 'retrasa' && (
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              onClick={() => void schimbaStarea(g, 'retrasa')}
+                              style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
+                            >
+                              Retrage
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setDeSters(g.id)}
+                            style={{
+                              padding: '6px 11px',
+                              border: '1px solid var(--line)',
+                              borderRadius: 8,
+                              background: 'transparent',
+                              color: 'var(--bad)',
+                              font: `500 12px ${SANS}`,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Șterge
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Alegerea variantei corecte — literele A–E. */
-function LetterPicker({ size = 44 }: { size?: number }) {
-  const { admin, setAdmin } = useApp();
-  return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="radiogroup" aria-label="Varianta corectă">
-      {OPTION_KEYS.map((k: OptionKey) => {
-        const active = admin.corect === k;
-        return (
-          <button
-            key={k}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => setAdmin('corect', k)}
-            style={{
-              width: size,
-              height: size,
-              borderRadius: 10,
-              border: `1.5px solid ${active ? 'var(--ok)' : 'var(--line2)'}`,
-              background: active ? 'var(--okS)' : 'var(--surf)',
-              color: active ? 'var(--ok)' : 'var(--fg2)',
-              font: `600 14px ${SANS}`,
-              cursor: 'pointer',
-            }}
-          >
-            {k}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function Grupat() {
-  return (
-    <div style={{ marginTop: 18 }}>
-      <div style={{ ...label, letterSpacing: '.1em', marginBottom: 10 }}>Cele patru afirmații</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {[1, 2, 3, 4].map((n) => (
-          <div key={n} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span
-              style={{
-                flex: '0 0 auto',
-                width: 30,
-                height: 30,
-                borderRadius: 9,
-                display: 'grid',
-                placeItems: 'center',
-                font: `600 13px ${SANS}`,
-                background: 'var(--surf2)',
-                color: 'var(--fg2)',
-              }}
-            >
-              {n}
-            </span>
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <input
-                className="field"
-                placeholder={`Afirmația ${n}`}
-                style={{ padding: '10px 12px', font: `400 13.5px ${SANS}` }}
-              />
-              <textarea
-                className="field-dashed"
-                placeholder={`De ce este adevărată sau falsă afirmația ${n}…`}
-                style={{ minHeight: 52, resize: 'vertical', padding: '9px 12px', font: `400 12.5px/1.5 ${SANS}` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ ...label, letterSpacing: '.1em', marginTop: 16, marginBottom: 10 }}>Varianta corectă</div>
-      <LetterPicker />
-      <div style={{ marginTop: 10, font: `400 11.5px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
-        Corespondența este fixă și nu se afișează elevului: A → 1, 2, 3 · B → 1, 3 · C → 2, 4 · D → 4 · E → toate.
-      </div>
-    </div>
-  );
-}
-
-function Simplu() {
-  const { admin, setAdmin } = useApp();
-
-  return (
-    <div style={{ marginTop: 18 }}>
-      <div style={{ ...label, letterSpacing: '.1em', marginBottom: 10 }}>
-        Variantele de răspuns și explicațiile lor · apasă litera pentru cea corectă
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {OPTION_KEYS.map((k: OptionKey) => {
-          const active = admin.corect === k;
-          return (
-            <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <button
-                type="button"
-                onClick={() => setAdmin('corect', k)}
-                aria-pressed={active}
-                aria-label={`Marchează varianta ${k} drept corectă`}
-                style={{
-                  flex: '0 0 auto',
-                  width: 30,
-                  height: 30,
-                  borderRadius: 9,
-                  display: 'grid',
-                  placeItems: 'center',
-                  font: `600 13px ${SANS}`,
-                  cursor: 'pointer',
-                  border: `1.5px solid ${active ? 'var(--ok)' : 'var(--line2)'}`,
-                  background: active ? 'var(--ok)' : 'transparent',
-                  color: active ? 'var(--onBrand)' : 'var(--fg2)',
-                }}
-              >
-                {k}
-              </button>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
-                <input
-                  className="field"
-                  placeholder={`Varianta ${k}`}
-                  style={{ padding: '10px 12px', font: `400 13.5px ${SANS}` }}
-                />
-                <textarea
-                  className="field-dashed"
-                  placeholder={active ? `De ce este corectă varianta ${k}…` : `De ce cade varianta ${k}…`}
-                  style={{ minHeight: 52, resize: 'vertical', padding: '9px 12px', font: `400 12.5px/1.5 ${SANS}` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ marginTop: 10, font: `400 11.5px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
-        Explicația fiecărei variante apare elevului după verificarea răspunsului, sub explicația generală.
-      </div>
-    </div>
-  );
-}
-
-function Flashcard() {
-  return (
-    <div style={{ marginTop: 18, ...autoGrid(220, 14) }}>
-      <label style={{ display: 'block' }}>
-        <span style={label}>Fața cardului</span>
-        <textarea
-          className="field"
-          placeholder="Noțiunea sau întrebarea…"
-          style={{ minHeight: 70, resize: 'vertical', padding: '11px 12px', font: `400 13.5px/1.5 ${SANS}` }}
-        />
-      </label>
-      <label style={{ display: 'block' }}>
-        <span style={label}>Versoul cardului</span>
-        <textarea
-          className="field"
-          placeholder="Răspunsul scurt, cum vrei să-l rețină elevul…"
-          style={{ minHeight: 70, resize: 'vertical', padding: '11px 12px', font: `400 13.5px/1.5 ${SANS}` }}
-        />
-      </label>
     </div>
   );
 }
