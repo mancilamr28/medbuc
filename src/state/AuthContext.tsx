@@ -1,5 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { stergeDateleLocale } from '../lib/dateLocale';
 import { supabase } from '../lib/supabase';
 import { mesajEroare } from './authErrors';
 
@@ -138,6 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async stergeContul() {
         const { error } = await supabase.rpc('sterge_contul');
         if (error) return { error: mesajEroare(error) };
+        // Cheile `medbuc.*` sunt indexate pe conținut, nu pe utilizator: notița
+        // de capitol și lucrarea în curs ar rămâne pe dispozitiv după ce contul
+        // a dispărut din bază, iar următorul cont făcut pe același browser le-ar
+        // citi ca pe ale lui. Ecranul promite „cu tot cu răspunsuri, simulări și
+        // notițe" — asta e partea locală a promisiunii.
+        stergeDateleLocale();
         // Sesiunea rămâne validă în memorie după ce contul a dispărut din bază;
         // fără deconectare explicită, aplicația ar continua să arate un profil
         // care nu mai există.

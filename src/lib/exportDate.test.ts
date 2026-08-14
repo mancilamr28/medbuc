@@ -1,5 +1,23 @@
-import { describe, expect, it } from 'vitest';
-import { cheiLocale, numeFisier } from './exportDate';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { adunaDatele, cheiLocale, numeFisier } from './exportDate';
+
+/** Se schimbă per test, ca să se poată simula o interogare picată. */
+let raspuns: { data: unknown; error: { message: string } | null } = { data: [], error: null };
+
+vi.mock('./supabase', () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+        then: (r: (v: unknown) => unknown) => r(raspuns),
+      }),
+    }),
+  },
+}));
+
+beforeEach(() => {
+  raspuns = { data: [], error: null };
+});
 
 /** Un `localStorage` de mână — `cheiLocale` ia depozitul ca parametru tocmai ca să meargă asta. */
 function depozit(perechi: Record<string, string>): Storage {
@@ -45,5 +63,34 @@ describe('cheiLocale', () => {
 
   it('merge pe un depozit gol', () => {
     expect(cheiLocale(depozit({}))).toEqual({});
+  });
+});
+
+/**
+ * Clientul Supabase nu respinge promisiunea la o eroare raportată de server —
+ * întoarce `{ data: null, error }`. Cât timp exportul citea doar `.data ?? []`,
+ * un timeout devenea tăcut o listă goală, iar fișierul pleca cu toast de succes
+ * și fără datele promise. Un buton care minte că dreptul GDPR a fost onorat e
+ * mai rău decât unul mort.
+ */
+describe('adunaDatele', () => {
+  it('aruncă în loc să livreze un export incomplet', async () => {
+    raspuns = { data: null, error: { message: 'canceling statement due to statement timeout' } };
+
+    await expect(adunaDatele('u1', 'ana@exemplu.ro')).rejects.toThrow(/statement timeout/);
+  });
+
+  it('spune care parte a picat', async () => {
+    raspuns = { data: null, error: { message: 'permission denied' } };
+
+    await expect(adunaDatele('u1', null)).rejects.toThrow(/sesiuni|simulari|raspunsuri|notite/);
+  });
+
+  it('întoarce datele când totul reușește', async () => {
+    const date = await adunaDatele('u1', 'ana@exemplu.ro');
+
+    expect(date.cont).toEqual({ id: 'u1', email: 'ana@exemplu.ro' });
+    expect(date.raspunsuri).toEqual([]);
+    expect(date.exportatLa).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });

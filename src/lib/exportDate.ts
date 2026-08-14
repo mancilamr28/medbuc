@@ -68,6 +68,15 @@ export async function adunaDatele(userId: string, email: string | null): Promise
     supabase.from('notes').select('*'),
   ]);
 
+  // Clientul Supabase nu respinge promisiunea la erorile raportate de server —
+  // întoarce `{ data: null, error }`. Fără verificarea asta, un timeout sau o
+  // politică RLS schimbată devenea tăcut o listă goală, iar exportul pleca cu
+  // toast de succes și fără datele pe care tocmai le promitea. Un buton care
+  // minte că dreptul a fost onorat e mai rău decât unul mort.
+  for (const [nume, r] of Object.entries({ profil, sesiuni, simulari, raspunsuri, notite })) {
+    if (r.error) throw new Error(`${nume}: ${r.error.message}`);
+  }
+
   let local: Record<string, string> = {};
   try {
     local = cheiLocale(window.localStorage);
