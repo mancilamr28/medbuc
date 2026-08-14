@@ -22,6 +22,19 @@ function fisiere(dir: string): string[] {
 }
 
 describe('izolarea paginii de prezentare', () => {
+  it('nu expune de două ori frazele luminoase', () => {
+    const fraze = [
+      join(RADACINA, 'sections', 'Hero.tsx'),
+      join(RADACINA, 'sections', 'CtaFinal.tsx'),
+    ].flatMap((cale) => {
+      const text = readFileSync(cale, 'utf8');
+      return [...text.matchAll(/<span className="lp-luminos" data-text="([^"]+)" aria-label="([^"]+)">/g)];
+    });
+
+    expect(fraze).toHaveLength(2);
+    for (const fraza of fraze) expect(fraza[1]).toBe(fraza[2]);
+  });
+
   /**
    * Pagina se randează exclusiv fără sesiune, iar `go()` duce spre rute care
    * cer autentificare: un `go('acasa')` strecurat aici — de pildă prin

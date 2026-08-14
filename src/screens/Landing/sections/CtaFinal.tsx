@@ -28,7 +28,7 @@ export function CtaFinal() {
         <Reveal fel="rand" indice={1}>
           <h2 className="lp-final__titlu">
             Drumul spre medicină începe cu{' '}
-            <span className="lp-luminos" data-text="următoarea grilă">
+            <span className="lp-luminos" data-text="următoarea grilă" aria-label="următoarea grilă">
               următoarea grilă
             </span>
             .
