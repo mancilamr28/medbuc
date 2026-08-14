@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { QUESTIONS } from '../data/questions';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Simulari } from './Simulari';
 import { AppProvider } from '../state/AppState';
+
+vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
 
 /** Ceasul simulării merge doar cât timp ecranul e deschis, deci fixăm ruta. */
 beforeEach(() => {
