@@ -93,6 +93,26 @@ describe('constrângerile de conținut', () => {
   });
 });
 
+describe('idempotența jurnalului de progres', () => {
+  it('nu permite aceeași cheie de client de două ori', async () => {
+    const id = await baza.creeazaUtilizator('elev@exemplu.ro');
+    await baza.caUtilizator(id, async () => {
+      await baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source, client_key)
+         values ($1, 'bio-nervos-01', 'B', true, 'sesiune', 'session-1:0')`,
+        [id],
+      );
+      await expect(
+        baza.db.query(
+          `insert into attempts (user_id, question_id, chosen, is_correct, source, client_key)
+           values ($1, 'bio-nervos-01', 'B', true, 'sesiune', 'session-1:0')`,
+          [id],
+        ),
+      ).rejects.toThrow(/attempts_client_key_unique/);
+    });
+  });
+});
+
 describe('contul', () => {
   it('primește un profil automat la înregistrare', async () => {
     const id = await baza.creeazaUtilizator('elev@exemplu.ro');
