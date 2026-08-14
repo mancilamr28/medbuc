@@ -94,4 +94,14 @@ describe('sesiunea de grile', () => {
       expect(optiune).not.toBeDisabled();
     }
   });
+
+  it('nu afișează statistici inventate înainte să existe răspunsuri', async () => {
+    deschide();
+    await userEvent.click(screen.getByRole('tab', { name: 'Cu context' }));
+
+    expect(screen.getByText('Statisticile apar după primele răspunsuri')).toBeInTheDocument();
+    expect(screen.queryByText('68%')).not.toBeInTheDocument();
+    expect(screen.queryByText('74%')).not.toBeInTheDocument();
+    expect(screen.queryByText('41s')).not.toBeInTheDocument();
+  });
 });

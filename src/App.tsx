@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { LandingBoundary } from './components/LandingBoundary';
+import { AttemptSync } from './components/AttemptSync';
 import { MobileNav } from './components/MobileNav';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -109,6 +110,7 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '100vh' }}>
+      <AttemptSync />
       {isDesktop && <Sidebar />}
       <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Topbar compact={!isDesktop} />

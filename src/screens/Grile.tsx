@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
+import { EmptyState } from '../components/EmptyState';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import {
@@ -548,26 +549,11 @@ function ContextColumn() {
 
       <div className="card-flat" style={{ padding: 18 }}>
         <div style={eyebrow()}>Capitolul tău în cifre</div>
-        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[
-            ['Corecte în acest capitol', '68%'],
-            ['Media platformei', '74%'],
-            ['Timp mediu / grilă', '41s'],
-          ].map(([label, value]) => (
-            <div
-              key={label}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                font: `400 13px ${SANS}`,
-                color: 'var(--fg2)',
-              }}
-            >
-              {label}
-              <b style={{ color: 'var(--fg)', fontWeight: 600 }}>{value}</b>
-            </div>
-          ))}
-        </div>
+        <EmptyState
+          title="Statisticile apar după primele răspunsuri"
+          hint="Rezolvă câteva grile pentru a vedea progresul real pe acest capitol."
+          padding="18px 0 0"
+        />
       </div>
     </div>
   );
