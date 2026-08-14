@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { chapterById, type ChapterId, type MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
 import { incarcaGrile, type GrilaCuStare } from '../lib/continut';
 
@@ -21,15 +20,25 @@ interface ContentValue {
   grile: GrilaCuStare[];
   /** Doar publicate — banca pe care o primesc motoarele de quiz. */
   questions: Question[];
-  /** Numărate din banca publicată, nu din fișier. */
-  chapterCount: (id: ChapterId) => number;
-  materieCount: (id: MaterieId) => number;
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
 }
 
 const ContentContext = createContext<ContentValue | null>(null);
+
+/**
+ * Contextul, fără să arunce când lipsește.
+ *
+ * `useContent()` aruncă intenționat: cine are nevoie de bibliotecă are nevoie și
+ * de provider. Dar `PoartaContinut` e doar decor peste stări — încărcare, eroare
+ * — iar ecranele își iau banca de la `AppProvider`, prin prop. Montate singure
+ * într-un test, n-au provider de conținut și nici nu le trebuie: nu e nimic de
+ * încărcat, deci nu e nimic de anunțat.
+ */
+export function useContentOptional(): ContentValue | null {
+  return useContext(ContentContext);
+}
 
 export function ContentProvider({ children }: { children: ReactNode }) {
   const [grile, setGrile] = useState<GrilaCuStare[]>([]);
@@ -55,32 +64,18 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     void incarca();
   }, [incarca]);
 
-  const value = useMemo<ContentValue>(() => {
-    const questions: Question[] = grile.filter((g) => g.status === 'publicata');
-
-    // Numărătorile se construiesc o dată per încărcare, nu la fiecare apel:
-    // `Materii` le cheamă pentru fiecare capitol la fiecare render.
-    const peCapitol = new Map<ChapterId, number>();
-    for (const q of questions) peCapitol.set(q.capId, (peCapitol.get(q.capId) ?? 0) + 1);
-
-    // Materia se citește din capitol, nu din prefixul id-ului: `Chapter` o poartă
-    // explicit tocmai ca să nu depindă nimic de forma șirului.
-    const peMaterie = new Map<MaterieId, number>();
-    for (const q of questions) {
-      const materie = chapterById(q.capId)?.materie;
-      if (materie) peMaterie.set(materie, (peMaterie.get(materie) ?? 0) + 1);
-    }
-
-    return {
+  const value = useMemo<ContentValue>(
+    () => ({
       grile,
-      questions,
-      chapterCount: (id) => peCapitol.get(id) ?? 0,
-      materieCount: (id) => peMaterie.get(id) ?? 0,
+      // Motoarele primesc doar publicatele. Filtrarea se face aici, nu în
+      // interogare: administratorul are nevoie și de ciorne, în aceeași încărcare.
+      questions: grile.filter((g) => g.status === 'publicata'),
       loading,
       error,
       reload: incarca,
-    };
-  }, [grile, loading, error, incarca]);
+    }),
+    [grile, loading, error, incarca],
+  );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }

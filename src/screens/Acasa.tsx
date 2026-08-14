@@ -2,7 +2,6 @@ import { ChapterChart } from '../components/ChapterChart';
 import { EmptyState } from '../components/EmptyState';
 import { ScoreChart } from '../components/ScoreChart';
 import { Segmented } from '../components/Segmented';
-import { QUESTIONS } from '../data/questions';
 import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
 import { usePersistentState } from '../lib/hooks';
 import { numar, primulNume } from '../lib/text';
@@ -10,6 +9,7 @@ import { daysUntil } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/AppState';
 import { useAuth } from '../state/AuthContext';
+import { useContentOptional } from '../state/ContentContext';
 
 type Variant = 'a' | 'b';
 
@@ -28,6 +28,7 @@ const cardSub = { marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' 
 export function Acasa() {
   const { go, session } = useApp();
   const { user, profile } = useAuth();
+  const loading = useContentOptional()?.loading ?? false;
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
   const daysLeft = daysUntil(EXAM_DATE);
@@ -40,8 +41,10 @@ export function Acasa() {
       <div style={{ marginBottom: 22 }}>
         <h1 style={pageTitle}>Bună, {prenume}</h1>
         <p style={pageLead}>
-          Mai sunt {numar(daysLeft, 'zi', 'zile')} până la examen. Biblioteca are{' '}
-          {numar(QUESTIONS.length, 'grilă', 'grile')} scrise deocamdată.
+          Mai sunt {numar(daysLeft, 'zi', 'zile')} până la examen.{' '}
+          {/* Cifra vine din bibliotecă, deci se spune abia după ce se știe.
+              Un „0 grile" cât timp se încarcă ar fi o afirmație falsă, nu o stare. */}
+          {loading ? 'Se încarcă biblioteca…' : `Biblioteca are ${numar(session.questions.length, 'grilă', 'grile')} publicate.`}
         </p>
       </div>
 

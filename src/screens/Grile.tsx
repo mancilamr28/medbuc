@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
 import { EmptyState } from '../components/EmptyState';
+import { PoartaContinut } from '../components/PoartaContinut';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
@@ -14,7 +15,9 @@ type Variant = 'a' | 'b';
 /** Ecranul de grile își alege faza: rezolvare sau panoul de rezultat. */
 export function Grile() {
   const { session } = useApp();
-  return session.finished ? <GrileRezultat /> : <GrileRun />;
+  return (
+    <PoartaContinut>{session.finished ? <GrileRezultat /> : <GrileRun />}</PoartaContinut>
+  );
 }
 
 function GrileRun() {

@@ -3,6 +3,7 @@ import { AnswerOptions } from '../components/AnswerOptions';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { EmptyState } from '../components/EmptyState';
+import { PoartaContinut } from '../components/PoartaContinut';
 import { questionCap, questionMaterie, tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
 import { formatClock } from '../lib/time';
@@ -23,8 +24,11 @@ import { useApp } from '../state/AppState';
 
 export function Simulari() {
   const { sim } = useApp();
-  if (sim.phase === 'rezultat') return <SimRezultat />;
-  return sim.phase === 'config' ? <SimConfig /> : <SimRun />;
+  return (
+    <PoartaContinut>
+      {sim.phase === 'rezultat' ? <SimRezultat /> : sim.phase === 'config' ? <SimConfig /> : <SimRun />}
+    </PoartaContinut>
+  );
 }
 
 /** Prima regulă urmează durata aleasă, nu o valoare fixă. */

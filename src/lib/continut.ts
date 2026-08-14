@@ -1,5 +1,5 @@
 import { OPTION_KEYS, type OptionKey, type Question, type QuestionType } from '../data/questions';
-import type { ChapterId } from '../data/chapters';
+import { chapterById, type ChapterId, type MaterieId } from '../data/chapters';
 
 /**
  * Biblioteca de grile, citită din Supabase.
@@ -83,6 +83,30 @@ export async function incarcaGrile(): Promise<GrilaCuStare[]> {
   const { data, error } = await supabase.from('questions').select(CAMPURI).order('id');
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as RandGrila[]).map(mapeazaGrila);
+}
+
+/**
+ * Câte grile are fiecare capitol, respectiv fiecare materie.
+ *
+ * Pure peste banca primită, nu hărți la nivel de modul cum erau în
+ * `data/questions.ts`: banca se schimbă acum la runtime, deci numărătoarea nu
+ * mai poate fi construită o dată, la import. Materia se citește din capitol —
+ * `Chapter` o poartă explicit — nu din prefixul id-ului.
+ */
+export function numaraGrile(questions: Question[]): {
+  peCapitol: ReadonlyMap<ChapterId, number>;
+  peMaterie: ReadonlyMap<MaterieId, number>;
+} {
+  const peCapitol = new Map<ChapterId, number>();
+  const peMaterie = new Map<MaterieId, number>();
+
+  for (const q of questions) {
+    peCapitol.set(q.capId, (peCapitol.get(q.capId) ?? 0) + 1);
+    const materie = chapterById(q.capId)?.materie;
+    if (materie) peMaterie.set(materie, (peMaterie.get(materie) ?? 0) + 1);
+  }
+
+  return { peCapitol, peMaterie };
 }
 
 /** Ce trimite formularul din Admin către `salveaza_grila`. */
