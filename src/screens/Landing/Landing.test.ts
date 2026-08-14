@@ -56,4 +56,18 @@ describe('izolarea paginii de prezentare', () => {
 
     expect(vinovate).toEqual([]);
   });
+
+  /**
+   * Reflectorul urmărește cursorul doar în erou. Dacă i se dă din nou un
+   * `inset` negativ, se revarsă în banda de cifre și este mascat brusc de
+   * stacking contextul acelei secțiuni în timpul derulării.
+   */
+  it('estompează reflectorul în interiorul eroului', () => {
+    const css = readFileSync(join(RADACINA, 'landing.css'), 'utf8');
+    const reflector = css.match(/\.lp-erou__reflector\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+
+    expect(reflector).toContain('inset: 0;');
+    expect(reflector).toContain('mask-image: linear-gradient(to bottom');
+    expect(reflector).not.toMatch(/^\s*inset:\s*-[^;]+;/m);
+  });
 });

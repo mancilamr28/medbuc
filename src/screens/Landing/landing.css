@@ -584,13 +584,22 @@ html:has(.lp) {
 /* Reflectorul care urmărește cursorul peste erou. Deasupra fundalului, sub text. */
 .lp-erou__reflector {
   position: absolute;
-  inset: -12% -30%;
+  /*
+   * Reflectorul aparține eroului, nu secțiunii de cifre care urmează. Înainte
+   * se prelungea mult în afara lui (`inset: -12% -30%`), apoi era acoperit
+   * brusc de următorul stacking context în timp ce pagina se derula. Îl
+   * ținem în erou și îi estompăm capetele verticale: trecerea rămâne lină
+   * indiferent unde rămâne cursorul în momentul derulării.
+   */
+  inset: 0;
   z-index: -1;
   background: radial-gradient(
     26% 34% at var(--lp-mx, 50%) var(--lp-my, 42%),
     oklch(0.72 0.155 233 / 0.16),
     transparent 68%
   );
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 84%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 84%, transparent);
   opacity: 0;
   transition: opacity 0.6s var(--lp-curba);
   pointer-events: none;
