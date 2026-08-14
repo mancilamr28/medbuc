@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { QUESTIONS } from '../data/questions';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Simulari } from './Simulari';
@@ -11,7 +12,7 @@ beforeEach(() => {
 
 const deschide = () =>
   render(
-    <AppProvider>
+    <AppProvider questions={QUESTIONS}>
       <Simulari />
     </AppProvider>,
   );

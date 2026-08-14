@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { MATERII, MATERIE_BY_NAME, chapterLabel, type MaterieId } from '../data/chapters';
-import type { OptionKey } from '../data/questions';
+import type { OptionKey, Question } from '../data/questions';
 import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute, type Screen } from '../lib/router';
 import { useSession, type Session } from './useSession';
@@ -51,16 +51,24 @@ const readInitialTheme = (): Theme => {
   return 'light';
 };
 
-export function AppProvider({ children }: { children: ReactNode }) {
+/**
+ * Banca vine ca prop, nu din `useContent()`.
+ *
+ * `AppProvider` nu are voie să depindă de un provider care face rețea: e ce ține
+ * `AppState.test.tsx` capabil să-l randeze singur, fără `AuthProvider` și fără
+ * `ContentProvider`. Cine îl montează în aplicație îi dă banca încărcată; cine îl
+ * montează într-un test îi dă o fixtură.
+ */
+export function AppProvider({ questions, children }: { questions: Question[]; children: ReactNode }) {
   const [screen, go] = useHashRoute();
   const [theme, setTheme] = usePersistentState<Theme>('medbuc.theme', readInitialTheme());
   const [materie, setMaterie] = useState<MaterieId>('bio');
   const [admin, setAdminState] = useState<AdminDraft>(DEFAULT_ADMIN_DRAFT);
 
-  const session = useSession();
+  const session = useSession(questions);
   // Ceasul simulării bate doar cât timp ecranul de simulare este deschis.
   const now = useNow(screen === 'simulari');
-  const sim = useSimulare(now);
+  const sim = useSimulare(now, questions);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {

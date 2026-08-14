@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { QUESTIONS } from '../data/questions';
 import { AppProvider, useApp } from './AppState';
 
 function ComutatorTema() {
@@ -15,7 +16,7 @@ function ComutatorTema() {
 
 const deschide = () =>
   render(
-    <AppProvider>
+    <AppProvider questions={QUESTIONS}>
       <ComutatorTema />
     </AppProvider>,
   );

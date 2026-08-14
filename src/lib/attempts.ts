@@ -1,4 +1,3 @@
-import { QUESTIONS } from '../data/questions';
 import type { Session } from '../state/useSession';
 
 export interface AttemptInsert {
@@ -11,11 +10,18 @@ export interface AttemptInsert {
   session_id: string;
   answered_at: string;
 }
-/** Transformă răspunsurile unei sesiuni într-un jurnal de încercări. */
+/**
+ * Transformă răspunsurile unei sesiuni într-un jurnal de încercări.
+ *
+ * `session.answers` e cheiat pe poziția din bancă, deci grila se caută în banca
+ * sesiunii — `session.questions` — nu într-un array importat. Jurnalul salvează
+ * mereu `question.id`, nu poziția: poziția depinde de ce e în bibliotecă în ziua
+ * aceea, id-ul nu.
+ */
 export function attemptsFromSession(session: Session, userId: string, finishedAt: number): AttemptInsert[] {
   const answeredAt = new Date(finishedAt).toISOString();
   return Object.entries(session.answers).flatMap(([index, chosen]) => {
-    const question = QUESTIONS[Number(index)];
+    const question = session.questions[Number(index)];
     if (!question) return [];
     return [
       {

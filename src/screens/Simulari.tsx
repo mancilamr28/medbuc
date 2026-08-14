@@ -18,7 +18,7 @@ import {
   statusChip,
   twoCol,
 } from '../lib/ui';
-import { SIM_FIELDS, questionAtPosition } from '../state/useSimulare';
+import { SIM_FIELDS } from '../state/useSimulare';
 import { useApp } from '../state/AppState';
 
 export function Simulari() {
@@ -120,6 +120,49 @@ function SimConfig() {
   );
 }
 
+/**
+ * Poziția din lucrare nu mai are pereche în bibliotecă.
+ *
+ * Se întâmplă când o grilă e retrasă după ce cineva a început lucrarea. Până la
+ * Faza 4 nu putea apărea — banca era compilată în bundle — și cădea tăcut pe
+ * prima grilă din bancă, adică arăta altceva decât se salvase.
+ */
+function GrilaLipsa() {
+  const { sim } = useApp();
+  return (
+    <div className="screen">
+      <div className="card" style={{ padding: 26, maxWidth: 620 }}>
+        <div style={eyebrow('var(--bad)')}>Grilă indisponibilă</div>
+        <p style={{ margin: '14px 0 0', font: `400 17px/1.5 ${SERIF}`, textWrap: 'pretty' }}>
+          Grila {sim.qi + 1} a fost scoasă din bibliotecă după ce ai început lucrarea.
+        </p>
+        <p style={{ margin: '10px 0 18px', font: `400 13.5px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
+          Restul lucrării e neatins. Treci mai departe sau predă — punctajul se calculează din
+          grilele care au rămas.
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={sim.prev}
+            style={{ padding: '10px 15px', font: `500 13px ${SANS}` }}
+          >
+            ← Înapoi
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={sim.next}
+            style={{ padding: '10px 16px', font: `600 13px ${SANS}` }}
+          >
+            Grila următoare →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Fereastra de 24 de grile din navigator care conține grila curentă. */
 const navWindow = (qi: number, total: number) => {
   const size = Math.min(24, total);
@@ -134,6 +177,12 @@ function SimRun() {
   const run = sim.run;
   const [confirmaPredarea, setConfirmaPredarea] = useState(false);
   const faraRaspuns = sim.total - sim.completed;
+  const question = sim.question;
+
+  // O lucrare începută înainte ca o grilă să fie retrasă poate ajunge pe o
+  // poziție care nu mai are pereche în bibliotecă. Se spune, nu se sare peste:
+  // altfel numerotarea ar minți despre câte grile are lucrarea.
+  if (!question) return <GrilaLipsa />;
 
   return (
     <div className="screen">
@@ -240,16 +289,16 @@ function SimRun() {
                 padding: '6px 9px',
               }}
             >
-              {tipLabel(sim.question.tip)}
+              {tipLabel(question.tip)}
             </span>
             <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
               Grila {sim.qi + 1} din {sim.total}
             </span>
           </div>
 
-          <p style={{ margin: '18px 0 0', font: `400 21px/1.45 ${SERIF}`, textWrap: 'pretty' }}>{sim.question.text}</p>
+          <p style={{ margin: '18px 0 0', font: `400 21px/1.45 ${SERIF}`, textWrap: 'pretty' }}>{question.text}</p>
 
-          {sim.question.enunturi && (
+          {question.enunturi && (
             <div
               style={{
                 marginTop: 16,
@@ -261,7 +310,7 @@ function SimRun() {
                 borderRadius: 11,
               }}
             >
-              {sim.question.enunturi.map((t, i) => (
+              {question.enunturi.map((t, i) => (
                 <div key={t} style={{ display: 'flex', gap: 10, font: `400 14.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>
                   <span style={{ fontWeight: 600, color: 'var(--fg)', flex: '0 0 auto' }}>{i + 1}.</span>
                   <span>{t}</span>
@@ -271,7 +320,7 @@ function SimRun() {
           )}
 
           <AnswerOptions
-            question={sim.question}
+            question={question}
             answer={sim.answer}
             revealed={false}
             onPick={sim.pick}
@@ -407,12 +456,16 @@ function SimRezultat() {
   const { corecte, gresite, neraspunse, total, pct, durataMs } = sim.score;
   const culoare = pct >= 80 ? 'var(--ok)' : pct >= 65 ? 'var(--brand)' : 'var(--bad)';
 
+  // `questionAt` intră ca dependență, nu `sim` întreg: e memoizat pe banca
+  // încărcată și pe lucrare, deci lista se recalculează exact când se schimbă
+  // una dintre ele, nu la fiecare bătaie de ceas a simulării.
+  const questionAt = sim.questionAt;
   const pozitii = useMemo(() => {
     if (!run) return [];
     return run.order
       .map((_, i) => i)
-      .filter((i) => filtru === 'toate' || run.answers[i] !== questionAtPosition(run, i).correct);
-  }, [filtru, run]);
+      .filter((i) => filtru === 'toate' || run.answers[i] !== questionAt(i)?.correct);
+  }, [filtru, questionAt, run]);
 
   if (!run) return null;
 
@@ -507,8 +560,26 @@ function SimRezultat() {
             ) : (
               <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {pozitii.map((i) => {
-                  const q = questionAtPosition(run, i);
+                  const q = sim.questionAt(i);
                   const ales = run.answers[i];
+
+                  // Grilă retrasă din bibliotecă după ce lucrarea a fost dată.
+                  // Se arată locul ei, nu se sare: altfel numerotarea din
+                  // recitire n-ar mai corespunde cu cea din timpul examenului.
+                  if (!q) {
+                    return (
+                      <div key={i} className="card-flat" style={{ padding: 18 }}>
+                        <span className="tabular" style={{ font: `500 12px ${SANS}`, color: 'var(--fg3)' }}>
+                          Grila {i + 1}
+                        </span>
+                        <p style={{ margin: '10px 0 0', font: `400 13.5px/1.6 ${SANS}`, color: 'var(--fg3)' }}>
+                          Grila asta nu mai e în bibliotecă, deci nu poate fi recitită. Punctajul
+                          lucrării a rămas cel de la predare.
+                        </p>
+                      </div>
+                    );
+                  }
+
                   const stare: [string, string, string] =
                     ales === undefined
                       ? ['Fără răspuns', 'var(--surf3)', 'var(--fg3)']

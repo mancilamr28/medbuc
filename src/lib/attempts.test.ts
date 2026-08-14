@@ -7,6 +7,7 @@ const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session 
   id: '00000000-0000-0000-0000-000000000001',
   qi: 0,
   question: QUESTIONS[0]!,
+  questions: QUESTIONS,
   total: QUESTIONS.length,
   answers,
   revealed: {},

@@ -1,0 +1,6 @@
+# `supabase/seed.sql` e generat, iar `seed.test.ts` compară fișierul de pe disc cu
+# ce produce generatorul, octet cu octet. Pe Windows, cu `core.autocrlf=true`,
+# fiecare `checkout` îl rescria cu CRLF în timp ce generatorul scrie LF — deci
+# testul pica după orice schimbare de ramură, fără ca nimeni să fi atins datele.
+# Restrâns la `.sql` intenționat: `* text=auto` ar renormaliza tot depozitul.
+*.sql text eol=lf

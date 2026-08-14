@@ -7,7 +7,7 @@ import { AppProvider } from '../state/AppState';
 
 const deschide = () =>
   render(
-    <AppProvider>
+    <AppProvider questions={QUESTIONS}>
       <Grile />
     </AppProvider>,
   );

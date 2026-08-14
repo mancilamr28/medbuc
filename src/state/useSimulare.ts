@@ -1,8 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import {
-  QUESTIONS,
-  isQuestionId,
-  questionById,
   questionCap,
   questionMaterie,
   type OptionKey,
@@ -67,20 +64,35 @@ export interface SimScore {
 
 const EMPTY_SCORE: SimScore = { corecte: 0, gresite: 0, neraspunse: 0, total: 0, pct: 0, durataMs: 0 };
 
-/** Grila de pe poziția `i` din lucrare (pozițiile indexează `order`, nu banca). */
-export const questionAtPosition = (run: SimRun, i: number): Question => {
+/**
+ * Grila de pe poziția `i` din lucrare (pozițiile indexează `order`, nu banca).
+ *
+ * Poate lipsi, și asta e o schimbare deliberată: până acum cădea pe `QUESTIONS[0]`,
+ * adică o lucrare care trimitea la o grilă dispărută afișa **altă grilă**, tăcut.
+ * Cu banca venind din bază cazul devine obișnuit — o grilă retrasă după ce cineva
+ * a început lucrarea — deci golul se arată ca gol.
+ */
+export const questionAtPosition = (
+  run: SimRun,
+  i: number,
+  byId: ReadonlyMap<QuestionId, Question>,
+): Question | undefined => {
   const id = run.order[i];
-  return (id !== undefined ? questionById(id) : undefined) ?? QUESTIONS[0]!;
+  return id !== undefined ? byId.get(id) : undefined;
 };
 
-export function scoreOf(run: SimRun, finishedAt: number): SimScore {
+export function scoreOf(
+  run: SimRun,
+  finishedAt: number,
+  byId: ReadonlyMap<QuestionId, Question>,
+): SimScore {
   let corecte = 0;
   let raspunse = 0;
   run.order.forEach((_, i) => {
     const ales = run.answers[i];
     if (ales === undefined) return;
     raspunse += 1;
-    if (ales === questionAtPosition(run, i).correct) corecte += 1;
+    if (ales === questionAtPosition(run, i, byId)?.correct) corecte += 1;
   });
   const total = run.order.length;
   return {
@@ -109,9 +121,13 @@ const isSimRun = (v: unknown): v is SimRun => {
     typeof r.qi === 'number' &&
     Array.isArray(r.order) &&
     r.order.length > 0 &&
-    // Id-uri care chiar există în bancă: o lucrare de la o versiune mai veche
-    // (care salva indici) sau cu grile șterse între timp e respinsă, nu crapă.
-    r.order.every(isQuestionId) &&
+    // Se verifică forma, nu apartenența la bancă. Până la Faza 4 banca era un
+    // array compilat, deci `isQuestionId` putea decide dacă un id există; acum
+    // grilele vin din bază, iar o grilă scrisă din Admin n-are cum să fie în
+    // fișier. Cu verificarea veche, o lucrare care conține o grilă nouă ar fi
+    // fost respinsă întreagă și aruncată la reîncărcare. Id-urile care nu se mai
+    // găsesc sunt tratate poziție cu poziție de `questionAtPosition`.
+    r.order.every((id) => typeof id === 'string' && id.length > 0) &&
     r.qi >= 0 &&
     r.qi < r.order.length &&
     typeof r.config === 'object' &&
@@ -137,7 +153,10 @@ export interface Simulare {
   /** Bilanțul lucrării; zerouri cât timp nu există o lucrare. */
   score: SimScore;
   run: SimRun | null;
-  question: Question;
+  /** Poate lipsi dacă lucrarea trimite la o grilă care nu mai e în bibliotecă. */
+  question: Question | undefined;
+  /** Grila de pe o poziție anume, legată de banca încărcată. */
+  questionAt: (i: number) => Question | undefined;
   qi: number;
   total: number;
   answer: OptionKey | undefined;
@@ -154,12 +173,18 @@ export interface Simulare {
 const minutesOf = (durata: string): number => Number.parseInt(durata, 10) || 180;
 
 /**
- * Banca de întrebări are șase grile; simularea le repetă până la numărul cerut,
- * respectând ordinea aleasă în configurare.
+ * Simularea repetă banca până la numărul cerut, respectând ordinea aleasă.
+ *
+ * Repetarea e o consecință a bibliotecii mici, nu o intenție: când banca ajunge
+ * la câteva sute de grile, `count` va fi sub dimensiunea ei și fiecare grilă va
+ * apărea o dată. Cu banca goală întoarce o listă goală, iar ecranul de simulări
+ * refuză să pornească.
  */
-export function buildOrder(count: number, ordine: string): QuestionId[] {
-  const base = QUESTIONS.map((q) => q.id);
-  const grouped = [...QUESTIONS]
+export function buildOrder(count: number, ordine: string, questions: Question[]): QuestionId[] {
+  if (questions.length === 0) return [];
+
+  const base = questions.map((q) => q.id);
+  const grouped = [...questions]
     .sort(
       (a, b) =>
         questionMaterie(a).localeCompare(questionMaterie(b), 'ro') ||
@@ -183,7 +208,11 @@ export function buildOrder(count: number, ordine: string): QuestionId[] {
   return order;
 }
 
-export function useSimulare(now: number): Simulare {
+export function useSimulare(now: number, questions: Question[]): Simulare {
+  // `order` ține id-uri, deci căutarea are nevoie de o hartă peste banca încărcată
+  // — nu mai poate fi harta de la nivel de modul, construită din fișier.
+  const byId = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
+
   const [config, setConfigState] = usePersistentState<SimConfig>('medbuc.sim.config', DEFAULT_SIM_CONFIG);
   const [run, setRun] = usePersistentState<SimRun | null>(
     'medbuc.sim.run',
@@ -204,12 +233,12 @@ export function useSimulare(now: number): Simulare {
       endsAt: startedAt + minutesOf(config.durata) * 60_000,
       finishedAt: null,
       config,
-      order: buildOrder(count, config.ordine),
+      order: buildOrder(count, config.ordine, questions),
       qi: 0,
       answers: {},
       marks: {},
     });
-  }, [config, setRun]);
+  }, [config, questions, setRun]);
 
   /**
    * Predarea păstrează lucrarea și notează ora. Ștergerea ei aici a fost multă
@@ -229,8 +258,13 @@ export function useSimulare(now: number): Simulare {
   // `endsAt`, deci rezultatul e același și după o reîncărcare.
   const finishedAt = run ? (run.finishedAt ?? (expired ? run.endsAt : null)) : null;
   const score = useMemo(
-    () => (run && finishedAt !== null ? scoreOf(run, finishedAt) : run ? scoreOf(run, now) : EMPTY_SCORE),
-    [finishedAt, now, run],
+    () =>
+      run && finishedAt !== null
+        ? scoreOf(run, finishedAt, byId)
+        : run
+          ? scoreOf(run, now, byId)
+          : EMPTY_SCORE,
+    [byId, finishedAt, now, run],
   );
 
   const patch = useCallback(
@@ -240,7 +274,11 @@ export function useSimulare(now: number): Simulare {
 
   const total = run ? run.order.length : Number.parseInt(config.nr, 10) || 100;
   const qi = run?.qi ?? 0;
-  const question = useMemo(() => (run ? questionAtPosition(run, qi) : QUESTIONS[0]!), [qi, run]);
+  const questionAt = useCallback(
+    (i: number) => (run ? questionAtPosition(run, i, byId) : undefined),
+    [byId, run],
+  );
+  const question = useMemo(() => questionAt(qi), [qi, questionAt]);
 
   const goTo = useCallback(
     (index: number) => patch((prev) => ({ ...prev, qi: Math.max(0, Math.min(index, prev.order.length - 1)) })),
@@ -285,6 +323,7 @@ export function useSimulare(now: number): Simulare {
       score,
       run,
       question,
+      questionAt,
       qi,
       total,
       answer,
@@ -311,6 +350,7 @@ export function useSimulare(now: number): Simulare {
       prev,
       qi,
       question,
+      questionAt,
       reset,
       run,
       score,

@@ -3,23 +3,13 @@ import { AnswerOptions } from '../components/AnswerOptions';
 import { EmptyState } from '../components/EmptyState';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
-import {
-  OPTION_KEYS,
-  QUESTIONS,
-  questionCap,
-  questionMaterie,
-  tipLabel,
-  type OptionKey,
-} from '../data/questions';
+import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/AppState';
 
 type Variant = 'a' | 'b';
-
-/** Răspunsul corect al fiecărei grile, pentru colorarea navigatorului. */
-const QUESTION_CORRECT: OptionKey[] = QUESTIONS.map((q) => q.correct);
 
 /** Ecranul de grile își alege faza: rezolvare sau panoul de rezultat. */
 export function Grile() {
@@ -58,6 +48,10 @@ function GrileRun() {
   }, [session]);
 
   const elapsed = formatClock((now - session.startedAt) / 1000);
+
+  // `Grile()` tratează deja biblioteca goală; garda de aici e pentru tipuri, după
+  // toate hook-urile, ca ordinea lor să rămână aceeași la fiecare randare.
+  if (!question) return null;
 
   return (
     <div className="screen">
@@ -110,7 +104,7 @@ function GrileRun() {
             <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
               {Array.from({ length: total }, (_, i) => {
                 const revealed = !!session.revealed[i];
-                const ok = session.answers[i] === QUESTION_CORRECT[i];
+                const ok = session.answers[i] === session.questions[i]?.correct;
                 return (
                   <button
                     key={i}
@@ -467,8 +461,9 @@ function GrileRezultat() {
 /** Coloana de context: navigatorul sesiunii, notița pe capitol și cifrele capitolului. */
 function ContextColumn() {
   const { session } = useApp();
+  const capId = session.question?.capId;
   // Cheia ține de id-ul capitolului: o redenumire nu mai orfanizează notița.
-  const [note, setNote] = usePersistentState<string>(`medbuc.note.${session.question.capId}`, '');
+  const [note, setNote] = usePersistentState<string>(`medbuc.note.${capId ?? 'fara-capitol'}`, '');
 
   return (
     <div style={{ display: 'grid', gap: 16, alignContent: 'start', minWidth: 0 }}>
@@ -484,7 +479,7 @@ function ContextColumn() {
         >
           {Array.from({ length: session.total }, (_, i) => {
             const revealed = !!session.revealed[i];
-            const ok = revealed && session.answers[i] === QUESTION_CORRECT[i];
+            const ok = revealed && session.answers[i] === session.questions[i]?.correct;
             const cur = i === session.qi;
             return (
               <button
