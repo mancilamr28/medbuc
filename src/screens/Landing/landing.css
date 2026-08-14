@@ -581,16 +581,38 @@ html:has(.lp) {
   padding-block: 132px 76px;
 }
 
-/* Reflectorul care urmărește cursorul peste erou. Deasupra fundalului, sub text. */
+/*
+ * Reflectorul care urmărește cursorul peste erou. Deasupra fundalului, sub text.
+ *
+ * `inset: 0` nu e o alegere estetică, e o condiție de corectitudine:
+ * `usePointerGlow` scrie `--lp-mx`/`--lp-my` ca procente din `.lp-erou`, iar
+ * gradientul le folosește ca procente din cutia elementului ăstuia. Cât timp
+ * cutia era mai mare decât eroul (`inset: -12% -30%`), cele două procente se
+ * refereau la lucruri diferite: lumina nu stătea sub cursor, iar decalajul
+ * creștea spre margini, până acolo încât cu cursorul jos strălucirea ieșea
+ * complet din erou și ateriza peste banda de cifre.
+ *
+ * Cu cutia egală cu eroul, marginea ei ar tăia însă gradientul drept atunci
+ * când cursorul se apropie de ea. De aia masca: spre margini lumina se stinge,
+ * în loc să fie retezată. Se estompează pe ambele axe — eroul e mărginit și la
+ * stânga/dreapta de `lp-wrap`, deci și acolo ar apărea o muchie verticală.
+ */
 .lp-erou__reflector {
   position: absolute;
-  inset: -12% -30%;
+  inset: 0;
   z-index: -1;
   background: radial-gradient(
-    26% 34% at var(--lp-mx, 50%) var(--lp-my, 42%),
-    oklch(0.72 0.155 233 / 0.16),
+    30% 38% at var(--lp-mx, 50%) var(--lp-my, 42%),
+    oklch(0.72 0.155 233 / 0.18),
     transparent 68%
   );
+  mask-image:
+    linear-gradient(to bottom, transparent, #000 14%, #000 84%, transparent),
+    linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  /* Doar proprietatea standard: `-webkit-mask-composite` folosește alt set de
+     cuvinte-cheie și, pusă după, suprascrie `intersect` cu unul din sintaxa
+     veche. Chrome și Safari acceptă `intersect` de la 15.4 încoace. */
+  mask-composite: intersect;
   opacity: 0;
   transition: opacity 0.6s var(--lp-curba);
   pointer-events: none;
