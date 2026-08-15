@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { QUESTIONS } from '../data/questions';
-import { AppProvider, useApp } from './AppState';
+import { AppProvider } from './AppState';
+import { useApp } from './appContextValue';
 
 function ComutatorTema() {
   const { theme, toggleTheme } = useApp();

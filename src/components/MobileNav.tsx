@@ -7,7 +7,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { Screen } from '../lib/router';
 import { mobileNavItem } from '../lib/ui';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 import { Icon } from './Icon';
 
 /** Aceleași iconițe ca în bara laterală, ca cele două navigații să se recunoască. */

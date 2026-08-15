@@ -1,56 +1,13 @@
-import {
-  faBookOpen,
-  faCalendarDays,
-  faChartLine,
-  faChevronRight,
-  faGear,
-  faHouse,
-  faListCheck,
-  faNoteSticky,
-  faRotateLeft,
-  faShieldHalved,
-  faStopwatch,
-} from '@fortawesome/free-solid-svg-icons';
-import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
 import { daysUntil } from '../lib/time';
 import { initialeDin } from '../lib/text';
 import { SANS, eyebrow } from '../lib/ui';
-import type { Screen } from '../lib/router';
-import { useApp } from '../state/AppState';
-import { useAuth } from '../state/AuthContext';
+import { useApp } from '../state/appContextValue';
+import { useAuth } from '../state/authState';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
-
-interface NavEntry {
-  id: Screen;
-  label: string;
-  icon: IconDefinition;
-  badge?: string;
-}
-
-export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
-  const { session } = useApp();
-  const { role } = useAuth();
-  const ramase = session.total - Object.keys(session.revealed).length;
-
-  return {
-    main: [
-      { id: 'acasa', label: 'Acasă', icon: faHouse },
-      { id: 'materii', label: 'Materii', icon: faBookOpen },
-      { id: 'grile', label: 'Grile', icon: faListCheck, badge: ramase > 0 ? String(ramase) : undefined },
-      { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft },
-      { id: 'simulari', label: 'Simulări', icon: faStopwatch },
-      { id: 'statistici', label: 'Statistici', icon: faChartLine },
-    ],
-    sec: [
-      { id: 'plan', label: 'Planul meu', icon: faCalendarDays },
-      { id: 'notite', label: 'Notițe', icon: faNoteSticky },
-      { id: 'setari', label: 'Profil și setări', icon: faGear },
-      ...(role === 'admin' ? [{ id: 'admin' as Screen, label: 'Administrare', icon: faShieldHalved }] : []),
-    ],
-  };
-}
+import { useNavGroups, type NavEntry } from './useNavGroups';
 
 export function Sidebar() {
   const { screen, go } = useApp();

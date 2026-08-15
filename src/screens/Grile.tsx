@@ -8,7 +8,7 @@ import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } f
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 import { descriereScop, frazaCapitoleGoale, frazaCorecte } from './grileText';
 
 type Variant = 'a' | 'b';

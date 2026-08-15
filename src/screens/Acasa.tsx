@@ -10,9 +10,9 @@ import { calculeazaProgres } from '../lib/progres';
 import { numar, primulNume } from '../lib/text';
 import { daysUntil } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill } from '../lib/ui';
-import { useApp } from '../state/AppState';
-import { useAuth } from '../state/AuthContext';
-import { useContentOptional } from '../state/ContentContext';
+import { useApp } from '../state/appContextValue';
+import { useAuth } from '../state/authState';
+import { useContentOptional } from '../state/contentState';
 import { useProgressOptional } from '../state/progressState';
 
 type Variant = 'a' | 'b';

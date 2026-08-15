@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { EmptyState } from './EmptyState';
 import { SANS } from '../lib/ui';
-import { useApp } from '../state/AppState';
-import { useContentOptional } from '../state/ContentContext';
+import { useApp } from '../state/appContextValue';
+import { useContentOptional } from '../state/contentState';
 
 /**
  * Poarta dintre ecranele care nu pot funcționa fără grile și biblioteca încărcată.

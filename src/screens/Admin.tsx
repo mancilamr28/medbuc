@@ -7,9 +7,9 @@ import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } fr
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
 import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip, twoCol } from '../lib/ui';
-import { useAuth } from '../state/AuthContext';
-import { useContent } from '../state/ContentContext';
-import { useToast } from '../state/ToastContext';
+import { useAuth } from '../state/authState';
+import { useContent } from '../state/contentState';
+import { useToast } from '../state/toastState';
 import {
   catreSalvare,
   ciornaGoala,

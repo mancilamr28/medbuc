@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS, materieQuestionCount } from '../data/questions';
 import type { AttemptRow } from '../lib/progres';
-import { AppProvider, useApp } from '../state/AppState';
+import { AppProvider } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 import { Grile } from './Grile';
 import { Materii } from './Materii';
 

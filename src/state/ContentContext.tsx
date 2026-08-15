@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Question } from '../data/questions';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { incarcaGrile, type GrilaCuStare } from '../lib/continut';
-import { useAuth } from './AuthContext';
+import { useAuth } from './authState';
+import { ContentContext, type ContentValue } from './contentState';
 
 /**
  * Biblioteca de grile, la runtime.
@@ -16,18 +16,6 @@ import { useAuth } from './AuthContext';
  * rămână montabil singur, fără provider și fără rețea, exact cum se bazează
  * `AppState.test.tsx`.
  */
-interface ContentValue {
-  /** Tot ce are voie contul să vadă. La administrator include ciornele. */
-  grile: GrilaCuStare[];
-  /** Doar publicate — banca pe care o primesc motoarele de quiz. */
-  questions: Question[];
-  loading: boolean;
-  error: string | null;
-  reload: () => Promise<void>;
-}
-
-const ContentContext = createContext<ContentValue | null>(null);
-
 /**
  * Contextul, fără să arunce când lipsește.
  *
@@ -37,10 +25,6 @@ const ContentContext = createContext<ContentValue | null>(null);
  * într-un test, n-au provider de conținut și nici nu le trebuie: nu e nimic de
  * încărcat, deci nu e nimic de anunțat.
  */
-export function useContentOptional(): ContentValue | null {
-  return useContext(ContentContext);
-}
-
 export function ContentProvider({ children }: { children: ReactNode }) {
   const { user, loading: sesiuneaSeIncarca } = useAuth();
   const [grile, setGrile] = useState<GrilaCuStare[]>([]);
@@ -97,10 +81,4 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
-}
-
-export function useContent(): ContentValue {
-  const ctx = useContext(ContentContext);
-  if (!ctx) throw new Error('useContent trebuie folosit în interiorul <ContentProvider>');
-  return ctx;
 }

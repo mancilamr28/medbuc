@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../components/Icon';
 import {
   faCircleCheck,
@@ -7,21 +7,13 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { SANS } from '../lib/ui';
-
-export type ToastKind = 'succes' | 'eroare' | 'info';
+import { ToastContext, type ToastKind, type ToastValue } from './toastState';
 
 interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
 }
-
-interface ToastValue {
-  /** Anunță reușita sau eșecul unei acțiuni. Dispare singur după câteva secunde. */
-  notify: (kind: ToastKind, message: string) => void;
-}
-
-const ToastContext = createContext<ToastValue | null>(null);
 
 const DURATA_MS = 4500;
 
@@ -133,10 +125,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast(): ToastValue {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast trebuie folosit în interiorul <ToastProvider>');
-  return ctx;
 }

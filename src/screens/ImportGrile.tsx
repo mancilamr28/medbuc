@@ -4,7 +4,7 @@ import { salveazaGrila, type GrilaCuStare, type QuestionStatus } from '../lib/co
 import { descarcaText, ziua } from '../lib/exportDate';
 import { numar } from '../lib/text';
 import { MONO, SANS, label } from '../lib/ui';
-import { useToast } from '../state/ToastContext';
+import { useToast } from '../state/toastState';
 import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } from './importLot';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */

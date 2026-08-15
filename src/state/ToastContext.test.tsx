@@ -1,7 +1,8 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ToastProvider, useToast } from './ToastContext';
+import { ToastProvider } from './ToastContext';
+import { useToast } from './toastState';
 
 function Declansator() {
   const { notify } = useToast();

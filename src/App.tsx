@@ -15,8 +15,8 @@ import { Materii } from './screens/Materii';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
 import { Simulari } from './screens/Simulari';
-import { useApp } from './state/AppState';
-import { useAuth } from './state/AuthContext';
+import { useApp } from './state/appContextValue';
+import { useAuth } from './state/authState';
 
 /**
  * Pagina de prezentare e cod pe care un elev autentificat nu-l descarcă
