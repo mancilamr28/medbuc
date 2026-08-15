@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MATERII } from '../data/chapters';
-import { descriereScop, frazaCorecte } from './grileText';
+import { descriereScop, frazaCapitoleGoale, frazaCorecte } from './grileText';
 
 const BIO = MATERII.bio.list.map((c) => c.id);
 
@@ -17,6 +17,16 @@ describe('frazaCorecte', () => {
 
   it('merge și pe zero', () => {
     expect(frazaCorecte(0, 3)).toBe('0 grile corecte din 3');
+  });
+});
+
+describe('frazaCapitoleGoale', () => {
+  it('acordă substantivul și verbul cu numărul de capitole', () => {
+    expect(frazaCapitoleGoale(['bio-nervos'])).toBe('Capitolul ales nu are nicio grilă publicată');
+    expect(frazaCapitoleGoale(['bio-nervos', 'bio-osos'])).toBe(
+      'Capitolele alese nu au nicio grilă publicată',
+    );
+    expect(frazaCapitoleGoale(BIO)).toBe('Capitolele alese nu au nicio grilă publicată');
   });
 });
 

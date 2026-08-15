@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { MATERII, MATERIE_TABS, chapterLabel } from '../data/chapters';
+import { MATERII, MATERIE_TABS, chapterLabel, type ChapterId } from '../data/chapters';
 import { numaraGrile } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
@@ -21,7 +21,7 @@ export function Materii() {
   // Capitolele sunt statice, deci ecranul se desenează întreg imediat; doar
   // numărătorile așteaptă biblioteca, iar cât timp o așteaptă arată „—", nu 0.
   const loading = useContentOptional()?.loading ?? false;
-  // Numărătoarea se face pe biblioteca întreagă, nu pe `session.questions`: aceea
+  // Numărătoarea se face pe biblioteca întreagă, nu pe `session.banca`: aceea
   // e restrânsă la capitolele sesiunii curente, deci după un „Exersează" toate
   // celelalte capitole ar apărea cu zero grile scrise.
   const { peCapitol, peMaterie } = useMemo(() => numaraGrile(questions), [questions]);
@@ -30,7 +30,7 @@ export function Materii() {
   const grileMaterie = peMaterie.get(mat.id) ?? 0;
 
   /** Deschide o sesiune nouă pe capitolele date și trece pe ecranul de grile. */
-  const exerseaza = (capitole: string[]) => {
+  const exerseaza = (capitole: ChapterId[]) => {
     session.start(capitole);
     go('grile');
   };
@@ -196,13 +196,7 @@ export function Materii() {
                 className="btn-primary"
                 onClick={() => exerseaza(mat.list.map((c) => c.id))}
                 disabled={grileMaterie === 0}
-                style={{
-                  width: '100%',
-                  padding: 11,
-                  font: `600 13.5px ${SANS}`,
-                  opacity: grileMaterie === 0 ? 0.45 : 1,
-                  cursor: grileMaterie === 0 ? 'not-allowed' : 'pointer',
-                }}
+                style={{ width: '100%', padding: 11, font: `600 13.5px ${SANS}` }}
               >
                 Exersează toată materia
               </button>

@@ -18,7 +18,7 @@ interface AppValue {
   materie: MaterieId;
   setMaterie: (id: MaterieId) => void;
   /**
-   * Biblioteca întreagă. `session.questions` e doar bucata din care se rezolvă
+   * Biblioteca întreagă. `session.banca` e doar bucata din care se rezolvă
    * acum, deci orice ecran care numără grile pe capitol are nevoie de asta:
    * altfel o sesiune pe un capitol face restul bibliotecii să pară goală.
    */

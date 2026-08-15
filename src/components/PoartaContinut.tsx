@@ -14,10 +14,16 @@ import { useContentOptional } from '../state/ContentContext';
  *
  * `Materii` și `Acasă` **nu** trec pe aici: capitolele lor sunt statice, deci pot
  * desena ceva util și fără bancă. Doar cifrele lor așteaptă.
+ *
+ * Poarta se uită la **bibliotecă**, niciodată la sesiune. O trecuse pe aici o
+ * verificare a sesiunii de exersare, iar poarta e comună cu `Simulari`: o
+ * sesiune pe un capitol rămas fără grile ar fi blocat și ecranul de simulare,
+ * cu lucrarea în curs cu tot. Ce ține de bazinul unei sesiuni se decide în
+ * ecranul ei.
  */
 export function PoartaContinut({ children }: { children: ReactNode }) {
   const continut = useContentOptional();
-  const { go, questions, session } = useApp();
+  const { questions } = useApp();
 
   // Fără provider de conținut nu există nici încărcare, nici eroare de anunțat —
   // banca a venit direct din `AppProvider`. Se întâmplă în testele de randare,
@@ -68,37 +74,6 @@ export function PoartaContinut({ children }: { children: ReactNode }) {
           <EmptyState
             title="Biblioteca nu are încă nicio grilă publicată"
             hint="Grilele apar aici pe măsură ce sunt scrise și publicate din Administrare."
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Biblioteca are grile, dar niciuna din capitolele sesiunii. „Materii" nu lasă
-  // să se ajungă aici — butonul e dezactivat pe capitolele goale — dar o grilă
-  // retrasă între alegere și rezolvare golește bazinul, iar o sesiune fără nicio
-  // grilă randează un ecran alb dacă nu se spune nimic.
-  if (session.total === 0) {
-    return (
-      <div className="screen">
-        <div className="card" style={{ padding: 8, maxWidth: 520 }}>
-          <EmptyState
-            title={
-              session.capitole.length === 1
-                ? 'Capitolul ales nu are nicio grilă publicată'
-                : 'Capitolele alese nu au nicio grilă publicată'
-            }
-            hint="Alege alt capitol sau exersează din toată biblioteca."
-            action={
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => go('materii')}
-                style={{ padding: '10px 16px', font: `600 13px ${SANS}` }}
-              >
-                Înapoi la materii
-              </button>
-            }
           />
         </div>
       </div>

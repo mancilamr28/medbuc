@@ -8,7 +8,7 @@ const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session 
   capitole: [],
   qi: 0,
   question: QUESTIONS[0]!,
-  questions: QUESTIONS,
+  banca: QUESTIONS,
   total: QUESTIONS.length,
   answers,
   revealed: {},

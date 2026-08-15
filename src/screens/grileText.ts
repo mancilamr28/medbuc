@@ -15,6 +15,12 @@ import { numar } from '../lib/text';
 export const frazaCorecte = (corecte: number, total: number): string =>
   `${numar(corecte, 'grilă corectă', 'grile corecte')} din ${total}`;
 
+/** Titlul stării în care capitolele sesiunii n-au nicio grilă publicată. */
+export const frazaCapitoleGoale = (capitole: readonly ChapterId[]): string =>
+  capitole.length === 1
+    ? 'Capitolul ales nu are nicio grilă publicată'
+    : 'Capitolele alese nu au nicio grilă publicată';
+
 /**
  * Cum se numește sesiunea curentă, după capitolele din care e compusă.
  *

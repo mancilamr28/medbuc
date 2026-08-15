@@ -3,14 +3,25 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Grile } from './Grile';
 import { QUESTIONS } from '../data/questions';
-import { AppProvider } from '../state/AppState';
+import { AppProvider, useApp } from '../state/AppState';
 
 vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
+
+/** Pornește o sesiune pe un capitol fără nicio grilă în fixtură. */
+function PornesteCapitolGol() {
+  const { session } = useApp();
+  return (
+    <button type="button" onClick={() => session.start(['bio-celula'])}>
+      capitol gol
+    </button>
+  );
+}
 
 const deschide = () =>
   render(
     <AppProvider questions={QUESTIONS}>
       <Grile />
+      <PornesteCapitolGol />
     </AppProvider>,
   );
 
@@ -95,6 +106,19 @@ describe('sesiunea de grile', () => {
     for (const optiune of screen.getAllByRole('radio')) {
       expect(optiune).not.toBeDisabled();
     }
+  });
+
+  /**
+   * O grilă retrasă între alegerea capitolului și rezolvare golește bazinul, iar
+   * ecranul rămânea alb: `GrileRun` se întorcea `null` fiindcă nu avea grilă.
+   */
+  it('spune când capitolul ales n-are nicio grilă, în loc să nu arate nimic', async () => {
+    deschide();
+    await userEvent.click(buton('capitol gol'));
+
+    expect(screen.getByText('Capitolul ales nu are nicio grilă publicată')).toBeInTheDocument();
+    expect(screen.queryByText(/Grila 1 din/)).not.toBeInTheDocument();
+    expect(buton('Înapoi la materii')).toBeInTheDocument();
   });
 
   it('nu afișează statistici inventate înainte să existe răspunsuri', async () => {

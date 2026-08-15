@@ -9,7 +9,7 @@ import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/AppState';
-import { descriereScop, frazaCorecte } from './grileText';
+import { descriereScop, frazaCapitoleGoale, frazaCorecte } from './grileText';
 
 type Variant = 'a' | 'b';
 
@@ -17,7 +17,48 @@ type Variant = 'a' | 'b';
 export function Grile() {
   const { session } = useApp();
   return (
-    <PoartaContinut>{session.finished ? <GrileRezultat /> : <GrileRun />}</PoartaContinut>
+    <PoartaContinut>
+      {session.total === 0 ? (
+        <CapitolGol />
+      ) : session.finished ? (
+        <GrileRezultat />
+      ) : (
+        <GrileRun />
+      )}
+    </PoartaContinut>
+  );
+}
+
+/**
+ * Biblioteca are grile, dar niciuna din capitolele sesiunii.
+ *
+ * `Materii` nu lasă să se ajungă aici — butonul e dezactivat pe capitolele goale
+ * — dar o grilă retrasă între alegere și rezolvare golește bazinul, iar o
+ * sesiune fără nicio grilă randează un ecran alb dacă nu se spune nimic. Starea
+ * stă aici, nu în `PoartaContinut`: poarta e comună cu `Simulari`, care n-are
+ * nicio treabă cu bazinul sesiunii de exersare.
+ */
+function CapitolGol() {
+  const { go, session } = useApp();
+  return (
+    <div className="screen">
+      <div className="card" style={{ padding: 8, maxWidth: 520 }}>
+        <EmptyState
+          title={frazaCapitoleGoale(session.capitole)}
+          hint="Alege alt capitol sau exersează din toată biblioteca."
+          action={
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => go('materii')}
+              style={{ padding: '10px 16px', font: `600 13px ${SANS}` }}
+            >
+              Înapoi la materii
+            </button>
+          }
+        />
+      </div>
+    </div>
   );
 }
 
@@ -111,7 +152,7 @@ function GrileRun() {
             <div style={{ display: 'flex', gap: 5, flex: 1, flexWrap: 'wrap' }}>
               {Array.from({ length: total }, (_, i) => {
                 const revealed = !!session.revealed[i];
-                const ok = session.answers[i] === session.questions[i]?.correct;
+                const ok = session.answers[i] === session.banca[i]?.correct;
                 return (
                   <button
                     key={i}
@@ -488,7 +529,7 @@ function ContextColumn() {
         >
           {Array.from({ length: session.total }, (_, i) => {
             const revealed = !!session.revealed[i];
-            const ok = revealed && session.answers[i] === session.questions[i]?.correct;
+            const ok = revealed && session.answers[i] === session.banca[i]?.correct;
             const cur = i === session.qi;
             return (
               <button
