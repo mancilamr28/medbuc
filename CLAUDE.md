@@ -118,6 +118,14 @@ The consequence to watch: **`session.banca` is the narrowed pool, so nothing tha
 
 `QUESTIONS` contains only ~6 entries, so `buildOrder()` repeats the bank to reach the configured question count.
 
+### Progress — `src/state/ProgressContext.tsx`, `src/state/progressState.ts` and `src/lib/progres.ts`
+
+Progress is read from Supabase's immutable `attempts` journal; it is never stored as a `pct` or `done` field. `ProgressProvider` mounts under `AuthProvider`, loads only for an authenticated user, and exposes the raw rows plus loading/error/reload. The context and hook live separately in `progressState.ts`, keeping the provider file a component-only Fast Refresh boundary. It keys the visible rows to the current user id so switching accounts cannot render the previous account's progress for even one frame.
+
+`calculeazaProgres()` is the pure derivation layer. It produces overall correctness, per-chapter coverage/correctness, and one score point per completed session or simulation. Repeated answers increase the answer count but only increase `grileIncercate` once. A response whose question is no longer in the visible runtime library still counts globally and in its run score, but is not guessed into a chapter. Home and Materii both consume this same result. `AttemptSync` calls `reload()` only after the retry-safe write succeeds, so a finished practice session appears without a page refresh.
+
+Real scores may range from 0 to 100. `ScoreChart` therefore uses a zero-based axis; do not restore the old minimum of 45, which came from the fabricated demo series and renders authentic low scores outside the SVG.
+
 ### Persistence — `usePersistentState` in `src/lib/hooks.ts`
 
 The only way state should touch `localStorage`. Keys are namespaced `medbuc.*` (`medbuc.theme`, `medbuc.setari`, `medbuc.sim.run`, and dynamic ones like `medbuc.note.${capId}`). It swallows storage errors, so private-mode/quota failures degrade to in-memory state instead of throwing.

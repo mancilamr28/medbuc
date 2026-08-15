@@ -1,19 +1,20 @@
 import { useMemo } from 'react';
+import { Progress } from '../components/Progress';
 import { MATERII, MATERIE_TABS, chapterLabel, type ChapterId } from '../data/chapters';
 import { numaraGrile } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
+import { calculeazaProgres } from '../lib/progres';
 import { numar } from '../lib/text';
-import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, sideStack } from '../lib/ui';
+import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill, sideStack } from '../lib/ui';
 import { useApp } from '../state/AppState';
 import { useContentOptional } from '../state/ContentContext';
+import { useProgressOptional } from '../state/progressState';
 
 /**
  * Lista de capitole.
  *
- * Filtrele („doar capitolele neterminate", „doar grilele greșite anterior",
- * „doar capitolele salvate") și barele de progres au fost scoase: se sprijineau
- * pe `done` și `pct`, cifre scrise de mână care nu se schimbau niciodată. Se
- * întorc când există răspunsuri înregistrate din care să iasă.
+ * Barele și procentele vin acum exclusiv din jurnalul `attempts`; biblioteca
+ * spune câte grile există, iar jurnalul spune ce a făcut elevul.
  */
 export function Materii() {
   const { materie, setMaterie, go, questions, session } = useApp();
@@ -21,10 +22,21 @@ export function Materii() {
   // Capitolele sunt statice, deci ecranul se desenează întreg imediat; doar
   // numărătorile așteaptă biblioteca, iar cât timp o așteaptă arată „—", nu 0.
   const loading = useContentOptional()?.loading ?? false;
+  const progressContext = useProgressOptional();
+  const progressLoading = progressContext?.loading ?? false;
+  const progressError = progressContext?.error ?? null;
   // Numărătoarea se face pe biblioteca întreagă, nu pe `session.banca`: aceea
   // e restrânsă la capitolele sesiunii curente, deci după un „Exersează" toate
   // celelalte capitole ar apărea cu zero grile scrise.
   const { peCapitol, peMaterie } = useMemo(() => numaraGrile(questions), [questions]);
+  const progress = useMemo(
+    () => calculeazaProgres(progressContext?.attempts ?? [], questions),
+    [progressContext?.attempts, questions],
+  );
+  const progresPeCapitol = useMemo(
+    () => new Map(progress.capitole.map((c) => [c.capId, c])),
+    [progress.capitole],
+  );
   const mat = MATERII[materie];
   const chapters = mat.list;
   const grileMaterie = peMaterie.get(mat.id) ?? 0;
@@ -35,9 +47,18 @@ export function Materii() {
     go('grile');
   };
 
+  const progresMaterie = progress.capitole.filter((c) => chapters.some((cap) => cap.id === c.capId));
+  const raspunsuriMaterie = progresMaterie.reduce((sum, c) => sum + c.raspunsuri, 0);
+  const corecteMaterie = progresMaterie.reduce((sum, c) => sum + c.corecte, 0);
   const stats = [
     { label: 'Capitole', value: String(mat.list.length), unit: mat.unit === 'sesiuni' ? 'sesiuni' : 'capitole' },
     { label: 'Grile scrise', value: loading ? '—' : String(grileMaterie), unit: 'grile' },
+    { label: 'Răspunsuri', value: progressLoading || progressError ? '—' : String(raspunsuriMaterie), unit: 'date' },
+    {
+      label: 'Corecte',
+      value: progressLoading || progressError || raspunsuriMaterie === 0 ? '—' : String(Math.round((corecteMaterie / raspunsuriMaterie) * 100)),
+      unit: '%',
+    },
   ];
 
   return (
@@ -134,6 +155,8 @@ export function Materii() {
                 în loc să deschidă o sesiune din alt capitol. */}
             {chapters.map((c) => {
               const scrise = peCapitol.get(c.id) ?? 0;
+              const progres = progresPeCapitol.get(c.id);
+              const acoperire = scrise === 0 ? 0 : ((progres?.grileIncercate ?? 0) / scrise) * 100;
               return (
                 <div
                   key={c.id}
@@ -151,14 +174,36 @@ export function Materii() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ font: `500 14px/1.3 ${SANS}` }}>{c.name}</div>
-                    <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-                      {/* Adjectivul intră în `numar()`, nu se lipește după: altfel iese
-                          „1 grilă scrise", fiindcă acordul se face cu numărul, nu cu substantivul. */}
-                      {scrise === 0
-                        ? 'Nicio grilă scrisă încă'
-                        : numar(scrise, 'grilă scrisă', 'grile scrise')}
-                    </div>
+                    {scrise === 0 ? (
+                      <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+                        Nicio grilă scrisă încă
+                      </div>
+                    ) : progressLoading ? (
+                      <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+                        {numar(scrise, 'grilă scrisă', 'grile scrise')} · se încarcă progresul…
+                      </div>
+                    ) : progressError ? (
+                      <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+                        {numar(scrise, 'grilă scrisă', 'grile scrise')} · progres indisponibil
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ flex: 1, maxWidth: 220 }}>
+                          <Progress
+                            pct={acoperire}
+                            height={5}
+                            color={progres && progres.pct >= 80 ? 'var(--ok)' : 'var(--brand)'}
+                            label={`${c.name}: ${progres?.grileIncercate ?? 0} din ${scrise} grile încercate`}
+                          />
+                        </div>
+                        <div style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)', whiteSpace: 'nowrap' }}>
+                          <span>{numar(scrise, 'grilă scrisă', 'grile scrise')}</span>
+                          {' · '}{progres?.grileIncercate ?? 0} / {scrise} încercate
+                        </div>
+                      </div>
+                    )}
                   </div>
+                  {!progressError && progres && <div style={pctPill(progres.pct)}>{progres.pct}%</div>}
                   <button
                     type="button"
                     className="practice-btn"
