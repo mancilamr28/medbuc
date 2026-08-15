@@ -11,7 +11,7 @@ vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
 
 let attemptsProgres: AttemptRow[] = [];
 let eroareProgres: string | null = null;
-vi.mock('../state/ProgressContext', () => ({
+vi.mock('../state/progressState', () => ({
   useProgressOptional: () => ({
     attempts: attemptsProgres,
     loading: false,

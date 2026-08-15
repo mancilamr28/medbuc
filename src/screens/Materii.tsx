@@ -8,7 +8,7 @@ import { numar } from '../lib/text';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill, sideStack } from '../lib/ui';
 import { useApp } from '../state/AppState';
 import { useContentOptional } from '../state/ContentContext';
-import { useProgressOptional } from '../state/ProgressContext';
+import { useProgressOptional } from '../state/progressState';
 
 /**
  * Lista de capitole.

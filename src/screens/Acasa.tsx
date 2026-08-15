@@ -13,7 +13,7 @@ import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill } from '..
 import { useApp } from '../state/AppState';
 import { useAuth } from '../state/AuthContext';
 import { useContentOptional } from '../state/ContentContext';
-import { useProgressOptional } from '../state/ProgressContext';
+import { useProgressOptional } from '../state/progressState';
 
 type Variant = 'a' | 'b';
 

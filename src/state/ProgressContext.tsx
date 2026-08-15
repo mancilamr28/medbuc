@@ -1,20 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import type { AttemptRow } from '../lib/progres';
 import { useAuth } from './AuthContext';
-
-interface ProgressValue {
-  attempts: AttemptRow[];
-  loading: boolean;
-  error: string | null;
-  reload: () => Promise<void>;
-}
-
-const ProgressContext = createContext<ProgressValue | null>(null);
-
-export function useProgressOptional(): ProgressValue | null {
-  return useContext(ProgressContext);
-}
+import { ProgressContext, type ProgressValue } from './progressState';
 
 export function ProgressProvider({ children }: { children: ReactNode }) {
   const { user, loading: sesiuneaSeIncarca } = useAuth();
