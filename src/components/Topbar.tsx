@@ -1,10 +1,14 @@
+import { faMoon, faSun } from '@fortawesome/free-solid-svg-icons';
 import { SANS } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
+import { Icon } from './Icon';
 import { Logo } from './Logo';
 
 /** Antetul lipit de marginea de sus: identitatea pe mobil și tema. */
 export function Topbar({ compact }: { compact: boolean }) {
   const { theme, toggleTheme } = useApp();
+  const activeazaLuminos = theme === 'dark';
+  const etichetaTema = activeazaLuminos ? 'Activează modul luminos' : 'Activează modul întunecat';
 
   return (
     <header
@@ -32,9 +36,11 @@ export function Topbar({ compact }: { compact: boolean }) {
         type="button"
         className="btn-quiet"
         onClick={toggleTheme}
-        style={{ padding: '9px 12px', font: `500 12.5px ${SANS}`, whiteSpace: 'nowrap' }}
+        aria-label={etichetaTema}
+        title={etichetaTema}
+        style={{ width: 38, height: 38, padding: 0, display: 'grid', placeItems: 'center' }}
       >
-        {theme === 'dark' ? 'Mod luminos' : 'Mod întunecat'}
+        <Icon icon={activeazaLuminos ? faSun : faMoon} size={15} />
       </button>
     </header>
   );

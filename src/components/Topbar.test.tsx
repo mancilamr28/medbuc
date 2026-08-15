@@ -4,9 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Topbar } from './Topbar';
 
 const toggleTheme = vi.fn();
+let theme: 'light' | 'dark' = 'dark';
 
 vi.mock('../state/appContextValue', () => ({
-  useApp: () => ({ theme: 'dark', toggleTheme }),
+  useApp: () => ({ theme, toggleTheme }),
 }));
 
 vi.mock('./Logo', () => ({
@@ -15,6 +16,7 @@ vi.mock('./Logo', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  theme = 'dark';
 });
 
 describe('Topbar', () => {
@@ -23,7 +25,10 @@ describe('Topbar', () => {
     render(<Topbar compact />);
 
     expect(screen.getByRole('button', { name: 'MedBuc' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Mod luminos' }));
+    const tema = screen.getByRole('button', { name: 'Activează modul luminos' });
+    expect(tema).toHaveAttribute('title', 'Activează modul luminos');
+    expect(tema).toHaveTextContent('');
+    await user.click(tema);
     expect(toggleTheme).toHaveBeenCalledTimes(1);
   });
 
@@ -39,6 +44,15 @@ describe('Topbar', () => {
     render(<Topbar compact={false} />);
 
     expect(screen.queryByRole('button', { name: 'MedBuc' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mod luminos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Activează modul luminos' })).toBeInTheDocument();
+  });
+
+  it('arată luna când acțiunea activează tema întunecată', () => {
+    theme = 'light';
+    render(<Topbar compact />);
+
+    const tema = screen.getByRole('button', { name: 'Activează modul întunecat' });
+    expect(tema).toHaveAttribute('title', 'Activează modul întunecat');
+    expect(tema).toHaveTextContent('');
   });
 });
