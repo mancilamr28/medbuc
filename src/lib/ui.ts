@@ -4,6 +4,8 @@ export type SX = CSSProperties;
 
 export const SANS = "'Public Sans',sans-serif";
 export const SERIF = 'Newsreader,Georgia,serif';
+/** Doar pentru text pe care îl citește și mașina: JSON-ul importului în masă. */
+export const MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
 
 /** Eticheta mică, majuscule spațiate, folosită drept titlu de secțiune. */
 export const eyebrow = (color = 'var(--fg3)', size = 10.5): SX => ({

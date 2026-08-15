@@ -187,3 +187,107 @@ describe('Administrare', () => {
     expect(screen.getByDisplayValue(GRILE[0]!.id)).toBeDisabled();
   });
 });
+
+/**
+ * Importul în masă.
+ *
+ * Regulile în sine sunt testate în `importLot.test.ts`, pe funcții pure. Aici se
+ * verifică doar ce nu se vede de acolo: că panoul chiar trimite spre bază, că un
+ * rând stricat nu pleacă odată cu lotul, și că lista rămasă vizibilă alături nu
+ * te lasă blocat în modul greșit.
+ */
+describe('Administrare · import în masă', () => {
+  const grilaJson = (peste: Record<string, unknown> = {}) => ({
+    id: 'bio-nervos-90',
+    capId: 'bio-nervos',
+    tip: 'simplu',
+    text: 'Enunțul importat.',
+    opts: [
+      ['A', 'prima'],
+      ['B', 'a doua'],
+    ],
+    correct: 'B',
+    expl: 'Explicația.',
+    src: 'Manual, p. 1',
+    ...peste,
+  });
+
+  const lipeste = async (user: ReturnType<typeof userEvent.setup>, lot: unknown) => {
+    await user.click(await screen.findByRole('tab', { name: 'Import în masă' }));
+    const camp = await screen.findByLabelText('Grilele, în JSON');
+    await user.click(camp);
+    await user.paste(JSON.stringify(lot, null, 2));
+  };
+
+  it('trimite fiecare grilă din lot, o cerere pe grilă', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await lipeste(user, [grilaJson(), grilaJson({ id: 'bio-nervos-91' })]);
+    await user.click(screen.getByRole('button', { name: 'Importă 2 grile' }));
+
+    await waitFor(() => expect(salveaza).toHaveBeenCalledTimes(2));
+    expect(salveaza.mock.calls.map((c) => c[0]!.id)).toEqual(['bio-nervos-90', 'bio-nervos-91']);
+    // Fără stare proprie, lotul intră ca ciornă: publicarea e o decizie separată.
+    expect(salveaza.mock.calls[0]![0]!.status).toBe('ciorna');
+  });
+
+  /**
+   * Bucata care contează la două sute de grile: un rând stricat nu are voie să
+   * oprească lotul, dar nici să plece spre bază sperând că trece.
+   */
+  it('lasă deoparte rândul cu probleme și importă restul', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await lipeste(user, [grilaJson(), grilaJson({ id: 'bio-nervos-91', correct: 'E' })]);
+
+    expect(await screen.findByText(/Rândul 2 · bio-nervos-91/)).toBeInTheDocument();
+    expect(screen.getByText(/Răspunsul corect trebuie să fie una dintre variantele scrise/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Importă 1 grilă' }));
+
+    await waitFor(() => expect(salveaza).toHaveBeenCalledTimes(1));
+    expect(salveaza.mock.calls[0]![0]!.id).toBe('bio-nervos-90');
+  });
+
+  /** Rescrierea e legitimă — așa se relipește un lot corectat — dar se spune înainte. */
+  it('anunță că un id existent va rescrie grila', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await lipeste(user, [grilaJson({ id: GRILE[0]!.id })]);
+
+    expect(await screen.findByText(/rescriu o grilă existentă/)).toBeInTheDocument();
+  });
+
+  it('nu poate porni un import gol', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await user.click(await screen.findByRole('tab', { name: 'Import în masă' }));
+
+    expect(screen.getByRole('button', { name: 'Importă' })).toBeDisabled();
+  });
+
+  /**
+   * Lista bibliotecii rămâne vizibilă în ambele moduri. Fără comutarea asta,
+   * „Editează" ar umple un formular ascuns și ar părea că butonul e mort.
+   */
+  it('revine la formular când editezi din listă', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await user.click(await screen.findByRole('tab', { name: 'Import în masă' }));
+    expect(screen.queryByLabelText('Enunțul grilei')).not.toBeInTheDocument();
+
+    await user.click((await screen.findAllByRole('button', { name: 'Editează' }))[0]!);
+
+    expect(await screen.findByLabelText('Enunțul grilei')).toHaveValue(GRILE[0]!.text);
+  });
+});
