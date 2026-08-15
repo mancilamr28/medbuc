@@ -87,6 +87,15 @@ describe('Profil și setări', () => {
     expect(screen.getByText('UMFCD „Carol Davila”, București')).toBeInTheDocument();
   });
 
+  it('marchează valorile lungi pentru rearanjarea pe mobil', async () => {
+    monteaza();
+    await gata();
+
+    const facultatea = screen.getByText('UMFCD „Carol Davila”, București');
+    expect(facultatea).toHaveClass('setari-rand__valoare');
+    expect(facultatea.parentElement).toHaveClass('setari-rand', 'setari-rand--doar-citire');
+  });
+
   it('salvează numele în profil', async () => {
     const user = userEvent.setup();
     monteaza();
