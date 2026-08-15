@@ -5,7 +5,7 @@ import { descarcaText, ziua } from '../lib/exportDate';
 import { numar } from '../lib/text';
 import { MONO, SANS, label } from '../lib/ui';
 import { useToast } from '../state/ToastContext';
-import { catreJson, citesteImport, importa, type BilantImport } from './importLot';
+import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } from './importLot';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -190,7 +190,9 @@ export function ImportGrile({ grile, reload }: { grile: GrilaCuStare[]; reload: 
         >
           {cifra(valide.length, 'var(--ok)')} gata de import
           {cuProbleme.length > 0 && <> · {cifra(cuProbleme.length, 'var(--bad)')} cu probleme</>}
-          {rescrise.length > 0 && <> · {cifra(rescrise.length, 'var(--fg2)')} rescriu o grilă existentă</>}
+          {rescrise.length > 0 && (
+            <> · {cifra(rescrise.length, 'var(--fg2)')} {frazaRescrieri(rescrise.length)}</>
+          )}
         </div>
       )}
 

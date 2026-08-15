@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { catreJson, citesteImport, importa } from './importLot';
+import { catreJson, citesteImport, frazaRescrieri, importa } from './importLot';
 import type { GrilaCuStare } from '../lib/continut';
 import type { GrilaDeSalvat } from '../lib/continut';
 
@@ -192,6 +192,17 @@ describe('citesteImport marchează rescrierile', () => {
   it('nu semnalează nimic pentru un id nou', () => {
     const { randuri } = citeste([valida()], [{ id: 'bio-nervos-01' }]);
     expect(randuri[0]!.suprascrie).toBe(false);
+  });
+
+  /**
+   * „1 rescriu o grilă existentă" a ajuns pe ecran. Aceeași clasă de defect ca
+   * „1 grilă scrise": un cuvânt rămas la plural lângă un numeral de unu, invizibil
+   * pentru orice test care nu se uită la fraza întreagă.
+   */
+  it('acordă verbul cu numărul, nu doar substantivul', () => {
+    expect(frazaRescrieri(1)).toBe('rescrie o grilă existentă');
+    expect(frazaRescrieri(2)).toBe('rescriu grile existente');
+    expect(frazaRescrieri(20)).toBe('rescriu grile existente');
   });
 });
 

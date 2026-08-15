@@ -198,6 +198,17 @@ export function citesteImport(
   return { eroare: null, randuri };
 }
 
+/**
+ * „1 rescrie o grilă existentă" / „2 rescriu grile existente".
+ *
+ * `numar()` acordă substantivul, dar aici se acordă și verbul, iar numărul e
+ * randat separat, colorat — deci fraza nu se poate lipi din bucăți în jurul lui.
+ * E a doua oară când acordul cade exact aici: prima a fost „1 grilă scrise", tot
+ * un cuvânt rămas la plural lângă un numeral de unu, tot prins abia în browser.
+ */
+export const frazaRescrieri = (n: number): string =>
+  n === 1 ? 'rescrie o grilă existentă' : 'rescriu grile existente';
+
 export interface BilantImport {
   reusite: number;
   esecuri: { id: string; mesaj: string }[];

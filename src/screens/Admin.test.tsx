@@ -261,7 +261,9 @@ describe('Administrare · import în masă', () => {
 
     await lipeste(user, [grilaJson({ id: GRILE[0]!.id })]);
 
-    expect(await screen.findByText(/rescriu o grilă existentă/)).toBeInTheDocument();
+    // Un singur rând, deci verbul e la singular. Prima versiune a testului cerea
+    // „rescriu", fiindcă asta scria ecranul — a picat abia când s-a reparat.
+    expect(await screen.findByText(/rescrie o grilă existentă/)).toBeInTheDocument();
   });
 
   it('nu poate porni un import gol', async () => {
