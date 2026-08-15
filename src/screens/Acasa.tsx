@@ -1,15 +1,19 @@
 import { ChapterChart } from '../components/ChapterChart';
 import { EmptyState } from '../components/EmptyState';
+import { Progress } from '../components/Progress';
 import { ScoreChart } from '../components/ScoreChart';
 import { Segmented } from '../components/Segmented';
 import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
+import { useMemo } from 'react';
 import { usePersistentState } from '../lib/hooks';
+import { calculeazaProgres } from '../lib/progres';
 import { numar, primulNume } from '../lib/text';
 import { daysUntil } from '../lib/time';
-import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle } from '../lib/ui';
+import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill } from '../lib/ui';
 import { useApp } from '../state/AppState';
 import { useAuth } from '../state/AuthContext';
 import { useContentOptional } from '../state/ContentContext';
+import { useProgressOptional } from '../state/ProgressContext';
 
 type Variant = 'a' | 'b';
 
@@ -29,12 +33,28 @@ export function Acasa() {
   const { go, questions, session } = useApp();
   const { user, profile } = useAuth();
   const loading = useContentOptional()?.loading ?? false;
+  const progressContext = useProgressOptional();
+  const progressLoading = progressContext?.loading ?? false;
+  const progressError = progressContext?.error ?? null;
+  const progress = useMemo(
+    () => calculeazaProgres(progressContext?.attempts ?? [], questions),
+    [progressContext?.attempts, questions],
+  );
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
   const daysLeft = daysUntil(EXAM_DATE);
   const raspunse = Object.keys(session.answers).length;
   const inSesiune = raspunse > 0 && !session.finished;
   const prenume = primulNume(profile?.fullName ?? null, user?.email ?? '');
+  const capitoleSlabe = progress.capitole
+    .filter((c) => c.corecte < c.raspunsuri)
+    .sort((a, b) => a.pct - b.pct || b.raspunsuri - a.raspunsuri)
+    .slice(0, 4);
+  const capitoleGrafic = [...progress.capitole]
+    .sort((a, b) => b.raspunsuri - a.raspunsuri)
+    .slice(0, 8)
+    .map((c) => ({ id: c.capId, name: c.nume, pct: c.pct }));
+  const evolutieGrafic = progress.evolutie.slice(-8);
 
   /**
    * O sesiune încheiată nu se poate „continua": ecranul de grile ar arăta iar
@@ -109,21 +129,67 @@ export function Acasa() {
 
         <div className="card" style={{ padding: 20 }}>
           <div style={cardTitle}>Unde pierzi puncte</div>
-          <div style={cardSub}>Capitolele cu cele mai multe greșeli</div>
-          <EmptyState
-            title="Nu avem încă destule răspunsuri"
-            hint="După câteva sesiuni apar aici capitolele la care greșești cel mai des, cu procentul tău pe fiecare."
-            action={
-              <button
-                type="button"
-                className="dashed-btn"
-                onClick={deschideGrile}
-                style={{ padding: '10px 16px', font: `500 13px ${SANS}` }}
-              >
-                Rezolvă niște grile
-              </button>
-            }
-          />
+          <div style={cardSub}>Procent corect din toate răspunsurile înregistrate</div>
+          {progressLoading ? (
+            <EmptyState
+              title="Se încarcă progresul…"
+              hint="Citirea răspunsurilor tale nu blochează restul paginii."
+            />
+          ) : progressError ? (
+            <EmptyState
+              title={progressError}
+              hint="Biblioteca rămâne disponibilă; poți reîncerca doar istoricul."
+              action={
+                <button
+                  type="button"
+                  className="dashed-btn"
+                  onClick={() => void progressContext?.reload()}
+                  style={{ padding: '10px 16px', font: `500 13px ${SANS}` }}
+                >
+                  Reîncearcă
+                </button>
+              }
+            />
+          ) : capitoleSlabe.length === 0 ? (
+            <EmptyState
+              title="Nu avem încă greșeli înregistrate"
+              hint="După ce termini o sesiune, capitolele în care ai pierdut puncte apar aici."
+              action={
+                <button
+                  type="button"
+                  className="dashed-btn"
+                  onClick={deschideGrile}
+                  style={{ padding: '10px 16px', font: `500 13px ${SANS}` }}
+                >
+                  Rezolvă niște grile
+                </button>
+              }
+            />
+          ) : (
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column' }}>
+              {capitoleSlabe.map((c) => (
+                <button
+                  key={c.capId}
+                  type="button"
+                  className="row-btn"
+                  onClick={() => {
+                    session.start([c.capId]);
+                    go('grile');
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 4px', borderTop: '1px solid var(--line)' }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                    <span style={{ display: 'block', font: `500 13.5px/1.3 ${SANS}` }}>{c.nume}</span>
+                    <span style={{ display: 'block', marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+                      {c.materie} · {numar(c.raspunsuri, 'răspuns', 'răspunsuri')}
+                    </span>
+                  </span>
+                  <Progress pct={c.pct} width={84} color={c.pct < 55 ? 'var(--bad)' : 'var(--acc)'} label={`${c.nume}: ${c.pct}%`} />
+                  <span style={pctPill(c.pct)}>{c.pct}%</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="card" style={{ padding: 20 }}>
@@ -160,7 +226,22 @@ export function Acasa() {
             />
           </div>
           <div style={{ marginTop: 18 }}>
-            {chart === 'a' ? <ScoreChart scores={[]} labels={[]} /> : <ChapterChart rows={[]} />}
+            {progressLoading ? (
+              <EmptyState
+                title="Se încarcă evoluția…"
+                hint="Graficul apare imediat ce istoricul răspunsurilor este gata."
+                padding="18px 16px 26px"
+              />
+            ) : progressError ? (
+              <EmptyState title={progressError} hint="Reîncearcă din panoul de mai sus." padding="18px 16px 26px" />
+            ) : chart === 'a' ? (
+              <ScoreChart
+                scores={evolutieGrafic.map((p) => p.pct)}
+                labels={evolutieGrafic.map((p) => p.eticheta)}
+              />
+            ) : (
+              <ChapterChart rows={capitoleGrafic} />
+            )}
           </div>
         </div>
       </div>

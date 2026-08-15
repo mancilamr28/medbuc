@@ -7,6 +7,7 @@ import { initSentry } from './lib/sentry';
 import { AppProvider } from './state/AppState';
 import { AuthProvider } from './state/AuthContext';
 import { ContentProvider, useContent } from './state/ContentContext';
+import { ProgressProvider } from './state/ProgressContext';
 import { ToastProvider } from './state/ToastContext';
 import './styles.css';
 
@@ -40,9 +41,11 @@ createRoot(root).render(
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <ContentProvider>
-            <CuBanca />
-          </ContentProvider>
+          <ProgressProvider>
+            <ContentProvider>
+              <CuBanca />
+            </ContentProvider>
+          </ProgressProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>

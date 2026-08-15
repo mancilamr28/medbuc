@@ -6,7 +6,9 @@ import { useApp } from '../state/AppState';
 const W = 720;
 const H = 190;
 const PAD = 26;
-const MIN = 45;
+// Scorurile sunt reale acum și pot începe de la 0. Pragul vechi de 45 era
+// potrivit doar seriei demo și împingea un rezultat slab în afara SVG-ului.
+const MIN = 0;
 const MAX = 100;
 
 /**
@@ -118,8 +120,8 @@ export function ScoreChart({
           color: 'var(--fg3)',
         }}
       >
-        {labels.map((m) => (
-          <span key={m}>{m}</span>
+        {labels.map((m, i) => (
+          <span key={`${m}-${i}`}>{m}</span>
         ))}
       </div>
     </div>

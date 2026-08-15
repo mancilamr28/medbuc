@@ -79,6 +79,9 @@ export const pctPill = (pct: number, width = 44): SX => ({
 });
 
 export const progressTrack = (height = 6, width: string | number = '100%'): SX => ({
+  // `Progress` randează un <span>. Fără display, width/height sunt ignorate pe
+  // un element inline și bara are dreptunghi vizibil 0 × 0 în browser.
+  display: 'block',
   width,
   height,
   borderRadius: 99,

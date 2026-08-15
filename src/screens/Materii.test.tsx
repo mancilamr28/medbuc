@@ -2,11 +2,23 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS, materieQuestionCount } from '../data/questions';
+import type { AttemptRow } from '../lib/progres';
 import { AppProvider, useApp } from '../state/AppState';
 import { Grile } from './Grile';
 import { Materii } from './Materii';
 
 vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
+
+let attemptsProgres: AttemptRow[] = [];
+let eroareProgres: string | null = null;
+vi.mock('../state/ProgressContext', () => ({
+  useProgressOptional: () => ({
+    attempts: attemptsProgres,
+    loading: false,
+    error: eroareProgres,
+    reload: async () => {},
+  }),
+}));
 
 /** Exact ce face `Content()` în `App.tsx`: un singur ecran, ales de rută. */
 function Aplicatie() {
@@ -26,6 +38,8 @@ const rand = (element: HTMLElement) => within(element.closest('.list-row') as HT
 
 beforeEach(() => {
   window.location.hash = '';
+  attemptsProgres = [];
+  eroareProgres = null;
 });
 
 describe('exersarea pe capitol', () => {
@@ -63,6 +77,44 @@ describe('exersarea pe capitol', () => {
     deschide();
     // „01. Celula. Țesuturile" nu are nicio grilă în fixtură.
     expect(rand(screen.getByText('Celula. Țesuturile')).getByRole('button')).toBeDisabled();
+  });
+
+  it('arată progresul calculat din răspunsuri, fără să dubleze grila repetată', () => {
+    const q = QUESTIONS.find((item) => item.capId === 'bio-nervos')!;
+    attemptsProgres = [
+      {
+        question_id: q.id,
+        is_correct: false,
+        source: 'sesiune',
+        session_id: 's1',
+        sim_run_id: null,
+        answered_at: '2026-08-15T10:00:00Z',
+      },
+      {
+        question_id: q.id,
+        is_correct: true,
+        source: 'sesiune',
+        session_id: 's2',
+        sim_run_id: null,
+        answered_at: '2026-08-16T10:00:00Z',
+      },
+    ];
+
+    deschide();
+    const nervos = rand(screen.getByText('Sistemul nervos'));
+    expect(nervos.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+    expect(nervos.getByText('50%')).toBeInTheDocument();
+    expect(nervos.getByText(/1 \/ 1 încercate/)).toBeInTheDocument();
+  });
+
+  it('nu prezintă o eroare de citire a progresului drept zero răspunsuri', () => {
+    eroareProgres = 'Nu am putut încărca progresul tău.';
+
+    deschide();
+
+    expect(screen.getByText('Răspunsuri').closest('.card-flat')).toHaveTextContent('—');
+    expect(rand(screen.getByText('Sistemul nervos')).getByText(/progres indisponibil/)).toBeInTheDocument();
+    expect(rand(screen.getByText('Sistemul nervos')).queryByText('0%')).not.toBeInTheDocument();
   });
 
   /**
