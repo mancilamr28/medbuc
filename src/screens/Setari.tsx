@@ -56,12 +56,14 @@ function RandDate({ rand }: { rand: Rand }) {
   if (deschis && rand.edit) {
     return (
       <form
+        className="setari-rand setari-rand--editare"
         onSubmit={(e) => void trimite(e)}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}
+        style={{ padding: '11px 0', borderTop: '1px solid var(--line)' }}
       >
         <label
+          className="setari-rand__eticheta"
           htmlFor={`camp-${rand.label}`}
-          style={{ flex: '0 0 auto', width: 150, font: `500 13px ${SANS}`, color: 'var(--fg3)' }}
+          style={{ font: `500 13px ${SANS}`, color: 'var(--fg3)' }}
         >
           {rand.label}
         </label>
@@ -73,7 +75,7 @@ function RandDate({ rand }: { rand: Rand }) {
           autoFocus
           placeholder={rand.edit.placeholder}
           onChange={(e) => setValoare(e.target.value)}
-          style={{ flex: 1, minWidth: 160, padding: '9px 11px', font: `400 13.5px ${SANS}` }}
+          style={{ minWidth: 0, padding: '9px 11px', font: `400 13.5px ${SANS}` }}
         />
         <button
           type="button"
@@ -96,11 +98,16 @@ function RandDate({ rand }: { rand: Rand }) {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderTop: '1px solid var(--line)' }}>
-      <span style={{ flex: '0 0 auto', width: 150, font: `500 13px ${SANS}`, color: 'var(--fg3)' }}>
+    <div
+      className={`setari-rand${rand.edit ? '' : ' setari-rand--doar-citire'}`}
+      style={{ padding: '13px 0', borderTop: '1px solid var(--line)' }}
+    >
+      <span className="setari-rand__eticheta" style={{ font: `500 13px ${SANS}`, color: 'var(--fg3)' }}>
         {rand.label}
       </span>
-      <span style={{ flex: 1, font: `400 13.5px ${SANS}` }}>{rand.value}</span>
+      <span className="setari-rand__valoare" style={{ font: `400 13.5px ${SANS}` }}>
+        {rand.value}
+      </span>
       {rand.edit ? (
         <button
           type="button"
@@ -213,9 +220,11 @@ export function Setari() {
             >
               {initiale}
             </div>
-            <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ flex: '1 1 150px', minWidth: 0 }}>
               <div style={{ font: `400 21px/1.2 ${SERIF}` }}>{nume}</div>
-              <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>{email}</div>
+              <div style={{ marginTop: 4, overflowWrap: 'anywhere', font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
+                {email}
+              </div>
             </div>
             <button
               type="button"

@@ -438,3 +438,46 @@ select {
 .user-card:hover .user-card__chevron {
   opacity: 1;
 }
+
+/* ---- Profil și setări -----------------------------------------------
+   Valorile lungi (facultatea, probele, adresa de e-mail) trebuie să poată
+   micșora coloana lor. Sub 560px, eticheta trece deasupra valorii ca niciun
+   rând să nu împingă pagina în afara ecranului. */
+
+.setari-rand {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.setari-rand--editare {
+  grid-template-columns: 150px minmax(0, 1fr) auto auto;
+  gap: 10px;
+}
+
+.setari-rand__eticheta,
+.setari-rand__valoare {
+  min-width: 0;
+}
+
+.setari-rand__valoare {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .setari-rand,
+  .setari-rand--editare {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .setari-rand__eticheta {
+    grid-column: 1 / -1;
+  }
+
+  .setari-rand--doar-citire .setari-rand__valoare,
+  .setari-rand--editare .field {
+    grid-column: 1 / -1;
+  }
+}
