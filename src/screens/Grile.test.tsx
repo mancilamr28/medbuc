@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Grile } from './Grile';
 import { QUESTIONS } from '../data/questions';
-import { AppProvider, useApp } from '../state/AppState';
+import { AppProvider } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 
 vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
 

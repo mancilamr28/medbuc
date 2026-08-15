@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { SANS, SERIF, label } from '../lib/ui';
-import { useAuth } from '../state/AuthContext';
-import { useToast } from '../state/ToastContext';
+import { useAuth } from '../state/authState';
+import { useToast } from '../state/toastState';
 
 /** Arătat când sesiunea vine dintr-un link de resetare — singurul lucru posibil e o parolă nouă. */
 export function ResetareParolaFinalizare() {

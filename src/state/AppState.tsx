@@ -1,33 +1,11 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
 import { useNow, usePersistentState } from '../lib/hooks';
-import { useHashRoute, type Screen } from '../lib/router';
-import { useSession, type Session } from './useSession';
-import { useSimulare, type Simulare } from './useSimulare';
-
-export type Theme = 'light' | 'dark';
-
-
-
-interface AppValue {
-  theme: Theme;
-  toggleTheme: () => void;
-  screen: Screen;
-  go: (screen: Screen) => void;
-  materie: MaterieId;
-  setMaterie: (id: MaterieId) => void;
-  /**
-   * Biblioteca întreagă. `session.banca` e doar bucata din care se rezolvă
-   * acum, deci orice ecran care numără grile pe capitol are nevoie de asta:
-   * altfel o sesiune pe un capitol face restul bibliotecii să pară goală.
-   */
-  questions: Question[];
-  session: Session;
-  sim: Simulare;
-}
-
-const AppContext = createContext<AppValue | null>(null);
+import { useHashRoute } from '../lib/router';
+import { AppContext, type AppValue, type Theme } from './appContextValue';
+import { useSession } from './useSession';
+import { useSimulare } from './useSimulare';
 
 const readInitialTheme = (): Theme => {
   if (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark') return 'dark';
@@ -78,10 +56,4 @@ export function AppProvider({ questions, children }: { questions: Question[]; ch
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
-}
-
-export function useApp(): AppValue {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp trebuie folosit în interiorul <AppProvider>');
-  return ctx;
 }

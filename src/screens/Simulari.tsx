@@ -20,7 +20,7 @@ import {
   twoCol,
 } from '../lib/ui';
 import { SIM_FIELDS } from '../state/useSimulare';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 import { frazaCorecte } from './grileText';
 
 export function Simulari() {

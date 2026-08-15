@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { SANS, SERIF, label } from '../lib/ui';
-import { useAuth } from '../state/AuthContext';
-import { useToast } from '../state/ToastContext';
+import { useAuth } from '../state/authState';
+import { useToast } from '../state/toastState';
 
 /** Exportat pentru că `App` alege modul din ruta publică (`#/inregistrare`). */
 export type ModAutentificare = 'login' | 'inregistrare' | 'uitat';

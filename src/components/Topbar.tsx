@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { SANS } from '../lib/ui';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 import { Logo } from './Logo';
 
 /** Antetul lipit de marginea de sus: căutare, temă și notificări. */

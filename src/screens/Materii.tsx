@@ -6,8 +6,8 @@ import { useIsDesktop } from '../lib/hooks';
 import { calculeazaProgres } from '../lib/progres';
 import { numar } from '../lib/text';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill, sideStack } from '../lib/ui';
-import { useApp } from '../state/AppState';
-import { useContentOptional } from '../state/ContentContext';
+import { useApp } from '../state/appContextValue';
+import { useContentOptional } from '../state/contentState';
 import { useProgressOptional } from '../state/progressState';
 
 /**

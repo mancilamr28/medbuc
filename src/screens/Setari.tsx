@@ -3,9 +3,9 @@ import { EXAMEN_ROWS } from '../data/profile';
 import { adunaDatele, descarca, numeFisier } from '../lib/exportDate';
 import { initialeDin } from '../lib/text';
 import { SANS, SERIF, pageLead, pageTitle } from '../lib/ui';
-import { useApp } from '../state/AppState';
-import { useAuth } from '../state/AuthContext';
-import { useToast } from '../state/ToastContext';
+import { useApp } from '../state/appContextValue';
+import { useAuth } from '../state/authState';
+import { useToast } from '../state/toastState';
 
 /**
  * Ce se poate schimba dintr-un rând. Fără `edit`, rândul e doar de citit și **nu

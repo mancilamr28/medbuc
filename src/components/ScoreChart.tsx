@@ -1,7 +1,7 @@
 import { EmptyState } from './EmptyState';
 import { SANS, SCORE_LABEL_FILL } from './chartTokens';
 import { SCORE_TARGET } from '../data/profile';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 
 const W = 720;
 const H = 190;

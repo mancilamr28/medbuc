@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { syncFinishedSession } from '../lib/syncAttempts';
-import { useApp } from '../state/AppState';
-import { useAuth } from '../state/AuthContext';
+import { useApp } from '../state/appContextValue';
+import { useAuth } from '../state/authState';
 import { useProgressOptional } from '../state/progressState';
 
 /** Sincronizează sesiunea doar după finalizare, fără să blocheze rezolvarea. */

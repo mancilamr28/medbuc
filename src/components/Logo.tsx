@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 
 /**
  * Marca MedBuc. Un clic duce înapoi la pagina principală și dă pisicii un mic

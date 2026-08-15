@@ -1,6 +1,6 @@
 import { SCREEN_TITLES, type Screen } from '../lib/router';
 import { SANS, SERIF } from '../lib/ui';
-import { useApp } from '../state/AppState';
+import { useApp } from '../state/appContextValue';
 
 /** Ecranele planificate pentru runda următoare. */
 export function InLucru({ screen }: { screen: Screen }) {

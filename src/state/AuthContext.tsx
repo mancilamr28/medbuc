@@ -1,43 +1,9 @@
 import type { Session, User } from '@supabase/supabase-js';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { stergeDateleLocale } from '../lib/dateLocale';
 import { supabase } from '../lib/supabase';
 import { mesajEroare } from './authErrors';
-
-export type AppRole = 'elev' | 'admin';
-
-export interface Profile {
-  id: string;
-  fullName: string | null;
-  role: AppRole;
-}
-
-interface AuthResult {
-  error: string | null;
-}
-
-interface AuthValue {
-  /** Cât timp sesiunea inițială și profilul se încarcă — nimic altceva nu se poate decide. */
-  loading: boolean;
-  user: User | null;
-  profile: Profile | null;
-  /** Fără cont, elev e implicit — rolul real vine mereu din `profiles`, nu din client. */
-  role: AppRole;
-  /** Sesiunea vine dintr-un link de resetare a parolei: aplicația cere o parolă nouă înainte de orice altceva. */
-  recovery: boolean;
-  signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (email: string, password: string, fullName: string) => Promise<AuthResult & { confirmareEmail: boolean }>;
-  signOut: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<AuthResult>;
-  updatePassword: (parolaNoua: string) => Promise<AuthResult>;
-  updateNume: (numeComplet: string) => Promise<AuthResult>;
-  /** Adresa nouă primește un email de confirmare; până la clic, cea veche rămâne. */
-  updateEmail: (email: string) => Promise<AuthResult>;
-  /** Dreptul GDPR de eliminare. Șterge contul și tot ce atârnă de el, apoi deconectează. */
-  stergeContul: () => Promise<AuthResult>;
-}
-
-const AuthContext = createContext<AuthValue | null>(null);
+import { AuthContext, type AuthValue, type Profile } from './authState';
 
 /**
  * Deconectarea pleacă mereu dintr-un ecran al aplicației, deci hash-ul rămâne
@@ -169,10 +135,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth trebuie folosit în interiorul <AuthProvider>');
-  return ctx;
 }
