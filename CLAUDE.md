@@ -183,6 +183,8 @@ Concretely: `Chapter` carries no `total` — `chapterQuestionCount()` / `materie
 
 Counted figures still need Romanian grammar: `numar()` in `src/lib/text.ts` handles the `de` rule ("6 grile" but "20 de grile"). Use it instead of interpolating a bare number next to a noun.
 
+**Agreement has shipped broken four times, always the same shape** — a word left plural beside a numeral of one: "1 grilă scrise", "1 grilă publicate", "1 rescriu o grilă existentă". Two rules follow from that. First, every word that must agree goes *inside* `numar()`'s arguments, adjectives included — `numar(n, 'grilă scrisă', 'grile scrise')`, never `` `${numar(n, 'grilă', 'grile')} scrise` ``. Second, when the number is rendered separately (a styled `<span>`, with the rest of the phrase following in JSX), `numar()` cannot reach the phrase at all: give that phrase its own pure function and test it at 1, 2 and 20, the way `frazaRescrieri` in `importLot.ts` does. Every one of these was found by looking at the screen, never by the suite — and once a render test was written *against the broken wording*, pinning the bug instead of the fix.
+
 ### Feedback for actions — `src/state/ToastContext.tsx`
 
 The counterpart to `EmptyState`: `EmptyState` says a screen has nothing yet, `useToast().notify(kind, message)` says an action just succeeded or failed. Before this there was no such mechanism anywhere in the app — a save with no visible result and a save that silently failed looked identical. `ToastProvider` is mounted in `main.tsx` outside `AppProvider`, since transient notifications don't belong in state that also holds session and exam data.
