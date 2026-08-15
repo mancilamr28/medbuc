@@ -21,6 +21,7 @@ import {
 } from '../lib/ui';
 import { SIM_FIELDS } from '../state/useSimulare';
 import { useApp } from '../state/AppState';
+import { frazaCorecte } from './grileText';
 
 export function Simulari() {
   const { sim } = useApp();
@@ -497,7 +498,7 @@ function SimRezultat() {
                 {pct}%
               </span>
               <span style={{ font: `400 14px ${SANS}`, color: 'var(--fg2)' }}>
-                {corecte} din {total} grile corecte
+                {frazaCorecte(corecte, total)}
               </span>
             </div>
 

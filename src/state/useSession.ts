@@ -74,8 +74,16 @@ export interface Session {
    * grile tratează amândouă înainte să randeze rezolvarea.
    */
   question: Question | undefined;
-  /** Banca sesiunii, ca ecranele să nu mai importe una proprie. */
-  questions: Question[];
+  /**
+   * Banca sesiunii: biblioteca restrânsă la `capitole`.
+   *
+   * Se numește altfel decât `useApp().questions` intenționat. Cele două sunt
+   * amândouă `Question[]` și stau la o linie de destructurare una de alta, iar
+   * bug-ul care a impus scopul pe capitole a fost exact confuzia dintre ele —
+   * `Materii` număra biblioteca din bancă. Cu nume diferite, greșeala nu mai
+   * compilează în loc să dea o cifră greșită.
+   */
+  banca: Question[];
   total: number;
   answers: Record<number, OptionKey>;
   revealed: Record<number, boolean>;
@@ -120,9 +128,8 @@ export interface Session {
  *
  * Peste banca aia se așază capitolele sesiunii: hook-ul ține **biblioteca
  * întreagă** ca parametru și restrânge singur. Ecranele care numără grile pe
- * capitol au deci nevoie de banca de la `useApp().questions`, nu de
- * `session.questions` — altfel „Exersează" pe un capitol ar face ca celelalte
- * capitole să pară goale.
+ * capitol au deci nevoie de `useApp().questions`, nu de `session.banca` —
+ * altfel „Exersează" pe un capitol ar face ca celelalte capitole să pară goale.
  */
 export function useSession(questions: Question[]): Session {
   const [id, setId] = useState(() => crypto.randomUUID());
@@ -159,8 +166,11 @@ export function useSession(questions: Question[]): Session {
   /** Idempotent: o sesiune încheiată nu-și rescrie momentul de final. */
   const finish = useCallback(() => setFinishedAt((f) => f ?? Date.now()), []);
 
-  const start = useCallback((capitole: ChapterId[]) => {
-    setCapitole(capitole);
+  // Parametrul nu se numește `capitole`: `restart` chiar dedesubt închide peste
+  // starea cu același nume, iar confuzia dintre ele ar schimba tăcut din ce
+  // capitole se reia sesiunea.
+  const start = useCallback((noiCapitole: ChapterId[]) => {
+    setCapitole(noiCapitole);
     setId(crypto.randomUUID());
     setQi(0);
     setAnswers({});
@@ -212,7 +222,7 @@ export function useSession(questions: Question[]): Session {
       capitole,
       qi,
       question,
-      questions: banca,
+      banca,
       total,
       answers,
       revealed,

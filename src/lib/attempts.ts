@@ -14,14 +14,14 @@ export interface AttemptInsert {
  * Transformă răspunsurile unei sesiuni într-un jurnal de încercări.
  *
  * `session.answers` e cheiat pe poziția din bancă, deci grila se caută în banca
- * sesiunii — `session.questions` — nu într-un array importat. Jurnalul salvează
+ * sesiunii — `session.banca` — nu într-un array importat. Jurnalul salvează
  * mereu `question.id`, nu poziția: poziția depinde de ce e în bibliotecă în ziua
  * aceea, id-ul nu.
  */
 export function attemptsFromSession(session: Session, userId: string, finishedAt: number): AttemptInsert[] {
   const answeredAt = new Date(finishedAt).toISOString();
   return Object.entries(session.answers).flatMap(([index, chosen]) => {
-    const question = session.questions[Number(index)];
+    const question = session.banca[Number(index)];
     if (!question) return [];
     return [
       {

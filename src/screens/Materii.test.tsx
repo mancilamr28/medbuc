@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { QUESTIONS } from '../data/questions';
+import { QUESTIONS, materieQuestionCount } from '../data/questions';
 import { AppProvider, useApp } from '../state/AppState';
 import { Grile } from './Grile';
 import { Materii } from './Materii';
@@ -54,8 +54,9 @@ describe('exersarea pe capitol', () => {
     const antet = await screen.findByText('Sesiune pe capitole');
     expect(antet.nextElementSibling).toHaveTextContent('Biologie · toate capitolele');
 
-    const bio = QUESTIONS.filter((q) => q.capId.startsWith('bio-')).length;
-    expect(screen.getByText(`Grila 1 din ${bio}`)).toBeInTheDocument();
+    // Numărul se ia din aceeași funcție pe care o folosește ecranul, nu din
+    // prefixul id-ului: materia se citește din capitol, nu din felul cum e scris.
+    expect(screen.getByText(`Grila 1 din ${materieQuestionCount('bio')}`)).toBeInTheDocument();
   });
 
   it('un capitol fără grile scrise nu se poate exersa', () => {
@@ -66,7 +67,7 @@ describe('exersarea pe capitol', () => {
 
   /**
    * Numărătorile se fac pe biblioteca întreagă, nu pe banca sesiunii: cu
-   * `session.questions`, o sesiune pornită pe un capitol golea toate celelalte
+   * `session.banca`, o sesiune pornită pe un capitol golea toate celelalte
    * capitole din listă și le dezactiva butonul.
    */
   it('sesiunea pe un capitol nu golește restul listei', async () => {
