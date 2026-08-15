@@ -5,6 +5,7 @@ import type { Session } from '../state/useSession';
 
 const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session => ({
   id: '00000000-0000-0000-0000-000000000001',
+  capitole: [],
   qi: 0,
   question: QUESTIONS[0]!,
   questions: QUESTIONS,
@@ -26,6 +27,7 @@ const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session 
   goTo: () => undefined,
   toggleMark: () => undefined,
   finish: () => undefined,
+  start: () => undefined,
   restart: () => undefined,
   tally: { corecte: 0, gresite: 0, marcate: 0 },
   score: { corecte: 0, gresite: 0, neraspunse: QUESTIONS.length, total: QUESTIONS.length, pct: 0, durataMs: 0 },

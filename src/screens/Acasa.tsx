@@ -26,7 +26,7 @@ const cardSub = { marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' 
  * curentă. Restul spune deschis că nu are încă date.
  */
 export function Acasa() {
-  const { go, session } = useApp();
+  const { go, questions, session } = useApp();
   const { user, profile } = useAuth();
   const loading = useContentOptional()?.loading ?? false;
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
@@ -35,6 +35,16 @@ export function Acasa() {
   const raspunse = Object.keys(session.answers).length;
   const inSesiune = raspunse > 0 && !session.finished;
   const prenume = primulNume(profile?.fullName ?? null, user?.email ?? '');
+
+  /**
+   * O sesiune încheiată nu se poate „continua": ecranul de grile ar arăta iar
+   * panoul de rezultat, deși butonul de aici scrie „Începe o sesiune". Una
+   * neîncheiată se reia ca atare, cu capitolele pe care le-a ales elevul.
+   */
+  const deschideGrile = () => {
+    if (session.finished) session.start([]);
+    go('grile');
+  };
 
   return (
     <div className="screen">
@@ -46,7 +56,7 @@ export function Acasa() {
               Un „0 grile" cât timp se încarcă ar fi o afirmație falsă, nu o stare. */}
           {loading
             ? 'Se încarcă biblioteca…'
-            : `Biblioteca are ${numar(session.questions.length, 'grilă publicată', 'grile publicate')}.`}
+            : `Biblioteca are ${numar(questions.length, 'grilă publicată', 'grile publicate')}.`}
         </p>
       </div>
 
@@ -59,14 +69,14 @@ export function Acasa() {
             </div>
             <div style={{ marginTop: 6, font: `400 13.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>
               {inSesiune
-                ? `Ai răspuns la ${raspunse} din ${session.total} grile.`
+                ? `Ai răspuns la ${numar(raspunse, 'grilă', 'grile')} din ${session.total}.`
                 : 'Fără limită de timp, cu explicații după fiecare răspuns.'}
             </div>
             <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => go('grile')}
+                onClick={deschideGrile}
                 style={{ padding: '12px 18px', font: `600 14px ${SANS}` }}
               >
                 {inSesiune ? 'Reia sesiunea →' : 'Începe o sesiune →'}
@@ -107,7 +117,7 @@ export function Acasa() {
               <button
                 type="button"
                 className="dashed-btn"
-                onClick={() => go('grile')}
+                onClick={deschideGrile}
                 style={{ padding: '10px 16px', font: `500 13px ${SANS}` }}
               >
                 Rezolvă niște grile

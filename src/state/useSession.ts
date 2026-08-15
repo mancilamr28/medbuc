@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import type { ChapterId } from '../data/chapters';
 import type { OptionKey, Question } from '../data/questions';
 
 export interface SessionScore {
@@ -43,9 +44,28 @@ export function scoreOf(
   };
 }
 
+/**
+ * Banca restrânsă la capitolele cerute.
+ *
+ * Lista goală înseamnă „toată biblioteca" — aceeași convenție ca la coloana
+ * `sessions.chapter_ids` din bază, ca să nu existe două înțelesuri pentru gol.
+ * În cazul acela se întoarce chiar banca primită, nu o copie: identitatea ei e
+ * ce ține memo-ul din `useSession` să nu recalculeze la fiecare randare.
+ */
+export function filtreazaCapitole(questions: Question[], capitole: readonly ChapterId[]): Question[] {
+  if (capitole.length === 0) return questions;
+  const cerute = new Set(capitole);
+  return questions.filter((q) => cerute.has(q.capId));
+}
+
 export interface Session {
   /** Identificator stabil pentru sincronizarea sesiunii finalizate. */
   id: string;
+  /**
+   * Capitolele din care s-a compus sesiunea; gol înseamnă toată biblioteca.
+   * Se scrie ca atare în `sessions.chapter_ids` la finalul sesiunii.
+   */
+  capitole: ChapterId[];
   /** Indexul grilei curente. */
   qi: number;
   /**
@@ -78,7 +98,12 @@ export interface Session {
   toggleMark: () => void;
   /** Încheie sesiunea și îngheață timpul; apelurile ulterioare nu schimbă nimic. */
   finish: () => void;
-  /** Reia sesiunea de la prima grilă, cu cronometrul de la zero. */
+  /**
+   * Deschide o sesiune nouă peste capitolele date; lista goală ia toată
+   * biblioteca. Ce era început se pierde — o sesiune trăiește doar în memorie.
+   */
+  start: (capitole: ChapterId[]) => void;
+  /** Reia sesiunea de la prima grilă, pe aceleași capitole, cu cronometrul de la zero. */
   restart: () => void;
   /** Câte grile sunt corecte / greșite / marcate în sesiunea curentă. */
   tally: { corecte: number; gresite: number; marcate: number };
@@ -92,9 +117,16 @@ export interface Session {
  * Banca vine prin parametru, nu dintr-un import: din Faza 4 grilele se citesc
  * din Supabase, iar `AppProvider` le pasează din `ContentContext`. Testele trec
  * `QUESTIONS` din `src/data/`, care rămâne fixtură.
+ *
+ * Peste banca aia se așază capitolele sesiunii: hook-ul ține **biblioteca
+ * întreagă** ca parametru și restrânge singur. Ecranele care numără grile pe
+ * capitol au deci nevoie de banca de la `useApp().questions`, nu de
+ * `session.questions` — altfel „Exersează" pe un capitol ar face ca celelalte
+ * capitole să pară goale.
  */
 export function useSession(questions: Question[]): Session {
   const [id, setId] = useState(() => crypto.randomUUID());
+  const [capitole, setCapitole] = useState<ChapterId[]>([]);
   const [qi, setQi] = useState(0);
   const [answers, setAnswers] = useState<Record<number, OptionKey>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
@@ -102,8 +134,10 @@ export function useSession(questions: Question[]): Session {
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
-  const total = questions.length;
-  const question = questions[qi];
+  const banca = useMemo(() => filtreazaCapitole(questions, capitole), [capitole, questions]);
+
+  const total = banca.length;
+  const question = banca[qi];
   const answer = answers[qi];
   const isRevealed = !!revealed[qi];
   const isCorrect = question !== undefined && answer === question.correct;
@@ -125,7 +159,8 @@ export function useSession(questions: Question[]): Session {
   /** Idempotent: o sesiune încheiată nu-și rescrie momentul de final. */
   const finish = useCallback(() => setFinishedAt((f) => f ?? Date.now()), []);
 
-  const restart = useCallback(() => {
+  const start = useCallback((capitole: ChapterId[]) => {
+    setCapitole(capitole);
     setId(crypto.randomUUID());
     setQi(0);
     setAnswers({});
@@ -134,6 +169,9 @@ export function useSession(questions: Question[]): Session {
     setFinishedAt(null);
     setStartedAt(Date.now());
   }, []);
+
+  /** Aceleași capitole, de la zero: „Reia sesiunea" nu are voie să lărgească bazinul. */
+  const restart = useCallback(() => start(capitole), [capitole, start]);
 
   const primary = useCallback(() => {
     if (!revealed[qi]) {
@@ -149,17 +187,17 @@ export function useSession(questions: Question[]): Session {
   const tally = useMemo(() => {
     let corecte = 0;
     let gresite = 0;
-    questions.forEach((q, i) => {
+    banca.forEach((q, i) => {
       if (!revealed[i]) return;
       if (answers[i] === q.correct) corecte += 1;
       else gresite += 1;
     });
     return { corecte, gresite, marcate: Object.values(marked).filter(Boolean).length };
-  }, [answers, marked, questions, revealed]);
+  }, [answers, banca, marked, revealed]);
 
   const score = useMemo<SessionScore>(
-    () => scoreOf(questions, answers, (finishedAt ?? Date.now()) - startedAt),
-    [answers, finishedAt, questions, startedAt],
+    () => scoreOf(banca, answers, (finishedAt ?? Date.now()) - startedAt),
+    [answers, banca, finishedAt, startedAt],
   );
 
   /**
@@ -171,9 +209,10 @@ export function useSession(questions: Question[]): Session {
   return useMemo<Session>(
     () => ({
       id,
+      capitole,
       qi,
       question,
-      questions,
+      questions: banca,
       total,
       answers,
       revealed,
@@ -192,6 +231,7 @@ export function useSession(questions: Question[]): Session {
       goTo,
       toggleMark,
       finish,
+      start,
       restart,
       tally,
       score,
@@ -199,6 +239,8 @@ export function useSession(questions: Question[]): Session {
     [
       answer,
       answers,
+      banca,
+      capitole,
       finish,
       finishedAt,
       goTo,
@@ -212,10 +254,10 @@ export function useSession(questions: Question[]): Session {
       primary,
       qi,
       question,
-      questions,
       restart,
       revealed,
       score,
+      start,
       startedAt,
       tally,
       toggleMark,

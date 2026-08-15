@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { ChapterId } from '../data/chapters';
 import type { OptionKey, Question } from '../data/questions';
-import { scoreOf } from './useSession';
+import { filtreazaCapitole, scoreOf } from './useSession';
 
 /** Grile de test: doar câmpurile care contează pentru scor. */
 let n = 0;
-const grila = (correct: OptionKey): Question => ({
+const grila = (correct: OptionKey, capId: ChapterId = 'bio-celula'): Question => ({
   id: `test-${(n += 1)}`,
   tip: 'simplu',
-  capId: 'bio-celula',
+  capId,
   text: 'Întrebare de test',
   opts: [
     ['A', 'a'],
@@ -70,5 +71,41 @@ describe('scoreOf', () => {
 
   it('ignoră răspunsurile pe poziții care nu există', () => {
     expect(scoreOf(SASE, { 99: 'A' }, 0)).toMatchObject({ corecte: 0, neraspunse: 6 });
+  });
+});
+
+describe('filtreazaCapitole', () => {
+  const AMESTEC = [
+    grila('A', 'bio-nervos'),
+    grila('B', 'chim-arene'),
+    grila('C', 'bio-nervos'),
+    grila('D', 'bio-osos'),
+  ];
+
+  it('lista goală înseamnă toată biblioteca', () => {
+    expect(filtreazaCapitole(AMESTEC, [])).toEqual(AMESTEC);
+  });
+
+  /**
+   * Nu doar egală — chiar aceeași. Identitatea băncii e ce ține memo-ul din
+   * `useSession` (și, prin el, cel din `AppProvider`) să nu recalculeze degeaba.
+   */
+  it('fără capitole întoarce chiar banca primită, nu o copie', () => {
+    expect(filtreazaCapitole(AMESTEC, [])).toBe(AMESTEC);
+  });
+
+  it('păstrează doar grilele din capitolele cerute, în ordinea lor', () => {
+    expect(filtreazaCapitole(AMESTEC, ['bio-nervos']).map((q) => q.capId)).toEqual([
+      'bio-nervos',
+      'bio-nervos',
+    ]);
+    expect(filtreazaCapitole(AMESTEC, ['bio-osos', 'chim-arene']).map((q) => q.capId)).toEqual([
+      'chim-arene',
+      'bio-osos',
+    ]);
+  });
+
+  it('un capitol fără grile scrise dă o listă goală, nu toată biblioteca', () => {
+    expect(filtreazaCapitole(AMESTEC, ['bio-celula'])).toEqual([]);
   });
 });
