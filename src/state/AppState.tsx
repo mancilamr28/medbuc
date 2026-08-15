@@ -17,6 +17,12 @@ interface AppValue {
   go: (screen: Screen) => void;
   materie: MaterieId;
   setMaterie: (id: MaterieId) => void;
+  /**
+   * Biblioteca întreagă. `session.questions` e doar bucata din care se rezolvă
+   * acum, deci orice ecran care numără grile pe capitol are nevoie de asta:
+   * altfel o sesiune pe un capitol face restul bibliotecii să pară goală.
+   */
+  questions: Question[];
   session: Session;
   sim: Simulare;
 }
@@ -64,10 +70,11 @@ export function AppProvider({ questions, children }: { questions: Question[]; ch
       go,
       materie,
       setMaterie,
+      questions,
       session,
       sim,
     }),
-    [go, materie, screen, session, sim, theme, toggleTheme],
+    [go, materie, questions, screen, session, sim, theme, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

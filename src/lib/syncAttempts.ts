@@ -13,7 +13,10 @@ export async function syncFinishedSession(userId: string, session: Session, fini
       user_id: userId,
       started_at: new Date(session.startedAt).toISOString(),
       finished_at: new Date(finishedAt).toISOString(),
-      chapter_ids: [],
+      // Din ce s-a compus sesiunea; gol înseamnă „din toată biblioteca", aceeași
+      // convenție ca în coloană. Se scria mereu gol, deci o sesiune pe un capitol
+      // nu se deosebea de una pe toată biblioteca.
+      chapter_ids: session.capitole,
     },
     { onConflict: 'id', ignoreDuplicates: true },
   );

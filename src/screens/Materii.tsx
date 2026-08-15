@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { MATERII, MATERIE_TABS } from '../data/chapters';
+import { MATERII, MATERIE_TABS, chapterLabel } from '../data/chapters';
 import { numaraGrile } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
@@ -16,18 +16,28 @@ import { useContentOptional } from '../state/ContentContext';
  * întorc când există răspunsuri înregistrate din care să iasă.
  */
 export function Materii() {
-  const { materie, setMaterie, go, session } = useApp();
+  const { materie, setMaterie, go, questions, session } = useApp();
   const isDesktop = useIsDesktop();
   // Capitolele sunt statice, deci ecranul se desenează întreg imediat; doar
   // numărătorile așteaptă biblioteca, iar cât timp o așteaptă arată „—", nu 0.
   const loading = useContentOptional()?.loading ?? false;
-  const { peCapitol, peMaterie } = useMemo(() => numaraGrile(session.questions), [session.questions]);
+  // Numărătoarea se face pe biblioteca întreagă, nu pe `session.questions`: aceea
+  // e restrânsă la capitolele sesiunii curente, deci după un „Exersează" toate
+  // celelalte capitole ar apărea cu zero grile scrise.
+  const { peCapitol, peMaterie } = useMemo(() => numaraGrile(questions), [questions]);
   const mat = MATERII[materie];
   const chapters = mat.list;
+  const grileMaterie = peMaterie.get(mat.id) ?? 0;
+
+  /** Deschide o sesiune nouă pe capitolele date și trece pe ecranul de grile. */
+  const exerseaza = (capitole: string[]) => {
+    session.start(capitole);
+    go('grile');
+  };
 
   const stats = [
     { label: 'Capitole', value: String(mat.list.length), unit: mat.unit === 'sesiuni' ? 'sesiuni' : 'capitole' },
-    { label: 'Grile scrise', value: loading ? '—' : String(peMaterie.get(mat.id) ?? 0), unit: 'grile' },
+    { label: 'Grile scrise', value: loading ? '—' : String(grileMaterie), unit: 'grile' },
   ];
 
   return (
@@ -152,8 +162,9 @@ export function Materii() {
                   <button
                     type="button"
                     className="practice-btn"
-                    onClick={() => go('grile')}
+                    onClick={() => exerseaza([c.id])}
                     disabled={scrise === 0}
+                    aria-label={`Exersează ${chapterLabel(c)}`}
                     style={{
                       padding: '8px 14px',
                       font: `500 12.5px ${SANS}`,
@@ -174,15 +185,26 @@ export function Materii() {
             <div style={{ background: 'var(--brandS)', border: '1px solid var(--brandS2)', borderRadius: 14, padding: 20 }}>
               <div style={{ font: `400 19px/1.3 ${SERIF}`, color: 'var(--fg)' }}>Nu știi de unde să începi?</div>
               <p style={{ margin: '8px 0 14px', font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)' }}>
-                Începe cu primul capitol din materie. După câteva sesiuni vei vedea aici unde stai bine și unde nu.
+                {/* Textul spunea „începe cu primul capitol", dar butonul deschidea
+                    biblioteca întreagă. Acum spune ce face butonul de sub el. */}
+                {grileMaterie === 0
+                  ? `Nu e scrisă încă nicio grilă la ${mat.name}. Alege altă materie sau revino după ce se publică.`
+                  : `Ia toate capitolele deodată: ${numar(grileMaterie, 'grilă', 'grile')} din ${mat.name}, în ordine.`}
               </p>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => go('grile')}
-                style={{ width: '100%', padding: 11, font: `600 13.5px ${SANS}` }}
+                onClick={() => exerseaza(mat.list.map((c) => c.id))}
+                disabled={grileMaterie === 0}
+                style={{
+                  width: '100%',
+                  padding: 11,
+                  font: `600 13.5px ${SANS}`,
+                  opacity: grileMaterie === 0 ? 0.45 : 1,
+                  cursor: grileMaterie === 0 ? 'not-allowed' : 'pointer',
+                }}
               >
-                Începe o sesiune
+                Exersează toată materia
               </button>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/AppState';
+import { descriereScop, frazaCorecte } from './grileText';
 
 type Variant = 'a' | 'b';
 
@@ -29,6 +30,7 @@ function GrileRun() {
   const { question, qi, total, answer, isRevealed, isMarked, isCorrect } = session;
   const withContext = layout === 'b';
   const ultima = qi === total - 1;
+  const scop = descriereScop(session.capitole);
 
   // Tastele A–E aleg varianta, Enter verifică sau trece mai departe.
   useEffect(() => {
@@ -68,9 +70,11 @@ function GrileRun() {
           ← Ieși din sesiune
         </button>
         <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ font: `600 13.5px/1.2 ${SANS}` }}>Sesiune rapidă · {questionMaterie(question)}</div>
+          {/* Antetul descrie sesiunea, nu grila de pe ecran: scria materia grilei
+              curente lângă „Sesiune rapidă", deci se schimba la fiecare pas. */}
+          <div style={{ font: `600 13.5px/1.2 ${SANS}` }}>{scop.titlu}</div>
           <div style={{ marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-            Capitole mixte · fără limită de timp
+            {scop.detaliu} · fără limită de timp
           </div>
         </div>
         <div className="tabular" style={{ font: `500 13px ${SANS}`, color: 'var(--fg2)' }} aria-label="Timp scurs">
@@ -379,6 +383,7 @@ function GrileRezultat() {
   const { go, session } = useApp();
   const { corecte, gresite, neraspunse, total, pct, durataMs } = session.score;
   const culoare = pct >= 80 ? 'var(--ok)' : pct >= 65 ? 'var(--brand)' : 'var(--bad)';
+  const scop = descriereScop(session.capitole);
 
   const dale: [string, string, string][] = [
     ['Corecte', String(corecte), 'var(--ok)'],
@@ -402,14 +407,15 @@ function GrileRezultat() {
         <div className="card" style={{ padding: 26 }}>
           <div style={eyebrow('var(--brand)')}>Sesiune încheiată</div>
           <h1 style={{ margin: '8px 0 0', font: `500 30px/1.15 ${SERIF}`, color: 'var(--fg)' }}>Rezultatul tău</h1>
+          <div style={{ marginTop: 6, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>{scop.detaliu}</div>
 
           <div style={{ marginTop: 20, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
             <span className="tabular" style={{ font: `600 46px/1 ${SERIF}`, color: culoare }}>
               {pct}%
             </span>
-            <span style={{ font: `400 14px ${SANS}`, color: 'var(--fg2)' }}>
-              {corecte} din {total} grile corecte
-            </span>
+            {/* Fraza vine întreagă dintr-o funcție pură: numărul e randat separat,
+                în procentul de alături, deci `numar()` n-ar ajunge la ea din JSX. */}
+            <span style={{ font: `400 14px ${SANS}`, color: 'var(--fg2)' }}>{frazaCorecte(corecte, total)}</span>
           </div>
 
           <div style={{ marginTop: 14 }}>

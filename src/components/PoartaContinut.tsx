@@ -17,7 +17,7 @@ import { useContentOptional } from '../state/ContentContext';
  */
 export function PoartaContinut({ children }: { children: ReactNode }) {
   const continut = useContentOptional();
-  const { session } = useApp();
+  const { go, questions, session } = useApp();
 
   // Fără provider de conținut nu există nici încărcare, nici eroare de anunțat —
   // banca a venit direct din `AppProvider`. Se întâmplă în testele de randare,
@@ -61,13 +61,44 @@ export function PoartaContinut({ children }: { children: ReactNode }) {
     );
   }
 
-  if (session.total === 0) {
+  if (questions.length === 0) {
     return (
       <div className="screen">
         <div className="card" style={{ padding: 8, maxWidth: 520 }}>
           <EmptyState
             title="Biblioteca nu are încă nicio grilă publicată"
             hint="Grilele apar aici pe măsură ce sunt scrise și publicate din Administrare."
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Biblioteca are grile, dar niciuna din capitolele sesiunii. „Materii" nu lasă
+  // să se ajungă aici — butonul e dezactivat pe capitolele goale — dar o grilă
+  // retrasă între alegere și rezolvare golește bazinul, iar o sesiune fără nicio
+  // grilă randează un ecran alb dacă nu se spune nimic.
+  if (session.total === 0) {
+    return (
+      <div className="screen">
+        <div className="card" style={{ padding: 8, maxWidth: 520 }}>
+          <EmptyState
+            title={
+              session.capitole.length === 1
+                ? 'Capitolul ales nu are nicio grilă publicată'
+                : 'Capitolele alese nu au nicio grilă publicată'
+            }
+            hint="Alege alt capitol sau exersează din toată biblioteca."
+            action={
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => go('materii')}
+                style={{ padding: '10px 16px', font: `600 13px ${SANS}` }}
+              >
+                Înapoi la materii
+              </button>
+            }
           />
         </div>
       </div>

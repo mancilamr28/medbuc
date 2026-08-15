@@ -110,6 +110,10 @@ The global `prefers-reduced-motion` block in `styles.css` only kills `.screen`/`
 
 The simulation clock only ticks while its screen is open — `AppState.tsx` passes `useNow(screen === 'simulari')`.
 
+**A session is scoped to chapters, and the scope lives in `useSession`, not in the bank it is given.** The hook takes the *whole* library and narrows it itself through the pure `filtreazaCapitole()`; `session.capitole` is the chosen scope and an **empty list means the whole library** — the same convention as the `sessions.chapter_ids` column it is written to, so there is only one meaning for empty. `start(capitole)` opens a new session over a scope, `restart()` reopens the same scope, and `syncFinishedSession` writes `session.capitole` (it used to hardcode `[]`, so a chapter session was indistinguishable from a full-library one).
+
+The consequence to watch: **`session.questions` is the narrowed bank, so nothing that counts the library may read it.** `useApp().questions` is the full one, and that is what `Materii` counts per chapter and `Acasa` reports as the library size — with `session.questions` there, starting a session on one chapter emptied every other chapter in the list and disabled its button. `PoartaContinut` distinguishes the two for the same reason: an empty *library* and a scope with nothing published in it are different screens.
+
 `QUESTIONS` contains only ~6 entries, so `buildOrder()` repeats the bank to reach the configured question count.
 
 ### Persistence — `usePersistentState` in `src/lib/hooks.ts`
@@ -183,7 +187,7 @@ Concretely: `Chapter` carries no `total` — `chapterQuestionCount()` / `materie
 
 Counted figures still need Romanian grammar: `numar()` in `src/lib/text.ts` handles the `de` rule ("6 grile" but "20 de grile"). Use it instead of interpolating a bare number next to a noun.
 
-**Agreement has shipped broken four times, always the same shape** — a word left plural beside a numeral of one: "1 grilă scrise", "1 grilă publicate", "1 rescriu o grilă existentă". Two rules follow from that. First, every word that must agree goes *inside* `numar()`'s arguments, adjectives included — `numar(n, 'grilă scrisă', 'grile scrise')`, never `` `${numar(n, 'grilă', 'grile')} scrise` ``. Second, when the number is rendered separately (a styled `<span>`, with the rest of the phrase following in JSX), `numar()` cannot reach the phrase at all: give that phrase its own pure function and test it at 1, 2 and 20, the way `frazaRescrieri` in `importLot.ts` does. Every one of these was found by looking at the screen, never by the suite — and once a render test was written *against the broken wording*, pinning the bug instead of the fix.
+**Agreement has shipped broken five times, always the same shape** — a word left plural beside a numeral of one: "1 grilă scrise", "1 grilă publicate", "1 rescriu o grilă existentă", "1 din 1 grile corecte" on the results panel. That last one had sat there since the panel was written and only became obvious once a session could be one question long; a phrase that reads fine at six is not evidence, and the count that exposes it usually arrives later. Two rules follow from that. First, every word that must agree goes *inside* `numar()`'s arguments, adjectives included — `numar(n, 'grilă scrisă', 'grile scrise')`, never `` `${numar(n, 'grilă', 'grile')} scrise` ``. Second, when the number is rendered separately (a styled `<span>`, with the rest of the phrase following in JSX), `numar()` cannot reach the phrase at all: give that phrase its own pure function and test it at 1, 2 and 20, the way `frazaRescrieri` in `importLot.ts` and `frazaCorecte` in `grileText.ts` do. Every one of these was found by looking at the screen, never by the suite — and once a render test was written *against the broken wording*, pinning the bug instead of the fix.
 
 ### Feedback for actions — `src/state/ToastContext.tsx`
 

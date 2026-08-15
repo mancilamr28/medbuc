@@ -52,7 +52,7 @@ describe('sesiunea de grile', () => {
     await userEvent.click(buton('Încheie sesiunea'));
 
     expect(screen.getByText('Rezultatul tău')).toBeInTheDocument();
-    expect(screen.getByText(/din \d+ grile corecte/)).toBeInTheDocument();
+    expect(screen.getByText(/grile corecte din \d+/)).toBeInTheDocument();
   });
 
   it('socotește grilele fără răspuns împotriva ta', async () => {
@@ -64,7 +64,7 @@ describe('sesiunea de grile', () => {
     const total = QUESTIONS.length;
     const asteptat = Math.round((1 / total) * 100);
     expect(screen.getByText(`${asteptat}%`)).toBeInTheDocument();
-    expect(screen.getByText(`1 din ${total} grile corecte`)).toBeInTheDocument();
+    expect(screen.getByText(`1 grilă corectă din ${total}`)).toBeInTheDocument();
 
     const faraRaspuns = screen.getByText('Fără răspuns').parentElement!;
     expect(within(faraRaspuns).getByText(String(total - 1))).toBeInTheDocument();
