@@ -21,15 +21,16 @@ export interface DateExportate {
   peAcestDispozitiv: Record<string, string>;
 }
 
-/** Numele fișierului descărcat, cu data în față ca să se sorteze singur. */
-export const numeFisier = (acum: Date): string => {
-  const zi = [
+/** Data ca `2026-08-15`, ca fișierele descărcate să se sorteze singure după nume. */
+export const ziua = (acum: Date): string =>
+  [
     acum.getFullYear(),
     String(acum.getMonth() + 1).padStart(2, '0'),
     String(acum.getDate()).padStart(2, '0'),
   ].join('-');
-  return `medbuc-datele-mele-${zi}.json`;
-};
+
+/** Numele fișierului descărcat, cu data în față. */
+export const numeFisier = (acum: Date): string => `medbuc-datele-mele-${ziua(acum)}.json`;
 
 /**
  * Cheile `medbuc.*` din `localStorage`.
@@ -96,13 +97,23 @@ export async function adunaDatele(userId: string, email: string | null): Promise
   };
 }
 
-/** Pune conținutul într-un fișier și îl dă browserului spre descărcare. */
-export function descarca(date: DateExportate, nume: string): void {
-  const blob = new Blob([JSON.stringify(date, null, 2)], { type: 'application/json' });
+/**
+ * Pune un text într-un fișier și îl dă browserului spre descărcare.
+ *
+ * Generic, fiindcă are doi apelanți cu nimic în comun în afară de asta: exportul
+ * GDPR de mai sus și exportul bibliotecii de grile din Administrare.
+ */
+export function descarcaText(continut: string, nume: string): void {
+  const blob = new Blob([continut], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = nume;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Exportul de date personale, ca fișier. */
+export function descarca(date: DateExportate, nume: string): void {
+  descarcaText(JSON.stringify(date, null, 2), nume);
 }

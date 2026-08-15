@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
+import { Segmented } from '../components/Segmented';
 import { MATERII, chapterLabel, chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
 import { OPTION_KEYS, tipLabel, type OptionKey, type QuestionType } from '../data/questions';
 import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
@@ -18,6 +19,7 @@ import {
   variantScrise,
   type Ciorna,
 } from './adminCiorna';
+import { ImportGrile } from './ImportGrile';
 
 /** Ce vede un cont fără drepturi de administrare. */
 export function AdminBlocat() {
@@ -74,6 +76,7 @@ function AdminPanel() {
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
+  const [mod, setMod] = useState<'formular' | 'import'>('formular');
   const [ciorna, setCiorna] = useState<Ciorna>(() => ciornaGoala());
   const [editez, setEditez] = useState<string | null>(null);
   const [cautare, setCautare] = useState('');
@@ -110,10 +113,13 @@ function AdminPanel() {
     setAratatProbleme(false);
   };
 
+  // Lista rămâne vizibilă și în modul de import, deci „Editează" trebuie să
+  // aducă înapoi formularul — altfel deschide o ciornă pe care n-o vede nimeni.
   const incarcaPentruEditare = (g: GrilaCuStare) => {
     setCiorna(dinGrila(g));
     setEditez(g.id);
     setAratatProbleme(false);
+    setMod('formular');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -170,12 +176,35 @@ function AdminPanel() {
 
   return (
     <div className="screen">
-      <div style={{ marginBottom: 18 }}>
-        <h1 style={pageTitle}>Administrare conținut</h1>
-        <p style={pageLead}>Adaugi grile în bibliotecă și decizi ce se publică pentru elevi.</p>
+      <div
+        style={{
+          marginBottom: 18,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 14,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <h1 style={pageTitle}>Administrare conținut</h1>
+          <p style={pageLead}>Adaugi grile în bibliotecă și decizi ce se publică pentru elevi.</p>
+        </div>
+        <Segmented
+          items={[
+            { id: 'formular' as const, label: 'O grilă' },
+            { id: 'import' as const, label: 'Import în masă' },
+          ]}
+          value={mod}
+          onChange={setMod}
+          ariaLabel="Felul în care scrii grile"
+        />
       </div>
 
       <div style={twoCol(isDesktop)}>
+        {mod === 'import' ? (
+          <ImportGrile grile={grile} reload={reload} />
+        ) : (
         <div className="card" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ font: `600 15px ${SANS}` }}>{editez ? 'Editezi o grilă' : 'Adaugă o grilă'}</div>
@@ -443,6 +472,7 @@ function AdminPanel() {
             </button>
           </div>
         </div>
+        )}
 
         <div style={sideStack}>
           <div className="card-flat" style={{ padding: 20 }}>

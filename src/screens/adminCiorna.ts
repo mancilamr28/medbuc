@@ -25,7 +25,8 @@ export interface Ciorna {
   src: string;
 }
 
-const opturiGoale = (): Ciorna['opts'] =>
+/** Cele cinci litere, goale. Exportată fiindcă și importul în masă umple aceeași formă. */
+export const opturiGoale = (): Ciorna['opts'] =>
   Object.fromEntries(OPTION_KEYS.map((k) => [k, { text: '', why: '' }])) as Ciorna['opts'];
 
 export const ciornaGoala = (capId: ChapterId = 'bio-celula'): Ciorna => ({
