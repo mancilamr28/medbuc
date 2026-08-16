@@ -53,23 +53,47 @@ describe('recapitularea inteligentă', () => {
     deschide([raspunsGresit()]);
 
     expect(screen.getByText('1 grilă de repetat')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Începe recapitularea' }));
+    expect(screen.getByText('În program').parentElement).toHaveTextContent(/1\s*grilă/);
+    const porneste = screen.getByRole('button', { name: /Începe recapitularea/ });
+    expect(porneste).toHaveClass('btn-primary', 'tinta-tactila');
+    expect(porneste).toHaveStyle({ padding: '12px 18px' });
+    await user.click(porneste);
 
     const variantaCorecta = question.opts.find(([key]) => key === question.correct)![1];
     await user.click(screen.getByRole('radio', { name: new RegExp(variantaCorecta.slice(0, 24), 'i') }));
     await user.click(screen.getByRole('button', { name: 'Verifică răspunsul' }));
 
     expect(screen.getByText('Corect — intervalul va crește.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Încheie recapitularea' }));
-    expect(screen.getByRole('heading', { name: '100% corecte' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Vezi rezultatul/ }));
+    expect(screen.getByRole('heading', { name: 'Rezultatul tău' })).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText(/1 grilă corectă din 1/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Scor 100%' })).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.getByRole('button', { name: /Vezi coada actualizată/ })).toHaveStyle({
+      padding: '12px 20px',
+    });
   });
 
   it('nu inventează o coadă înainte de prima greșeală', () => {
     deschide();
 
-    expect(screen.getByText('Nimic de recapitulat azi')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Începe recapitularea' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Construiește prima recapitulare' })).toBeInTheDocument();
+    expect(screen.getByText('Ritmul repetării')).toBeInTheDocument();
+    const exerseaza = screen.getByRole('button', { name: /Exersează din capitole/ });
+    expect(exerseaza).toHaveClass('btn-primary', 'tinta-tactila');
+    expect(exerseaza).toHaveStyle({ padding: '12px 18px' });
+    expect(screen.queryByRole('button', { name: /Începe recapitularea/ })).not.toBeInTheDocument();
+  });
+
+  it('păstrează sesiunea când elevul iese temporar din recapitulare', async () => {
+    const user = userEvent.setup();
+    deschide([raspunsGresit()]);
+
+    await user.click(screen.getByRole('button', { name: /Începe recapitularea/ }));
+    await user.click(screen.getByRole('button', { name: 'Ieși din recapitulare' }));
+
+    expect(window.location.hash).toBe('#/acasa');
+    expect(screen.getByText('Grila 1 din 1')).toBeInTheDocument();
   });
 
   it('nu prezintă o eroare de citire drept o coadă goală și permite reîncercarea', async () => {

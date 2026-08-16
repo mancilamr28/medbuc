@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 export type SX = CSSProperties;
 
-export const SANS = "'Public Sans',sans-serif";
+export const SANS = "'Public Sans',system-ui,sans-serif";
 export const SERIF = 'Newsreader,Georgia,serif';
 /** Doar pentru text pe care îl citește și mașina: JSON-ul importului în masă. */
 export const MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
