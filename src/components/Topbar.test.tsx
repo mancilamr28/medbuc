@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { faLightbulb, faMoon, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import { Topbar } from './Topbar';
+
+const cale = (icon: IconDefinition): string => {
+  const path = icon.icon[4];
+  return Array.isArray(path) ? path.join(' ') : path;
+};
 
 const toggleTheme = vi.fn();
 let theme: 'light' | 'dark' = 'dark';
@@ -29,6 +35,7 @@ describe('Topbar', () => {
     expect(tema).toHaveAttribute('title', 'Activează modul luminos');
     expect(tema).toHaveTextContent('');
     expect(tema).toHaveClass('tinta-tactila', 'tinta-tactila--patrata');
+    expect(tema.querySelector('path')).toHaveAttribute('d', cale(faLightbulb));
     await user.click(tema);
     expect(toggleTheme).toHaveBeenCalledTimes(1);
   });
@@ -55,5 +62,6 @@ describe('Topbar', () => {
     const tema = screen.getByRole('button', { name: 'Activează modul întunecat' });
     expect(tema).toHaveAttribute('title', 'Activează modul întunecat');
     expect(tema).toHaveTextContent('');
+    expect(tema.querySelector('path')).toHaveAttribute('d', cale(faMoon));
   });
 });

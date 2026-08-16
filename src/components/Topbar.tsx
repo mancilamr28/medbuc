@@ -1,4 +1,4 @@
-import { faMoon, faSun } from '@fortawesome/free-solid-svg-icons';
+import { faLightbulb, faMoon } from '@fortawesome/free-solid-svg-icons';
 import { SANS } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
 import { Icon } from './Icon';
@@ -40,7 +40,11 @@ export function Topbar({ compact }: { compact: boolean }) {
         title={etichetaTema}
         style={{ width: 38, height: 38, padding: 0, display: 'grid', placeItems: 'center' }}
       >
-        <Icon icon={activeazaLuminos ? faSun : faMoon} size={15} />
+        <Icon
+          icon={activeazaLuminos ? faLightbulb : faMoon}
+          size={17}
+          style={{ color: activeazaLuminos ? 'var(--acc)' : 'var(--brand)' }}
+        />
       </button>
     </header>
   );

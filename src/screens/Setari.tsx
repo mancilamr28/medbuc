@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { faLightbulb, faMoon } from '@fortawesome/free-solid-svg-icons';
+import { Icon } from '../components/Icon';
 import { EXAMEN_ROWS } from '../data/profile';
 import { adunaDatele, descarca, numeFisier } from '../lib/exportDate';
 import { initialeDin } from '../lib/text';
@@ -256,8 +258,13 @@ export function Setari() {
               type="button"
               className="btn-ghost"
               onClick={toggleTheme}
-              style={{ padding: '11px 16px', font: `500 13.5px ${SANS}` }}
+              style={{ padding: '11px 16px', display: 'inline-flex', alignItems: 'center', gap: 9, font: `500 13.5px ${SANS}` }}
             >
+              <Icon
+                icon={theme === 'dark' ? faLightbulb : faMoon}
+                size={16}
+                style={{ color: theme === 'dark' ? 'var(--acc)' : 'var(--brand)' }}
+              />
               {theme === 'dark' ? 'Mod luminos' : 'Mod întunecat'}
             </button>
             <span style={{ font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
