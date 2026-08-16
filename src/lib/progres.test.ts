@@ -24,21 +24,50 @@ describe('calculeazaProgres', () => {
     );
   });
 
-  it('grupează evoluția pe sesiuni, în ordine cronologică', () => {
-    const [q1, q2] = QUESTIONS;
+  it('calculează stăpânirea zilnică fără ca sesiunile sau repetările imediate să o poată umfla', () => {
+    const [q1, q2, q3, q4, q5] = QUESTIONS;
     const rezultat = calculeazaProgres(
       [
-        attempt({ question_id: q1!.id, is_correct: true, session_id: 'tarziu', answered_at: '2026-08-16T10:00:00Z' }),
-        attempt({ question_id: q1!.id, is_correct: true, session_id: 'devreme', answered_at: '2026-08-15T10:00:00Z' }),
-        attempt({ question_id: q2!.id, is_correct: false, session_id: 'devreme', answered_at: '2026-08-15T10:00:00Z' }),
+        attempt({ question_id: q1!.id, is_correct: true, session_id: 'a', answered_at: '2026-08-15T09:00:00Z' }),
+        attempt({ question_id: q2!.id, is_correct: true, session_id: 'b', answered_at: '2026-08-15T09:10:00Z' }),
+        attempt({ question_id: q3!.id, is_correct: true, session_id: 'c', answered_at: '2026-08-15T09:20:00Z' }),
+        attempt({ question_id: q4!.id, is_correct: false, session_id: 'd', answered_at: '2026-08-15T09:30:00Z' }),
+        attempt({ question_id: q5!.id, is_correct: false, session_id: 'e', answered_at: '2026-08-15T09:40:00Z' }),
+        // Reîncercarea imediată nu rescrie primul răspuns al zilei.
+        attempt({ question_id: q5!.id, is_correct: true, session_id: 'f', answered_at: '2026-08-15T09:50:00Z' }),
+        // În ziua următoare, grila poate demonstra că informația a fost reținută.
+        attempt({ question_id: q5!.id, is_correct: true, session_id: 'g', answered_at: '2026-08-16T10:00:00Z' }),
       ],
       QUESTIONS,
     );
 
-    expect(rezultat.evolutie.map((p) => [p.id, p.pct])).toEqual([
-      ['sesiune:devreme', 50],
-      ['sesiune:tarziu', 100],
+    expect(rezultat.evolutie.map((p) => [p.id, p.pct, p.grile])).toEqual([
+      ['2026-08-15', 60, 5],
+      ['2026-08-16', 80, 5],
     ]);
+  });
+
+  it('nu publică un procent de stăpânire bazat pe mai puțin de cinci grile distincte', () => {
+    const attempts = QUESTIONS.slice(0, 4).map((q, index) =>
+      attempt({ question_id: q.id, is_correct: true, answered_at: `2026-08-1${index + 1}T10:00:00Z` }),
+    );
+
+    expect(calculeazaProgres(attempts, QUESTIONS).evolutie).toEqual([]);
+  });
+
+  it('ignoră în evoluție datele invalide și grilele care nu mai sunt în bibliotecă', () => {
+    const valide = QUESTIONS.slice(0, 5).map((q) => attempt({ question_id: q.id, is_correct: true }));
+    const rezultat = calculeazaProgres(
+      [
+        ...valide,
+        attempt({ question_id: QUESTIONS[5]!.id, is_correct: true, answered_at: 'nu-e-dată' }),
+        attempt({ question_id: 'grila-retrasa', is_correct: true }),
+      ],
+      QUESTIONS,
+    );
+
+    expect(rezultat.evolutie).toHaveLength(1);
+    expect(rezultat.evolutie[0]).toMatchObject({ pct: 100, grile: 5 });
   });
 
   it('nu atribuie unui capitol o grilă care lipsește din bibliotecă', () => {

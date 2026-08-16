@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { faMoon } from '@fortawesome/free-solid-svg-icons';
 import { QUESTIONS } from '../data/questions';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -199,5 +200,13 @@ describe('Profil și setări', () => {
     await waitFor(() => expect(click).toHaveBeenCalled());
     expect(await screen.findByText('Datele tale au fost descărcate.')).toBeInTheDocument();
     click.mockRestore();
+  });
+
+  it('arată iconița Font Awesome a temei care poate fi activată', async () => {
+    monteaza();
+    await gata();
+
+    const tema = screen.getByRole('button', { name: 'Mod întunecat' });
+    expect(tema.querySelector('path')).toHaveAttribute('d', faMoon.icon[4]);
   });
 });
