@@ -56,7 +56,7 @@ export function Acasa() {
     .sort((a, b) => b.raspunsuri - a.raspunsuri)
     .slice(0, 8)
     .map((c) => ({ id: c.capId, name: c.nume, pct: c.pct }));
-  const evolutieGrafic = progress.evolutie.slice(-8);
+  const evolutieGrafic = progress.evolutie.slice(-12);
   const urmatoareaRecapitulare = urmatoareaScadenta(recapitulare.items);
 
   /**
@@ -242,8 +242,8 @@ export function Acasa() {
             }}
           >
             <div>
-              <div style={cardTitle}>Evoluția scorului</div>
-              <div style={cardSub}>Punctaj estimat la admitere, pe baza testelor rezolvate</div>
+              <div style={cardTitle}>Stăpânirea grilelor</div>
+              <div style={cardSub}>O tendință zilnică bazată pe grile distincte, nu pe numărul de sesiuni</div>
             </div>
             <Segmented
               items={[
@@ -265,10 +265,7 @@ export function Acasa() {
             ) : progressError ? (
               <EmptyState title={progressError} hint="Reîncearcă din panoul de mai sus." padding="18px 16px 26px" />
             ) : chart === 'a' ? (
-              <ScoreChart
-                scores={evolutieGrafic.map((p) => p.pct)}
-                labels={evolutieGrafic.map((p) => p.eticheta)}
-              />
+              <ScoreChart points={evolutieGrafic} grileDistincte={progress.grileDistincte} />
             ) : (
               <ChapterChart rows={capitoleGrafic} />
             )}

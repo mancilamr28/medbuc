@@ -48,7 +48,7 @@ export function Statistici() {
     .slice(0, 12)
     .map((capitol) => ({ id: capitol.capId, name: capitol.nume, pct: capitol.pct }));
   const activitate = statistici.activitate.slice(-14);
-  const evolutie = progres.evolutie.slice(-8);
+  const evolutie = progres.evolutie.slice(-12);
   const maximZi = Math.max(1, ...activitate.map((zi) => zi.raspunsuri));
 
   return (
@@ -90,10 +90,10 @@ export function Statistici() {
 
           <div style={{ ...autoGrid(280), alignItems: 'start' }}>
             <div className="card" style={{ padding: '20px 20px 8px' }}>
-              <div style={{ font: `600 15px ${SANS}` }}>Evoluția rezultatelor</div>
-              <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>Procent corect la fiecare lucrare încheiată</div>
+              <div style={{ font: `600 15px ${SANS}` }}>Stăpânirea grilelor</div>
+              <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>O singură măsurătoare pe zi, indiferent câte sesiuni închei</div>
               <div style={{ marginTop: 14 }}>
-                <ScoreChart scores={evolutie.map((punct) => punct.pct)} labels={evolutie.map((punct) => punct.eticheta)} />
+                <ScoreChart points={evolutie} grileDistincte={progres.grileDistincte} />
               </div>
             </div>
 
