@@ -81,6 +81,18 @@ button {
   color: inherit;
 }
 
+/* Pe telefon, controalele folosite cu degetul păstrează cel puțin 44px de
+   suprafață tactilă. Elementul vizual poate rămâne mai mic în interior. */
+@media (max-width: 959px) {
+  .tinta-tactila {
+    min-height: 44px;
+  }
+
+  .tinta-tactila--patrata {
+    min-width: 44px;
+  }
+}
+
 input,
 textarea,
 select {

@@ -104,7 +104,7 @@ function GrileRun() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
         <button
           type="button"
-          className="btn-ghost"
+          className="btn-ghost tinta-tactila"
           onClick={() => go('acasa')}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
         >
@@ -123,7 +123,7 @@ function GrileRun() {
         </div>
         <button
           type="button"
-          className="btn-ghost"
+          className="btn-ghost tinta-tactila"
           onClick={session.finish}
           style={{ padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
         >
@@ -157,26 +157,38 @@ function GrileRun() {
                   <button
                     key={i}
                     type="button"
+                    className="tinta-tactila"
                     onClick={() => session.goTo(i)}
                     aria-label={`Grila ${i + 1}`}
                     style={{
                       flex: 1,
                       minWidth: 14,
-                      height: 6,
                       border: 0,
-                      borderRadius: 99,
                       padding: 0,
                       cursor: 'pointer',
-                      background:
-                        i === qi
-                          ? 'var(--brand)'
-                          : revealed
-                            ? ok
-                              ? 'var(--ok)'
-                              : 'var(--bad)'
-                            : 'var(--surf3)',
+                      background: 'transparent',
+                      display: 'grid',
+                      alignItems: 'center',
                     }}
-                  />
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        height: 6,
+                        borderRadius: 99,
+                        background:
+                          i === qi
+                            ? 'var(--brand)'
+                            : revealed
+                              ? ok
+                                ? 'var(--ok)'
+                                : 'var(--bad)'
+                              : 'var(--surf3)',
+                      }}
+                    />
+                  </button>
                 );
               })}
             </div>
@@ -203,6 +215,7 @@ function GrileRun() {
               </span>
               <button
                 type="button"
+                className="tinta-tactila"
                 onClick={session.toggleMark}
                 aria-pressed={isMarked}
                 style={{
@@ -359,14 +372,14 @@ function GrileRun() {
                   </span>
                   <button
                     type="button"
-                    className="btn-ghost"
+                    className="btn-ghost tinta-tactila"
                     style={{ marginLeft: 'auto', padding: '8px 13px', borderRadius: 9, font: `500 12.5px ${SANS}`, background: 'var(--surf)' }}
                   >
                     Adaugă la recapitulare
                   </button>
                   <button
                     type="button"
-                    className="btn-ghost"
+                    className="btn-ghost tinta-tactila"
                     onClick={() => go('materii')}
                     style={{ padding: '8px 13px', borderRadius: 9, font: `500 12.5px ${SANS}`, background: 'var(--surf)' }}
                   >
@@ -389,7 +402,7 @@ function GrileRun() {
             >
               <button
                 type="button"
-                className="btn-ghost"
+                className="btn-ghost tinta-tactila"
                 onClick={session.prev}
                 disabled={qi === 0}
                 style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}
@@ -402,7 +415,7 @@ function GrileRun() {
               </span>
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-primary tinta-tactila"
                 onClick={session.primary}
                 disabled={!isRevealed && !answer}
                 style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}
