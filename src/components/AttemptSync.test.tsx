@@ -6,20 +6,23 @@ import { AttemptSync } from './AttemptSync';
 const stare = vi.hoisted(() => ({
   syncRecapitulare: vi.fn(),
   reload: vi.fn(async () => {}),
+  user: { id: 'user-1' },
+  session: { id: 'sesiune-1', finished: false },
+  recapitulare: { id: 'recap-1', phase: 'rezultat', finishedAt: 2_000 },
 }));
 
 vi.mock('../lib/syncAttempts', () => ({ syncFinishedSession: vi.fn() }));
 vi.mock('../lib/syncRecapitulare', () => ({
   syncFinishedRecapitulare: (...args: unknown[]) => stare.syncRecapitulare(...args),
 }));
-vi.mock('../state/authState', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
+vi.mock('../state/authState', () => ({ useAuth: () => ({ user: stare.user }) }));
 vi.mock('../state/progressState', () => ({
   useProgressOptional: () => ({ reload: stare.reload }),
 }));
 vi.mock('../state/appContextValue', () => ({
   useApp: () => ({
-    session: { id: 'sesiune-1', finished: false },
-    recapitulare: { id: 'recap-1', phase: 'rezultat', finishedAt: 2_000 },
+    session: stare.session,
+    recapitulare: stare.recapitulare,
   }),
 }));
 

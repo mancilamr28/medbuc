@@ -50,12 +50,17 @@ describe('Navigarea mobilă', () => {
 
     expect(within(meniu).getByRole('button', { name: 'Profil și setări' })).toBeInTheDocument();
     expect(within(meniu).getByRole('button', { name: 'Recapitulare' })).toBeInTheDocument();
-    expect(within(meniu).getByText('Statistici și progres')).toBeInTheDocument();
-    expect(within(meniu).getAllByText('În curând')).toHaveLength(4);
+    expect(within(meniu).getByRole('button', { name: 'Statistici și progres' })).toBeInTheDocument();
+    expect(within(meniu).getAllByText('În curând')).toHaveLength(3);
 
     await user.click(within(meniu).getByRole('button', { name: 'Recapitulare' }));
     expect(stare.go).toHaveBeenCalledWith('recapitulare');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Mai multe' }));
+
+    await user.click(screen.getByRole('button', { name: 'Statistici și progres' }));
+    expect(stare.go).toHaveBeenCalledWith('statistici');
 
     await user.click(screen.getByRole('button', { name: 'Mai multe' }));
 

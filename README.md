@@ -38,12 +38,13 @@ design/
 | Pagina principală | `#/acasa` | două variante: **Focus** și **Dens** |
 | Materii și capitole | `#/materii` | trei materii, filtre funcționale |
 | Grile | `#/grile` | rezolvare cu verificare, explicații pe variantă, taste A–E / Enter |
-| Planul meu | `#/plan` | parametrii planului și următoarele patru săptămâni |
+| Recapitulare | `#/recapitulare` | repetare inteligentă la intervale de 1, 3, 7, 14 și 30 de zile |
 | Simulări | `#/simulari` | configurare + simulare cu cronometru real |
+| Statistici | `#/statistici` | progres real pe perioadă, capitole, activitate și tip de exercițiu |
 | Profil și setări | `#/setari` | date cont, examen, notificări, temă |
-| Administrare | `#/admin` | adăugare grile; blocat pentru rolul „Elev” |
+| Administrare | `#/admin` | adăugare și import de grile; blocat pentru rolul „Elev” |
 
-Ecranele `#/recapitulare`, `#/statistici` și `#/notite` afișează pagina „în lucru”, ca în design.
+Ecranele `#/plan` și `#/notite` afișează pagina „în lucru”.
 
 ## Decizii de implementare
 
@@ -57,8 +58,8 @@ Ecranele `#/recapitulare`, `#/statistici` și `#/notite` afișează pagina „î
 - **Zile până la examen** se calculează din `EXAM_DATE` (25 iulie 2027), nu sunt scrise fix.
 - **Filtrele de la Materii** funcționează: primele trei restrâng lista de capitole, iar
   „Include grilele neverificate” lărgește bazinul de grile, deci nu schimbă lista.
-- **Persistență locală** pentru temă, notificări, notițele pe capitol și preferințele de
-  afișare. Nu există încă backend — datele de conținut sunt în `src/data/`.
+- **Supabase** pentru autentificare, conținut și istoricul răspunsurilor, protejat prin RLS.
+  Preferințele locale rămân în `localStorage`.
 - **Ctrl/⌘ + K** duce cursorul în câmpul de căutare, așa cum promite indicația din câmp.
   Căutarea propriu-zisă rămâne de implementat, împreună cu ecranele marcate „în lucru”.
 
