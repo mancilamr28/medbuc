@@ -16,6 +16,7 @@ import { Recapitulare } from './screens/Recapitulare';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
 import { Simulari } from './screens/Simulari';
+import { Statistici } from './screens/Statistici';
 import { useApp } from './state/appContextValue';
 import { useAuth } from './state/authState';
 
@@ -71,6 +72,8 @@ function Content() {
       return <Recapitulare />;
     case 'simulari':
       return <Simulari />;
+    case 'statistici':
+      return <Statistici />;
     case 'setari':
       return <Setari />;
     case 'admin':
