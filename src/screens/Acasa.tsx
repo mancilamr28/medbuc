@@ -222,7 +222,12 @@ export function Acasa() {
                   : `Următoarea repetare: ${DATA.format(new Date(urmatoareaRecapitulare))}.`
               }
               action={
-                <button type="button" className="btn-ghost tinta-tactila" onClick={() => go('recapitulare')}>
+                <button
+                  type="button"
+                  className="btn-ghost tinta-tactila"
+                  onClick={() => go('recapitulare')}
+                  style={{ padding: '11px 16px', font: `500 13.5px ${SANS}` }}
+                >
                   Vezi recapitularea
                 </button>
               }

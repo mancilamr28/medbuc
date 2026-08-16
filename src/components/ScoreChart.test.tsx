@@ -15,8 +15,12 @@ describe('ScoreChart', () => {
   it('explică de câte grile distincte este nevoie înainte să afișeze un procent', () => {
     render(<ScoreChart points={[]} grileDistincte={2} />);
 
-    expect(screen.getByText('Avem nevoie de 5 grile distincte')).toBeInTheDocument();
-    expect(screen.getByText('Ai 2 din 5; mai lipsesc 3 grile.')).toBeInTheDocument();
+    const titlu = screen.getByText('Avem nevoie de 5 grile distincte');
+    const explicatie = screen.getByText('Ai 2 din 5; mai lipsesc 3 grile.');
+    expect(titlu).toBeInTheDocument();
+    expect(explicatie).toBeInTheDocument();
+    expect(titlu.style.font).toContain('system-ui');
+    expect(explicatie.style.font).toContain('system-ui');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
