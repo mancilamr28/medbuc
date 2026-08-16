@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
+import type { AttemptRow } from '../lib/progres';
 import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute } from '../lib/router';
 import { AppContext, type AppValue, type Theme } from './appContextValue';
 import { useSession } from './useSession';
+import { useRecapitulare } from './useRecapitulare';
 import { useSimulare } from './useSimulare';
 
 const readInitialTheme = (): Theme => {
@@ -20,12 +22,23 @@ const readInitialTheme = (): Theme => {
  * `ContentProvider`. Cine îl montează în aplicație îi dă banca încărcată; cine îl
  * montează într-un test îi dă o fixtură.
  */
-export function AppProvider({ questions, children }: { questions: Question[]; children: ReactNode }) {
+export function AppProvider({
+  questions,
+  attempts = [],
+  children,
+}: {
+  questions: Question[];
+  attempts?: readonly AttemptRow[];
+  children: ReactNode;
+}) {
   const [screen, go] = useHashRoute();
   const [theme, setTheme] = usePersistentState<Theme>('medbuc.theme', readInitialTheme());
   const [materie, setMaterie] = useState<MaterieId>('bio');
 
   const session = useSession(questions);
+  // Recalculează scadențele rar și numai cât timp ecranul lor este deschis.
+  const recapNow = useNow(screen === 'recapitulare' || screen === 'acasa', 60_000);
+  const recapitulare = useRecapitulare(recapNow, questions, attempts);
   // Ceasul simulării bate doar cât timp ecranul de simulare este deschis.
   const now = useNow(screen === 'simulari');
   const sim = useSimulare(now, questions);
@@ -50,9 +63,10 @@ export function AppProvider({ questions, children }: { questions: Question[]; ch
       setMaterie,
       questions,
       session,
+      recapitulare,
       sim,
     }),
-    [go, materie, questions, screen, session, sim, theme, toggleTheme],
+    [go, materie, questions, recapitulare, screen, session, sim, theme, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

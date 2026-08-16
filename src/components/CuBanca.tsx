@@ -1,12 +1,14 @@
 import { App } from '../App';
 import { AppProvider } from '../state/AppState';
 import { useContent } from '../state/contentState';
+import { useProgressOptional } from '../state/progressState';
 
 /** Leagă biblioteca încărcată de starea aplicației. */
 export function CuBanca() {
   const { questions } = useContent();
+  const attempts = useProgressOptional()?.attempts ?? [];
   return (
-    <AppProvider questions={questions}>
+    <AppProvider questions={questions} attempts={attempts}>
       <App />
     </AppProvider>
   );

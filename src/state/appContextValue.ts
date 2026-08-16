@@ -4,6 +4,7 @@ import type { Question } from '../data/questions';
 import type { Screen } from '../lib/router';
 import type { Session } from './useSession';
 import type { Simulare } from './useSimulare';
+import type { Recapitulare } from './useRecapitulare';
 
 export type Theme = 'light' | 'dark';
 
@@ -17,6 +18,7 @@ export interface AppValue {
   /** Biblioteca întreagă; `session.banca` este doar domeniul sesiunii curente. */
   questions: Question[];
   session: Session;
+  recapitulare: Recapitulare;
   sim: Simulare;
 }
 

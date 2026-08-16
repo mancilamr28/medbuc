@@ -5,13 +5,14 @@ import { MobileNav } from './components/MobileNav';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { useIsDesktop } from './lib/hooks';
-import { BUILT_SCREENS, usePublicView, type PublicRoute } from './lib/router';
+import { BUILT_SCREENS, isPublicRouteHash, usePublicView, type PublicRoute } from './lib/router';
 import { Acasa } from './screens/Acasa';
 import { Admin } from './screens/Admin';
 import { Autentificare, type ModAutentificare } from './screens/Autentificare';
 import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
 import { Materii } from './screens/Materii';
+import { Recapitulare } from './screens/Recapitulare';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
 import { Simulari } from './screens/Simulari';
@@ -66,6 +67,8 @@ function Content() {
       return <Materii />;
     case 'grile':
       return <Grile />;
+    case 'recapitulare':
+      return <Recapitulare />;
     case 'simulari':
       return <Simulari />;
     case 'setari':
@@ -86,7 +89,7 @@ export function App() {
   // `Screen`, deci `useHashRoute` e deja pe `acasa` și shell-ul e corect, doar
   // bara de adrese minte. `replaceState` nu declanșează `hashchange`, deci nu
   // provoacă un render în plus.
-  const hashPublic = user !== null && publicView !== 'landing';
+  const hashPublic = user !== null && isPublicRouteHash();
   useEffect(() => {
     if (hashPublic) window.history.replaceState(null, '', '#/acasa');
   }, [hashPublic]);
