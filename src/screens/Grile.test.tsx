@@ -36,6 +36,17 @@ const raspundeCorect = async (index: number) => {
 };
 
 describe('sesiunea de grile', () => {
+  it('mărește țintele tactile fără să îngroașe barele de navigare', () => {
+    deschide();
+
+    expect(buton('Încheie sesiunea')).toHaveClass('tinta-tactila');
+    expect(screen.getByRole('tab', { name: 'Focus' })).toHaveClass('tinta-tactila');
+
+    const pas = buton('Grila 1');
+    expect(pas).toHaveClass('tinta-tactila');
+    expect(pas.firstElementChild).toHaveStyle({ height: '6px' });
+  });
+
   it('nu mai lasă răspunsul schimbat după verificare', async () => {
     deschide();
     await raspundeCorect(0);

@@ -84,6 +84,7 @@ export function Materii() {
             <button
               key={t.id}
               type="button"
+              className="tinta-tactila"
               onClick={() => setMaterie(t.id)}
               aria-pressed={active}
               style={{
@@ -206,7 +207,7 @@ export function Materii() {
                   {!progressError && progres && <div style={pctPill(progres.pct)}>{progres.pct}%</div>}
                   <button
                     type="button"
-                    className="practice-btn"
+                    className="practice-btn tinta-tactila"
                     onClick={() => exerseaza([c.id])}
                     disabled={scrise === 0}
                     aria-label={`Exersează ${chapterLabel(c)}`}
@@ -238,7 +239,7 @@ export function Materii() {
               </p>
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-primary tinta-tactila"
                 onClick={() => exerseaza(mat.list.map((c) => c.id))}
                 disabled={grileMaterie === 0}
                 style={{ width: '100%', padding: 11, font: `600 13.5px ${SANS}` }}

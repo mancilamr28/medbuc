@@ -28,6 +28,7 @@ describe('Topbar', () => {
     const tema = screen.getByRole('button', { name: 'Activează modul luminos' });
     expect(tema).toHaveAttribute('title', 'Activează modul luminos');
     expect(tema).toHaveTextContent('');
+    expect(tema).toHaveClass('tinta-tactila', 'tinta-tactila--patrata');
     await user.click(tema);
     expect(toggleTheme).toHaveBeenCalledTimes(1);
   });

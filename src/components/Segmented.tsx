@@ -23,6 +23,7 @@ export function Segmented<T extends string>({
         <button
           key={item.id}
           type="button"
+          className="tinta-tactila"
           role="tab"
           aria-selected={value === item.id}
           onClick={() => onChange(item.id)}

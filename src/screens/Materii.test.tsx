@@ -44,6 +44,14 @@ beforeEach(() => {
 });
 
 describe('exersarea pe capitol', () => {
+  it('păstrează acțiunile principale suficient de mari pentru atingere pe mobil', () => {
+    deschide();
+
+    expect(screen.getByRole('button', { name: /Biologie/ })).toHaveClass('tinta-tactila');
+    expect(screen.getByRole('button', { name: 'Exersează 03. Sistemul nervos' })).toHaveClass('tinta-tactila');
+    expect(screen.getByRole('button', { name: 'Exersează toată materia' })).toHaveClass('tinta-tactila');
+  });
+
   /**
    * Cele ~30 de butoane „Exersează" duceau toate în aceeași sesiune peste toată
    * biblioteca: capitolul ales nu ajungea nicăieri, iar `sessions.chapter_ids`

@@ -34,7 +34,7 @@ export function Topbar({ compact }: { compact: boolean }) {
 
       <button
         type="button"
-        className="btn-quiet"
+        className="btn-quiet tinta-tactila tinta-tactila--patrata"
         onClick={toggleTheme}
         aria-label={etichetaTema}
         title={etichetaTema}
