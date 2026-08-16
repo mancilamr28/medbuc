@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { QUESTIONS } from '../data/questions';
-import { attemptsFromSession } from './attempts';
+import { attemptsFromRecapitulare, attemptsFromSession } from './attempts';
 import type { Session } from '../state/useSession';
 
 const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session => ({
@@ -48,5 +48,25 @@ describe('attemptsFromSession', () => {
     });
     expect(rows[1]!.client_key).toBe('00000000-0000-0000-0000-000000000001:2');
     expect(rows[1]!.is_correct).toBe(false);
+  });
+});
+
+describe('attemptsFromRecapitulare', () => {
+  it('scrie sursa dedicată și păstrează id-ul stabil al grilei', () => {
+    const recapitulare = {
+      id: '00000000-0000-0000-0000-000000000002',
+      banca: [QUESTIONS[2]!],
+      answers: { 0: QUESTIONS[2]!.correct },
+    };
+
+    expect(attemptsFromRecapitulare(recapitulare, 'user-1', 3_000)).toEqual([
+      expect.objectContaining({
+        client_key: '00000000-0000-0000-0000-000000000002:0',
+        question_id: QUESTIONS[2]!.id,
+        source: 'recapitulare',
+        session_id: '00000000-0000-0000-0000-000000000002',
+        is_correct: true,
+      }),
+    ]);
   });
 });

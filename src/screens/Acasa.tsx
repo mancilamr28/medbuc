@@ -7,6 +7,7 @@ import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
 import { useMemo } from 'react';
 import { usePersistentState } from '../lib/hooks';
 import { calculeazaProgres } from '../lib/progres';
+import { urmatoareaScadenta } from '../lib/recapitulare';
 import { numar, primulNume } from '../lib/text';
 import { daysUntil } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill } from '../lib/ui';
@@ -19,6 +20,7 @@ type Variant = 'a' | 'b';
 
 const cardTitle = { font: `600 15px/1.2 ${SANS}` } as const;
 const cardSub = { marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' } as const;
+const DATA = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long' });
 
 /**
  * Pagina principală.
@@ -30,7 +32,7 @@ const cardSub = { marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' 
  * curentă. Restul spune deschis că nu are încă date.
  */
 export function Acasa() {
-  const { go, questions, session } = useApp();
+  const { go, questions, session, recapitulare } = useApp();
   const { user, profile } = useAuth();
   const loading = useContentOptional()?.loading ?? false;
   const progressContext = useProgressOptional();
@@ -55,6 +57,7 @@ export function Acasa() {
     .slice(0, 8)
     .map((c) => ({ id: c.capId, name: c.nume, pct: c.pct }));
   const evolutieGrafic = progress.evolutie.slice(-8);
+  const urmatoareaRecapitulare = urmatoareaScadenta(recapitulare.items);
 
   /**
    * O sesiune încheiată nu se poate „continua": ecranul de grile ar arăta iar
@@ -195,10 +198,37 @@ export function Acasa() {
         <div className="card" style={{ padding: 20 }}>
           <div style={cardTitle}>De recapitulat</div>
           <div style={cardSub}>Repetare inteligentă</div>
-          <EmptyState
-            title="Recapitularea nu e gata încă"
-            hint="Grilele la care greșești vor reveni la intervale calculate, ca să le prinzi înainte de examen."
-          />
+          {progressLoading ? (
+            <EmptyState title="Se încarcă recapitularea…" padding="22px 12px" />
+          ) : progressError ? (
+            <EmptyState title="Recapitularea este indisponibilă" hint="Reîncearcă istoricul din panoul alăturat." padding="22px 12px" />
+          ) : recapitulare.scadente.length > 0 ? (
+            <EmptyState
+              title={numar(recapitulare.scadente.length, 'grilă scadentă', 'grile scadente')}
+              hint="Începe cu cea mai veche și mută răspunsurile corecte la intervalul următor."
+              action={
+                <button type="button" className="btn-primary tinta-tactila" onClick={() => go('recapitulare')}>
+                  Începe recapitularea
+                </button>
+              }
+              padding="22px 12px"
+            />
+          ) : (
+            <EmptyState
+              title="Ești la zi"
+              hint={
+                urmatoareaRecapitulare === null
+                  ? 'Grilele greșite vor apărea aici pentru repetare.'
+                  : `Următoarea repetare: ${DATA.format(new Date(urmatoareaRecapitulare))}.`
+              }
+              action={
+                <button type="button" className="btn-ghost tinta-tactila" onClick={() => go('recapitulare')}>
+                  Vezi recapitularea
+                </button>
+              }
+              padding="22px 12px"
+            />
+          )}
         </div>
 
         <div className="card" style={{ gridColumn: '1/-1', padding: '20px 20px 8px' }}>

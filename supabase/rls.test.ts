@@ -74,7 +74,7 @@ describe('răspunsurile și lucrările', () => {
     await baza.caUtilizator(ana, () =>
       baza.db.query(
         `insert into attempts (user_id, question_id, chosen, is_correct, source)
-         values ($1, 'bio-nervos-01', 'B', true, 'sesiune')`,
+         values ($1, 'bio-nervos-01', 'B', true, 'recapitulare')`,
         [ana],
       ),
     );

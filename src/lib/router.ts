@@ -16,7 +16,7 @@ export const SCREENS = [
 export type Screen = (typeof SCREENS)[number];
 
 /** Ecranele care au deja o implementare; restul cad pe pagina „în lucru”. */
-export const BUILT_SCREENS: Screen[] = ['acasa', 'materii', 'grile', 'simulari', 'setari', 'admin'];
+export const BUILT_SCREENS: Screen[] = ['acasa', 'materii', 'grile', 'recapitulare', 'simulari', 'setari', 'admin'];
 
 export const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   recapitulare: 'Repetare inteligentă',
@@ -79,6 +79,9 @@ export type PublicView = 'landing' | PublicRoute;
 
 const isPublicRoute = (value: string): value is PublicRoute =>
   (PUBLIC_ROUTES as readonly string[]).includes(value);
+
+/** Spune dacă bara de adrese arată chiar o rută publică, nu un ecran care cere autentificare. */
+export const isPublicRouteHash = (): boolean => isPublicRoute(rawHash());
 
 /**
  * Pură, ca `screenFor`. `raw` e hash-ul deja curățat de `#/`.

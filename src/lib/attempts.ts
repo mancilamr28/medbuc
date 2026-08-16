@@ -1,4 +1,5 @@
 import type { Session } from '../state/useSession';
+import type { Recapitulare } from '../state/useRecapitulare';
 
 export interface AttemptInsert {
   client_key: string;
@@ -6,10 +7,11 @@ export interface AttemptInsert {
   question_id: string;
   chosen: string;
   is_correct: boolean;
-  source: 'sesiune';
+  source: 'sesiune' | 'recapitulare';
   session_id: string;
   answered_at: string;
 }
+
 /**
  * Transformă răspunsurile unei sesiuni într-un jurnal de încercări.
  *
@@ -32,6 +34,31 @@ export function attemptsFromSession(session: Session, userId: string, finishedAt
         is_correct: chosen === question.correct,
         source: 'sesiune' as const,
         session_id: session.id,
+        answered_at: answeredAt,
+      },
+    ];
+  });
+}
+
+/** Transformă o recapitulare în același jurnal retry-safe ca sesiunea liberă. */
+export function attemptsFromRecapitulare(
+  recapitulare: Pick<Recapitulare, 'id' | 'banca' | 'answers'>,
+  userId: string,
+  finishedAt: number,
+): AttemptInsert[] {
+  const answeredAt = new Date(finishedAt).toISOString();
+  return Object.entries(recapitulare.answers).flatMap(([index, chosen]) => {
+    const question = recapitulare.banca[Number(index)];
+    if (!question) return [];
+    return [
+      {
+        client_key: `${recapitulare.id}:${index}`,
+        user_id: userId,
+        question_id: question.id,
+        chosen,
+        is_correct: chosen === question.correct,
+        source: 'recapitulare' as const,
+        session_id: recapitulare.id,
         answered_at: answeredAt,
       },
     ];
