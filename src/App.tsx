@@ -11,6 +11,7 @@ import { Admin } from './screens/Admin';
 import { Autentificare, type ModAutentificare } from './screens/Autentificare';
 import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
+import { Notite } from './screens/Notite';
 import { Recapitulare } from './screens/Recapitulare';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
@@ -71,6 +72,8 @@ function Content() {
       return <Simulari />;
     case 'statistici':
       return <Statistici />;
+    case 'notite':
+      return <Notite />;
     case 'setari':
       return <Setari />;
     case 'admin':
