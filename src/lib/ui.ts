@@ -2,6 +2,9 @@ import type { CSSProperties } from 'react';
 
 export type SX = CSSProperties;
 
+// Aceeași stivă ca `--sans` din styles.css. `system-ui` trebuie păstrat aici:
+// dacă fontul web nu a sosit încă, textul inline și cel moștenit din body nu
+// au voie să cadă în două fonturi de sistem diferite.
 export const SANS = "'Public Sans',system-ui,sans-serif";
 export const SERIF = 'Newsreader,Georgia,serif';
 /** Doar pentru text pe care îl citește și mașina: JSON-ul importului în masă. */
