@@ -12,11 +12,13 @@ const esteText = (v: unknown): v is string => typeof v === 'string';
 
 /** O notiță de capitol, cu editare pe loc. Fiecare card ține propria stare persistentă. */
 function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => void }) {
-  const [note, setNote] = usePersistentState<string>(`${NOTE_PREFIX}${capId}`, '', esteText);
+  const [note, setNote, stergeNota] = usePersistentState<string>(`${NOTE_PREFIX}${capId}`, '', esteText);
   const [editare, setEditare] = useState(false);
 
+  // `stergeNota()`, nu `setNote('')`: cardul se demontează imediat după, prin
+  // `onSters()`, iar o scriere lăsată în updater s-ar pierde odată cu el.
   const sterge = () => {
-    setNote('');
+    stergeNota();
     onSters();
   };
 

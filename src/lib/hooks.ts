@@ -75,7 +75,7 @@ export function usePersistentState<T>(
   key: string,
   initial: T,
   isValid?: Validator<T>,
-): [T, (value: T | ((prev: T) => T)) => void] {
+): [T, (value: T | ((prev: T) => T)) => void, () => void] {
   const initialRef = useRef(initial);
   const validRef = useRef(isValid);
   const [state, setState] = useState<{ key: string; value: T }>(() => ({
@@ -105,5 +105,24 @@ export function usePersistentState<T>(
     [key],
   );
 
-  return [state.value, set];
+  /**
+   * Șterge cheia și revine la valoarea inițială.
+   *
+   * `removeItem` se face aici, direct, nu în updater-ul lui `setState` ca la
+   * `set`: dacă apelantul demontează componenta în același handler (cardul de
+   * notiță se scoate din listă imediat după ștergere), React aruncă
+   * actualizarea în așteptare odată cu ea și un efect ascuns în updater n-ar
+   * mai rula niciodată. Golirea prin `set('')` chiar așa pica — notița dispărea
+   * de pe ecran, dar rămânea în storage și reapărea la următoarea deschidere.
+   */
+  const remove = useCallback(() => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* modul privat sau storage indisponibil — rămânem doar cu starea din memorie */
+    }
+    setState({ key, value: initialRef.current });
+  }, [key]);
+
+  return [state.value, set, remove];
 }
