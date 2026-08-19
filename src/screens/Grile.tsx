@@ -6,6 +6,7 @@ import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
+import { navWindow } from '../lib/navWindow';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
@@ -532,20 +533,24 @@ function ContextColumn() {
   const capId = session.question?.capId;
   // Cheia ține de id-ul capitolului: o redenumire nu mai orfanizează notița.
   const [note, setNote] = usePersistentState<string>(`medbuc.note.${capId ?? 'fara-capitol'}`, '');
+  const { start, end } = navWindow(session.qi, session.total);
 
   return (
     <div style={{ display: 'grid', gap: 16, alignContent: 'start', minWidth: 0 }}>
       <div className="card-flat" style={{ padding: 18 }}>
-        <div style={eyebrow()}>Grile în sesiune</div>
+        <div style={eyebrow()}>
+          Grile {start + 1}–{end} din {session.total}
+        </div>
         <div
           style={{
             marginTop: 14,
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(38px,1fr))',
+            gridTemplateColumns: 'repeat(6,1fr)',
             gap: 7,
           }}
         >
-          {Array.from({ length: session.total }, (_, i) => {
+          {Array.from({ length: end - start }, (_, k) => {
+            const i = start + k;
             const revealed = !!session.revealed[i];
             const ok = revealed && session.answers[i] === session.banca[i]?.correct;
             const cur = i === session.qi;
