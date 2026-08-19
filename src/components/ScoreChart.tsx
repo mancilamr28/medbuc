@@ -49,7 +49,7 @@ export function ScoreChart({
         <div style={{ margin: '12px auto 0', maxWidth: 280, height: 7, borderRadius: 99, background: 'var(--surf2)', overflow: 'hidden' }}>
           <div style={{ width: `${progres}%`, height: '100%', borderRadius: 99, background: 'var(--brand)' }} />
         </div>
-        <div style={{ marginTop: 9, font: `400 12.5px/1.55 ${SANS}`, color: 'var(--fg3)' }}>
+        <div style={{ marginTop: 9, font: `400 12.5px/1.55 ${SANS}`, color: 'var(--fg2)' }}>
           {grileDistincte === 0
             ? 'Rezolvă grile diferite pentru prima măsurătoare.'
             : `Ai ${grileDistincte} din ${MIN_GRILE_EVOLUTIE}; mai ${ramase === 1 ? 'lipsește' : 'lipsesc'} ${numar(ramase, 'grilă', 'grile')}.`}
@@ -78,7 +78,7 @@ export function ScoreChart({
           <span className="tabular" style={{ font: `600 28px/1 ${SANS}` }}>{ultimul.pct}%</span>
           <span style={{ marginLeft: 8, font: `500 12px ${SANS}`, color: 'var(--fg2)' }}>stăpânire curentă</span>
         </div>
-        <div style={{ font: `500 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+        <div style={{ font: `500 11.5px ${SANS}`, color: 'var(--fg2)' }}>
           {numar(ultimul.grile, 'grilă distinctă', 'grile distincte')} · {numar(points.length, 'zi măsurată', 'zile măsurate')}
         </div>
       </div>
@@ -101,7 +101,7 @@ export function ScoreChart({
           return (
             <g key={reper}>
               <line x1={STANGA} y1={y} x2={W - DREAPTA} y2={y} stroke="var(--line)" strokeWidth={1} />
-              <text x={STANGA - 10} y={y + 4} textAnchor="end" style={{ font: `400 10.5px ${SANS}`, fill: 'var(--fg3)' }}>
+              <text x={STANGA - 10} y={y + 4} textAnchor="end" style={{ font: `400 10.5px ${SANS}`, fill: 'var(--fg2)' }}>
                 {reper}%
               </text>
             </g>
@@ -126,7 +126,7 @@ export function ScoreChart({
                   x={x}
                   y={H - 11}
                   textAnchor={index === 0 && points.length > 1 ? 'start' : esteUltimul && points.length > 1 ? 'end' : 'middle'}
-                  style={{ font: `400 10.5px ${SANS}`, fill: 'var(--fg3)' }}
+                  style={{ font: `400 10.5px ${SANS}`, fill: 'var(--fg2)' }}
                 >
                   {punct.eticheta}
                 </text>
@@ -145,7 +145,7 @@ export function ScoreChart({
         </text>
       </svg>
 
-      <div style={{ margin: '-2px 8px 14px', paddingTop: 11, borderTop: '1px solid var(--line)', font: `400 11.5px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
+      <div style={{ margin: '-2px 8px 14px', paddingTop: 11, borderTop: '1px solid var(--line)', font: `400 11.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>
         Fiecare grilă are aceeași greutate. Contează primul răspuns al zilei, iar repetările imediate nu schimbă procentul.
       </div>
     </div>

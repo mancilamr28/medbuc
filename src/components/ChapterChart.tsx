@@ -83,8 +83,9 @@ export function ChapterChart({ rows }: { rows: readonly ChapterProgress[] }) {
           </span>
         </div>
       ))}
-      <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-        Linia verticală marchează {PRAG_RELUARE}% — pragul sub care recomandăm reluarea capitolului.
+      <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg2)' }}>
+        Linia verticală marchează {PRAG_RELUARE}%, pragul sub care recomandăm reluarea capitolului; barele care
+        nu-l ating sunt colorate diferit.
       </div>
     </div>
   );
