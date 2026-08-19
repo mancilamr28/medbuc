@@ -11,10 +11,10 @@ import { PreviewGrila } from '../visual/PreviewGrila';
  * macheta funcțională a grilelor, două panouri mici lângă el.
  *
  * Fiecare rând din liste corespunde unui comportament care chiar există în
- * `Grile.tsx`, `Materii.tsx` și `Simulari.tsx`. Nu apar aici statisticile,
- * planul de învățare sau repetarea inteligentă — sunt ecrane „în lucru", iar o
- * pagină de prezentare care le promite ar minți la fel de tare ca un procent
- * inventat.
+ * `Grile.tsx` (configurarea sesiunii, inclusă) și `Simulari.tsx`. Nu apar aici
+ * statisticile, planul de învățare sau repetarea inteligentă — sunt ecrane „în
+ * lucru", iar o pagină de prezentare care le promite ar minți la fel de tare ca
+ * un procent inventat.
  */
 
 const DESPRE_GRILE = [
@@ -67,18 +67,17 @@ export function Capabilitati() {
 
         <Reveal fel="dreapta" indice={1} className="lp-cap__mic">
           <Panou>
-            <span className="lp-chip">Materii</span>
+            <span className="lp-chip">Sesiune nouă</span>
             <h3 className="lp-h3" style={{ marginTop: 14 }}>
-              Capitolele celor două probe
+              Alegi exact de unde exersezi
             </h3>
 
-            {/* Cifrele scoase din text: se citesc dintr-o privire, iar panoul nu
-                mai arată identic cu vecinul lui. Toate trei se numără din `MATERII`. */}
+            {/* Cifrele scoase din text: se citesc dintr-o privire. Amândouă se
+                numără din `MATERII`. */}
             <div className="lp-mini">
               {[
                 { n: MATERII.bio.list.length, e: 'capitole Biologie' },
                 { n: MATERII.chim.list.length, e: 'capitole Chimie' },
-                { n: MATERII.ant.list.length, e: 'sesiuni anterioare' },
               ].map((m) => (
                 <div key={m.e}>
                   <span className="lp-mini__n">{m.n}</span>
@@ -88,8 +87,8 @@ export function Capabilitati() {
             </div>
 
             <p className="lp-corp" style={{ marginTop: 18 }}>
-              Fiecare capitol arată câte grile sunt scrise în el — cifra crește pe măsură ce se adaugă conținut, nu
-              înainte. Un capitol încă gol o spune, nu se preface plin.
+              Materie, apoi scop — toată programa, capitole anume sau punctele tale slabe — apoi sursa grilelor.
+              Un capitol încă fără grile scrise o spune, nu se preface plin.
             </p>
           </Panou>
         </Reveal>

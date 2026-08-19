@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 export const SCREENS = [
   'acasa',
-  'materii',
   'grile',
   'recapitulare',
   'simulari',
@@ -16,7 +15,7 @@ export const SCREENS = [
 export type Screen = (typeof SCREENS)[number];
 
 /** Ecranele care au deja o implementare; restul cad pe pagina „în lucru”. */
-export const BUILT_SCREENS: Screen[] = ['acasa', 'materii', 'grile', 'recapitulare', 'simulari', 'statistici', 'setari', 'admin'];
+export const BUILT_SCREENS: Screen[] = ['acasa', 'grile', 'recapitulare', 'simulari', 'statistici', 'setari', 'admin'];
 
 export const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   recapitulare: 'Repetare inteligentă',

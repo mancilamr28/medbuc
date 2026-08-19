@@ -31,7 +31,6 @@ describe('Navigarea mobilă', () => {
     const navigare = screen.getByRole('navigation', { name: 'Navigare principală' });
     expect(within(navigare).getAllByRole('button').map((buton) => buton.textContent)).toEqual([
       'Acasă',
-      'Materii',
       'Grile',
       'Simulări',
       'Mai multe',

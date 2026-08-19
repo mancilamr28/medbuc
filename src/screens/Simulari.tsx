@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState';
 import { PoartaContinut } from '../components/PoartaContinut';
 import { questionCap, questionMaterie, tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
+import { navWindow } from '../lib/navWindow';
 import { formatClock } from '../lib/time';
 import {
   SANS,
@@ -167,13 +168,6 @@ function GrilaLipsa() {
     </div>
   );
 }
-
-/** Fereastra de 24 de grile din navigator care conține grila curentă. */
-const navWindow = (qi: number, total: number) => {
-  const size = Math.min(24, total);
-  const start = Math.min(Math.floor(qi / size) * size, Math.max(0, total - size));
-  return { start, end: Math.min(start + size, total) };
-};
 
 function SimRun() {
   const { sim } = useApp();

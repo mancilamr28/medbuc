@@ -1,5 +1,5 @@
 import { chapterById, type ChapterId } from '../data/chapters';
-import { OPTION_KEYS, type OptionKey, type Question, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 
 /**
@@ -23,6 +23,9 @@ export interface Ciorna {
   correct: OptionKey;
   expl: string;
   src: string;
+  sursa: QuestionSursa;
+  /** Anul subiectului, ca text în formular; gol dacă nu se aplică. */
+  an: string;
 }
 
 /** Cele cinci litere, goale. Exportată fiindcă și importul în masă umple aceeași formă. */
@@ -39,6 +42,8 @@ export const ciornaGoala = (capId: ChapterId = 'bio-celula'): Ciorna => ({
   correct: 'A',
   expl: '',
   src: '',
+  sursa: 'materie',
+  an: '',
 });
 
 /** Umple formularul dintr-o grilă existentă, pentru editare. */
@@ -56,6 +61,8 @@ export function dinGrila(g: GrilaCuStare): Ciorna {
     correct: g.correct,
     expl: g.expl,
     src: g.src,
+    sursa: g.sursa,
+    an: g.an === undefined ? '' : String(g.an),
   };
 }
 
@@ -92,6 +99,13 @@ export function valideaza(c: Ciorna): string[] {
 
   if (c.expl.trim() === '') probleme.push('Explicația generală nu poate fi goală.');
 
+  if (c.an.trim() !== '') {
+    const an = Number(c.an.trim());
+    if (!Number.isInteger(an) || an < 2015 || an > 2100) {
+      probleme.push('Anul subiectului trebuie să fie un an valid.');
+    }
+  }
+
   return probleme;
 }
 
@@ -112,6 +126,8 @@ export function catreSalvare(c: Ciorna, status: QuestionStatus): GrilaDeSalvat {
     correct: c.correct,
     expl: c.expl.trim(),
     src: c.src.trim(),
+    sursa: c.sursa,
+    ...(c.an.trim() !== '' ? { an: Number(c.an.trim()) } : {}),
     opts,
   };
 }

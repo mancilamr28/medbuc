@@ -273,6 +273,7 @@ describe('catreJson', () => {
     expl: 'Explicația.',
     why: { A: 'Cade fiindcă…' },
     src: 'Manual, p. 1',
+    sursa: 'materie',
     status: 'publicata',
   };
 
@@ -292,6 +293,19 @@ describe('catreJson', () => {
         { key: 'B', text: 'alta' },
       ],
     });
+  });
+
+  it('păstrează sursa și anul unui subiect oficial', () => {
+    const oficiala: GrilaCuStare = { ...dinBiblioteca, id: 'bio-nervos-03', sursa: 'subiect_oficial', an: 2026 };
+    const { randuri } = citesteImport(catreJson([oficiala]), 'ciorna', []);
+
+    expect(randuri[0]!.probleme).toEqual([]);
+    expect(randuri[0]!.grila).toMatchObject({ sursa: 'subiect_oficial', an: 2026 });
+  });
+
+  it('respinge o sursă necunoscută', () => {
+    const { randuri } = citesteImport(JSON.stringify([{ ...JSON.parse(catreJson([dinBiblioteca]))[0], sursa: 'ziar' }]), 'ciorna', []);
+    expect(randuri[0]!.probleme).toContain('Sursă necunoscută: ziar.');
   });
 
   it('păstrează afirmațiile complementului grupat', () => {

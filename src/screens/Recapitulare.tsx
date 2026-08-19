@@ -97,7 +97,7 @@ function RitmRecapitulare() {
 }
 
 function ListaRecapitulare() {
-  const { go, recapitulare } = useApp();
+  const { go, recapitulare, session } = useApp();
   const isDesktop = useIsDesktop();
   const progress = useProgressOptional();
   const urmatoarea = urmatoareaScadenta(recapitulare.items);
@@ -162,7 +162,15 @@ function ListaRecapitulare() {
                   ? 'După prima grilă greșită, ea va intra automat în programul de repetare.'
                   : `Următoarea repetare este programată pe ${DATA.format(new Date(urmatoarea!))}.`}
               </p>
-              <button type="button" className="btn-primary tinta-tactila" onClick={() => go('materii')} style={{ marginTop: 20, padding: '12px 18px', font: `600 14px ${SANS}` }}>
+              <button
+                type="button"
+                className="btn-primary tinta-tactila"
+                onClick={() => {
+                  session.cereConfigurare();
+                  go('grile');
+                }}
+                style={{ marginTop: 20, padding: '12px 18px', font: `600 14px ${SANS}` }}
+              >
                 Exersează din capitole →
               </button>
             </div>

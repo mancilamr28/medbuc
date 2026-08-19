@@ -9,12 +9,6 @@ describe('identitatea capitolelor', () => {
     expect(CHAPTER_BY_ID.size).toBe(TOATE.length);
   });
 
-  it('distinge cele două sesiuni din 2026, deși au același nr', () => {
-    const din2026 = MATERII.ant.list.filter((c) => c.nr === '2026');
-    expect(din2026).toHaveLength(2);
-    expect(new Set(din2026.map((c) => c.id)).size).toBe(2);
-  });
-
   it('leagă fiecare capitol de materia lui', () => {
     expect(materieNameOf('bio-nervos')).toBe('Biologie');
     expect(materieNameOf('chim-arene')).toBe('Chimie organică');

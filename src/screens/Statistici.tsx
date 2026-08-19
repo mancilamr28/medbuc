@@ -35,7 +35,7 @@ function Cifra({ label, value, suffix }: { label: string; value: number | string
 }
 
 export function Statistici() {
-  const { go, questions } = useApp();
+  const { go, questions, session } = useApp();
   const progress = useProgressOptional();
   const [perioada, setPerioada] = useState<PerioadaStatistici>('30z');
   const statistici = useMemo(
@@ -76,7 +76,18 @@ export function Statistici() {
           <EmptyState
             title="Nu există răspunsuri în perioada aleasă"
             hint={perioada === 'toate' ? 'Încheie o sesiune de grile și progresul va apărea aici.' : 'Alege o perioadă mai lungă sau rezolvă câteva grile.'}
-            action={<button type="button" className="btn-primary tinta-tactila" onClick={() => go('materii')}>Alege un capitol</button>}
+            action={
+              <button
+                type="button"
+                className="btn-primary tinta-tactila"
+                onClick={() => {
+                  session.cereConfigurare();
+                  go('grile');
+                }}
+              >
+                Alege un capitol
+              </button>
+            }
           />
         </div>
       ) : (

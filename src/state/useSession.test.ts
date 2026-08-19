@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ChapterId } from '../data/chapters';
-import type { OptionKey, Question } from '../data/questions';
+import type { OptionKey, Question, QuestionSursa } from '../data/questions';
 import { filtreazaCapitole, scoreOf } from './useSession';
 
 /** Grile de test: doar câmpurile care contează pentru scor. */
 let n = 0;
-const grila = (correct: OptionKey, capId: ChapterId = 'bio-celula'): Question => ({
+const grila = (correct: OptionKey, capId: ChapterId = 'bio-celula', sursa: QuestionSursa = 'materie'): Question => ({
   id: `test-${(n += 1)}`,
   tip: 'simplu',
   capId,
@@ -21,6 +21,7 @@ const grila = (correct: OptionKey, capId: ChapterId = 'bio-celula'): Question =>
   expl: '',
   why: {},
   src: '',
+  sursa,
 });
 
 const SASE = [grila('A'), grila('B'), grila('C'), grila('D'), grila('E'), grila('A')];
@@ -107,5 +108,27 @@ describe('filtreazaCapitole', () => {
 
   it('un capitol fără grile scrise dă o listă goală, nu toată biblioteca', () => {
     expect(filtreazaCapitole(AMESTEC, ['bio-celula'])).toEqual([]);
+  });
+
+  it('lista de surse goală înseamnă orice sursă', () => {
+    expect(filtreazaCapitole(AMESTEC, [], [])).toEqual(AMESTEC);
+  });
+
+  it('păstrează doar grilele din sursele cerute', () => {
+    const cuSurse = [
+      grila('A', 'bio-nervos', 'materie'),
+      grila('B', 'bio-nervos', 'subiect_oficial'),
+      grila('C', 'bio-nervos', 'culegere'),
+    ];
+    expect(filtreazaCapitole(cuSurse, [], ['subiect_oficial']).map((q) => q.id)).toEqual([cuSurse[1]!.id]);
+  });
+
+  it('combină filtrul de capitole cu cel de surse', () => {
+    const mixt = [
+      grila('A', 'bio-nervos', 'materie'),
+      grila('B', 'bio-nervos', 'culegere'),
+      grila('C', 'chim-arene', 'culegere'),
+    ];
+    expect(filtreazaCapitole(mixt, ['bio-nervos'], ['culegere']).map((q) => q.id)).toEqual([mixt[1]!.id]);
   });
 });

@@ -1,5 +1,4 @@
 import {
-  faBookOpen,
   faCalendarDays,
   faChartLine,
   faEllipsis,
@@ -28,7 +27,6 @@ interface NavMobil {
 
 const PRINCIPALE: NavMobil[] = [
   { id: 'acasa', label: 'Acasă', icon: faHouse },
-  { id: 'materii', label: 'Materii', icon: faBookOpen },
   { id: 'grile', label: 'Grile', icon: faListCheck },
   { id: 'simulari', label: 'Simulări', icon: faStopwatch },
 ];

@@ -13,8 +13,6 @@ insert into materii (id, name, unit, position) values ('bio', 'Biologie', 'grile
   on conflict (id) do update set name = excluded.name, unit = excluded.unit, position = excluded.position;
 insert into materii (id, name, unit, position) values ('chim', 'Chimie organică', 'grile', 1)
   on conflict (id) do update set name = excluded.name, unit = excluded.unit, position = excluded.position;
-insert into materii (id, name, unit, position) values ('ant', 'Subiecte anterioare', 'sesiuni', 2)
-  on conflict (id) do update set name = excluded.name, unit = excluded.unit, position = excluded.position;
 
 -- capitole --------------------------------------------------------------
 
@@ -62,38 +60,25 @@ insert into chapters (id, materie_id, nr, name, position) values ('chim-zaharide
   on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
 insert into chapters (id, materie_id, nr, name, position) values ('chim-izomerie', 'chim', '10', 'Izomerie', 9)
   on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2026-mg', 'ant', '2026', 'Admitere UMFCD · Medicină', 0)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2026-simulare', 'ant', '2026', 'Simulare oficială · aprilie', 1)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2025-mg', 'ant', '2025', 'Admitere UMFCD · Medicină', 2)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2025-md', 'ant', '2025', 'Admitere UMFCD · Medicină dentară', 3)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2024-mg', 'ant', '2024', 'Admitere UMFCD · Medicină', 4)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2024-simulare', 'ant', '2024', 'Simulare oficială · martie', 5)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2023-mg', 'ant', '2023', 'Admitere UMFCD · Medicină', 6)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
-insert into chapters (id, materie_id, nr, name, position) values ('ant-2022-mg', 'ant', '2022', 'Admitere UMFCD · Medicină', 7)
-  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;
 
 -- grile ------------------------------------------------------------------
 --
 -- `questions_correct_exists` e o cheie externă amânată: grila se inserează
 -- înaintea variantelor ei, iar verificarea se face la commit.
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (
+insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (
   'bio-nervos-01', 'bio-nervos', 'simplu', 'publicata',
   'Substanța cenușie a medulei spinării este dispusă:',
   null,
   'B',
   'În medula spinării substanța cenușie este așezată central și are pe secțiune transversală forma literei „H”, cu coarne anterioare, posterioare și laterale. Substanța albă este dispusă la periferie, organizată în cordoane.',
-  'Biologie, manual clasa a XI-a · Sistemul nervos'
+  'Biologie, manual clasa a XI-a · Sistemul nervos',
+  'materie',
+  null
 ) on conflict (id) do update set
   chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
-  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;
+  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
+  sursa = excluded.sursa, an = excluded.an;
 
 insert into question_options (question_id, key, text, why) values ('bio-nervos-01', 'A', 'la periferie, sub forma unui strat continuu', 'Descrie dispunerea din emisferele cerebrale, unde substanța cenușie formează scoarța la periferie. La medulă raportul este invers.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
@@ -106,16 +91,19 @@ insert into question_options (question_id, key, text, why) values ('bio-nervos-0
 insert into question_options (question_id, key, text, why) values ('bio-nervos-01', 'E', 'exclusiv în ganglionii spinali', 'Nu este dispusă în noduli; formațiunile nodulare sunt ganglionii spinali, situați în afara medulei.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (
+insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (
   'chim-alcooli-01', 'chim-alcooli', 'grupat', 'publicata',
   'Referitor la etanol sunt corecte afirmațiile:',
   array['are formula moleculară C₂H₆O', 'este un alcool secundar', 'se poate obține prin fermentația glucozei', 'este insolubil în apă']::text[],
   'B',
   'Etanolul are formula moleculară C₂H₆O (C₂H₅–OH), deci afirmația 1 este corectă, iar fermentația alcoolică a glucozei este metoda clasică de obținere, deci și 3. Este un alcool primar, nu secundar, și este miscibil cu apa în orice proporție — afirmațiile 2 și 4 sunt false.',
-  'Chimie organică, manual clasa a X-a · Alcooli'
+  'Chimie organică, manual clasa a X-a · Alcooli',
+  'materie',
+  null
 ) on conflict (id) do update set
   chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
-  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;
+  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
+  sursa = excluded.sursa, an = excluded.an;
 
 insert into question_options (question_id, key, text, why) values ('chim-alcooli-01', 'A', '1, 2, 3', 'Include afirmația 2, dar etanolul este alcool primar: gruparea –OH este legată de un carbon care mai are doi atomi de hidrogen.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
@@ -128,16 +116,19 @@ insert into question_options (question_id, key, text, why) values ('chim-alcooli
 insert into question_options (question_id, key, text, why) values ('chim-alcooli-01', 'E', 'toate', 'Nu toate: 2 și 4 sunt false.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (
+insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (
   'bio-endocrin-01', 'bio-endocrin', 'simplu', 'publicata',
   'Insulina este secretată de:',
   null,
   'C',
   'Insulina este produsă de celulele beta din insulele pancreatice (Langerhans) și are efect hipoglicemiant. Celulele alfa secretă glucagon, cu efect antagonist.',
-  'Biologie, manual clasa a XI-a · Glandele endocrine'
+  'Biologie, manual clasa a XI-a · Glandele endocrine',
+  'materie',
+  null
 ) on conflict (id) do update set
   chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
-  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;
+  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
+  sursa = excluded.sursa, an = excluded.an;
 
 insert into question_options (question_id, key, text, why) values ('bio-endocrin-01', 'A', 'celulele alfa ale insulelor pancreatice', 'Celulele alfa secretă glucagon, hormon hiperglicemiant, cu efect opus insulinei.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
@@ -150,16 +141,19 @@ insert into question_options (question_id, key, text, why) values ('bio-endocrin
 insert into question_options (question_id, key, text, why) values ('bio-endocrin-01', 'E', 'adenohipofiză', 'Celulele delta secretă somatostatină, care inhibă atât insulina, cât și glucagonul.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (
+insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (
   'bio-sange-01', 'bio-sange', 'grupat', 'publicata',
   'Despre hematiile adultului sunt adevărate afirmațiile:',
   array['sunt celule anucleate', 'conțin hemoglobină', 'au o durată de viață de aproximativ 120 de zile', 'asigură apărarea specifică a organismului']::text[],
   'A',
   'Hematiile adulte sunt anucleate, conțin hemoglobină și trăiesc în medie 120 de zile. Apărarea specifică este realizată de limfocite, nu de hematii, deci afirmația 4 este falsă.',
-  'Biologie, manual clasa a XI-a · Sângele'
+  'Biologie, manual clasa a XI-a · Sângele',
+  'materie',
+  null
 ) on conflict (id) do update set
   chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
-  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;
+  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
+  sursa = excluded.sursa, an = excluded.an;
 
 insert into question_options (question_id, key, text, why) values ('bio-sange-01', 'A', '1, 2, 3', 'Corect. Afirmațiile 1, 2 și 3 descriu exact hematia adultă.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
@@ -172,16 +166,19 @@ insert into question_options (question_id, key, text, why) values ('bio-sange-01
 insert into question_options (question_id, key, text, why) values ('bio-sange-01', 'E', 'toate', 'Nu toate: apărarea specifică revine limfocitelor.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (
+insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (
   'bio-osos-01', 'bio-osos', 'simplu', 'publicata',
   'Numărul vertebrelor din regiunea toracală a coloanei vertebrale este:',
   null,
   'B',
   'Coloana vertebrală cuprinde 7 vertebre cervicale, 12 toracale, 5 lombare, 5 sacrale sudate și 4–5 coccigiene.',
-  'Biologie, manual clasa a XI-a · Sistemul osos'
+  'Biologie, manual clasa a XI-a · Sistemul osos',
+  'materie',
+  null
 ) on conflict (id) do update set
   chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
-  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;
+  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
+  sursa = excluded.sursa, an = excluded.an;
 
 insert into question_options (question_id, key, text, why) values ('bio-osos-01', 'A', '7', '7 este numărul vertebrelor cervicale.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
@@ -194,16 +191,19 @@ insert into question_options (question_id, key, text, why) values ('bio-osos-01'
 insert into question_options (question_id, key, text, why) values ('bio-osos-01', 'E', '33–34', '33–34 este numărul total al vertebrelor din întreaga coloană.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (
+insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (
   'chim-arene-01', 'chim-arene', 'simplu', 'publicata',
   'Formula moleculară a benzenului este:',
   null,
   'C',
   'Benzenul este prima arenă mononucleară, cu formula C₆H₆ și un ciclu de șase atomi de carbon cu electroni π delocalizați. C₇H₈ corespunde toluenului.',
-  'Chimie organică, manual clasa a X-a · Arene'
+  'Chimie organică, manual clasa a X-a · Arene',
+  'materie',
+  null
 ) on conflict (id) do update set
   chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
-  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;
+  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
+  sursa = excluded.sursa, an = excluded.an;
 
 insert into question_options (question_id, key, text, why) values ('chim-arene-01', 'A', 'C₆H₁₂', 'C₆H₁₂ este ciclohexanul, hidrocarbură saturată ciclică.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;

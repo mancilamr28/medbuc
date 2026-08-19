@@ -84,16 +84,19 @@ scrie(
 
 for (const q of QUESTIONS) {
   scrie(
-    'insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src) values (',
+    'insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an) values (',
     `  ${sql(q.id)}, ${sql(q.capId)}, ${sql(q.tip)}, 'publicata',`,
     `  ${sql(q.text)},`,
     `  ${sqlArray(q.enunturi)},`,
     `  ${sql(q.correct)},`,
     `  ${sql(q.expl)},`,
-    `  ${sql(q.src)}`,
+    `  ${sql(q.src)},`,
+    `  ${sql(q.sursa)},`,
+    `  ${sql(q.an)}`,
     ') on conflict (id) do update set',
     '  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,',
-    '  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src;',
+    '  enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,',
+    '  sursa = excluded.sursa, an = excluded.an;',
     '',
   );
 

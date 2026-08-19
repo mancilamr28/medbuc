@@ -1,19 +1,19 @@
-export type MaterieId = 'bio' | 'chim' | 'ant';
+export type MaterieId = 'bio' | 'chim';
 
 /**
  * Identitatea unui capitol, la fel ca `QuestionId` pentru grile.
  *
- * `nr` nu poate ține locul unui id: la „Subiecte anterioare" e un an, iar în
- * 2026 sunt două sesiuni, deci `nr` se repetă. Nici eticheta nu poate — pe ea
- * se sprijineau cheile notițelor (`medbuc.note.03. Sistemul nervos`), așa că o
- * simplă corectare de titlu orfaniza notița elevului.
+ * `nr` nu poate ține locul unui id — nu e garantat unic în afara materiei lui.
+ * Nici eticheta nu poate — pe ea se sprijineau cheile notițelor
+ * (`medbuc.note.03. Sistemul nervos`), așa că o simplă corectare de titlu
+ * orfaniza notița elevului.
  */
 export type ChapterId = string;
 
 export interface Chapter {
   id: ChapterId;
   materie: MaterieId;
-  /** Numărul capitolului sau anul sesiunii, ex. "04" sau "2026". */
+  /** Numărul capitolului, ex. "04". */
   nr: string;
   name: string;
 }
@@ -68,35 +68,17 @@ export const MATERII: Record<MaterieId, Materie> = {
       ['chim-izomerie', '10', 'Izomerie'],
     ]),
   },
-  ant: {
-    id: 'ant',
-    name: 'Subiecte anterioare',
-    unit: 'sesiuni',
-    // Aici `nr` e anul, iar 2026 are două sesiuni: id-ul e singurul lucru unic.
-    list: chapterList('ant', [
-      ['ant-2026-mg', '2026', 'Admitere UMFCD · Medicină'],
-      ['ant-2026-simulare', '2026', 'Simulare oficială · aprilie'],
-      ['ant-2025-mg', '2025', 'Admitere UMFCD · Medicină'],
-      ['ant-2025-md', '2025', 'Admitere UMFCD · Medicină dentară'],
-      ['ant-2024-mg', '2024', 'Admitere UMFCD · Medicină'],
-      ['ant-2024-simulare', '2024', 'Simulare oficială · martie'],
-      ['ant-2023-mg', '2023', 'Admitere UMFCD · Medicină'],
-      ['ant-2022-mg', '2022', 'Admitere UMFCD · Medicină'],
-    ]),
-  },
 };
 
 export const MATERIE_TABS: { id: MaterieId; label: string }[] = [
   { id: 'bio', label: 'Biologie' },
   { id: 'chim', label: 'Chimie organică' },
-  { id: 'ant', label: 'Subiecte anterioare' },
 ];
 
 /** Numele afișat în administrare → cheia internă a materiei. */
 export const MATERIE_BY_NAME: Record<string, MaterieId> = {
   Biologie: 'bio',
   'Chimie organică': 'chim',
-  'Subiecte anterioare': 'ant',
 };
 
 export const chapterLabel = (c: Chapter): string => `${c.nr}. ${c.name}`;

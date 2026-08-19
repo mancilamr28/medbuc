@@ -34,8 +34,8 @@ describe('migrările', () => {
     const grile = await baza.db.query<{ n: number }>('select count(*)::int as n from questions');
     const variante = await baza.db.query<{ n: number }>('select count(*)::int as n from question_options');
 
-    expect(materii.rows[0]!.n).toBe(3);
-    expect(capitole.rows[0]!.n).toBe(30);
+    expect(materii.rows[0]!.n).toBe(2);
+    expect(capitole.rows[0]!.n).toBe(22);
     expect(grile.rows[0]!.n).toBe(6);
     expect(variante.rows[0]!.n).toBe(30);
   });

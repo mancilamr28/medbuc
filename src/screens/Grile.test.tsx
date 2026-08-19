@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Grile } from './Grile';
 import { QUESTIONS } from '../data/questions';
@@ -7,6 +8,22 @@ import { AppProvider } from '../state/AppState';
 import { useApp } from '../state/appContextValue';
 
 vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
+
+/**
+ * Pornește direct o sesiune pe toată biblioteca, sărind peste configurare —
+ * testele de aici verifică ecranul de rezolvare, nu formularul de dinainte.
+ * Acela are propriile teste în `GrileConfig.test.tsx`.
+ */
+function PornesteBiblioteca() {
+  // `start` e stabil (useCallback fără dependințe) chiar dacă `session`
+  // capătă o identitate nouă la fiecare `start()`. Depinderea de `session`
+  // întreg ar rula efectul din nou de fiecare dată, la infinit.
+  const { start } = useApp().session;
+  useEffect(() => {
+    start([]);
+  }, [start]);
+  return null;
+}
 
 /** Pornește o sesiune pe un capitol fără nicio grilă în fixtură. */
 function PornesteCapitolGol() {
@@ -22,6 +39,7 @@ const deschide = () =>
   render(
     <AppProvider questions={QUESTIONS}>
       <Grile />
+      <PornesteBiblioteca />
       <PornesteCapitolGol />
     </AppProvider>,
   );
@@ -112,7 +130,7 @@ describe('sesiunea de grile', () => {
     await raspundeCorect(0);
     await userEvent.click(buton('Verifică răspunsul'));
     await userEvent.click(buton('Încheie sesiunea'));
-    await userEvent.click(buton(/Reia sesiunea|Începe din nou|Sesiune nouă/));
+    await userEvent.click(buton('Reia sesiunea'));
 
     expect(screen.getByText(`Grila 1 din ${QUESTIONS.length}`)).toBeInTheDocument();
     for (const optiune of screen.getAllByRole('radio')) {
@@ -130,7 +148,20 @@ describe('sesiunea de grile', () => {
 
     expect(screen.getByText('Capitolul ales nu are nicio grilă publicată')).toBeInTheDocument();
     expect(screen.queryByText(/Grila 1 din/)).not.toBeInTheDocument();
-    expect(buton('Înapoi la materii')).toBeInTheDocument();
+    expect(buton('Alege alt capitol')).toBeInTheDocument();
+  });
+
+  it('„Sesiune nouă" deschide iar configurarea, fără să piardă sesiunea în curs', async () => {
+    deschide();
+    await raspundeCorect(0);
+    await userEvent.click(buton('Sesiune nouă'));
+
+    expect(screen.getByText('Sesiune nouă')).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Scopul sesiunii' })).toBeInTheDocument();
+
+    // Renunțarea la configurare întoarce la sesiunea neterminată, nu la una goală.
+    await userEvent.click(buton('← Renunță'));
+    expect(screen.getByText(`Grila 1 din ${QUESTIONS.length}`)).toBeInTheDocument();
   });
 
   it('nu afișează statistici inventate înainte să existe răspunsuri', async () => {

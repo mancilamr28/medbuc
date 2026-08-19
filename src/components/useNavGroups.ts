@@ -1,5 +1,4 @@
 import {
-  faBookOpen,
   faCalendarDays,
   faChartLine,
   faGear,
@@ -30,7 +29,6 @@ export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
   return {
     main: [
       { id: 'acasa', label: 'Acasă', icon: faHouse },
-      { id: 'materii', label: 'Materii', icon: faBookOpen },
       { id: 'grile', label: 'Grile', icon: faListCheck, badge: ramase > 0 ? String(ramase) : undefined },
       { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft },
       { id: 'simulari', label: 'Simulări', icon: faStopwatch },

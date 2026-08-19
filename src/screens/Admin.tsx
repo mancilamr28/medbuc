@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { Segmented } from '../components/Segmented';
 import { MATERII, chapterLabel, chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
-import { OPTION_KEYS, tipLabel, type OptionKey, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, tipLabel, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
@@ -60,6 +60,12 @@ const STARI: { id: QuestionStatus; eticheta: string; culoare: [string, string] }
 ];
 
 const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[0]!;
+
+const SURSE: { id: QuestionSursa; eticheta: string }[] = [
+  { id: 'materie', eticheta: 'Curriculum' },
+  { id: 'subiect_oficial', eticheta: 'Subiect oficial' },
+  { id: 'culegere', eticheta: 'Culegere' },
+];
 
 /**
  * Administrarea conținutului.
@@ -419,6 +425,38 @@ function AdminPanel() {
               style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
             />
           </label>
+
+          <div style={{ marginTop: 14, ...autoGrid(200, 14) }}>
+            <label style={{ display: 'block' }}>
+              <span style={label}>Sursă</span>
+              <select
+                className="field"
+                value={ciorna.sursa}
+                onChange={(e) => camp('sursa', e.target.value as QuestionSursa)}
+                style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
+              >
+                {SURSE.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.eticheta}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {ciorna.sursa === 'subiect_oficial' && (
+              <label style={{ display: 'block' }}>
+                <span style={label}>Anul subiectului</span>
+                <input
+                  className="field"
+                  value={ciorna.an}
+                  onChange={(e) => camp('an', e.target.value)}
+                  placeholder="2026"
+                  inputMode="numeric"
+                  style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
+                />
+              </label>
+            )}
+          </div>
 
           {aratatProbleme && probleme.length > 0 && (
             <ul

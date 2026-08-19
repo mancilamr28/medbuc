@@ -29,7 +29,6 @@ describe('numărătoarea grilelor', () => {
   it('adună pe materie exact cât e în bancă', () => {
     expect(materieQuestionCount('bio')).toBe(4);
     expect(materieQuestionCount('chim')).toBe(2);
-    expect(materieQuestionCount('ant')).toBe(0);
   });
 
   it('suma pe materii dă exact banca, fără grile pierdute pe drum', () => {
