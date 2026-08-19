@@ -31,10 +31,7 @@ const PRINCIPALE: NavMobil[] = [
   { id: 'simulari', label: 'Simulări', icon: faStopwatch },
 ];
 
-const IN_CURAND: NavMobil[] = [
-  { id: 'plan', label: 'Planul meu', icon: faCalendarDays },
-  { id: 'notite', label: 'Notițe', icon: faNoteSticky },
-];
+const IN_CURAND: NavMobil[] = [{ id: 'plan', label: 'Planul meu', icon: faCalendarDays }];
 
 const MENU_ID = 'navigare-mobila-mai-multe';
 
@@ -168,6 +165,7 @@ export function MobileNav() {
             <div style={{ display: 'grid', gap: 3 }}>
               {randMeniu({ id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft })}
               {randMeniu({ id: 'statistici', label: 'Statistici și progres', icon: faChartLine })}
+              {randMeniu({ id: 'notite', label: 'Notițe', icon: faNoteSticky })}
               {randMeniu({ id: 'setari', label: 'Profil și setări', icon: faGear })}
               {role === 'admin' && randMeniu({ id: 'admin', label: 'Administrare', icon: faShieldHalved })}
             </div>
