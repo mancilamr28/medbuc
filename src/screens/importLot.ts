@@ -1,4 +1,4 @@
-import { OPTION_KEYS, type OptionKey, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 import { catreSalvare, ciornaGoala, opturiGoale, valideaza, type Ciorna } from './adminCiorna';
 import type { ChapterId } from '../data/chapters';
@@ -48,6 +48,7 @@ const esteObiect = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const STARI: QuestionStatus[] = ['ciorna', 'publicata', 'retrasa'];
+const SURSE: QuestionSursa[] = ['materie', 'subiect_oficial', 'culegere'];
 
 /**
  * Variantele, din oricare dintre cele trei forme în care ajung să fie scrise.
@@ -99,6 +100,13 @@ function catreCiorna(brut: Record<string, unknown>): { ciorna: Ciorna; probleme:
   ciorna.text = sir(brut['text']);
   ciorna.expl = sir(brut['expl']);
   ciorna.src = sir(brut['src']);
+
+  const sursa = sir(brut['sursa']);
+  if (sursa !== '') {
+    if (!(SURSE as string[]).includes(sursa)) probleme.push(`Sursă necunoscută: ${sursa}.`);
+    else ciorna.sursa = sursa as QuestionSursa;
+  }
+  ciorna.an = typeof brut['an'] === 'number' ? String(brut['an']) : sir(brut['an']);
 
   const tip = sir(brut['tip']);
   if (tip === '') probleme.push('Grila nu spune ce tip e („simplu" sau „grupat").');
@@ -266,6 +274,8 @@ export function catreJson(grile: readonly GrilaCuStare[]): string {
       why: g.why,
       expl: g.expl,
       src: g.src,
+      sursa: g.sursa,
+      ...(g.an !== undefined ? { an: g.an } : {}),
     })),
     null,
     2,

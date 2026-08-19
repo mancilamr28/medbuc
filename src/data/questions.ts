@@ -8,6 +8,14 @@ import {
 
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 export type QuestionType = 'simplu' | 'grupat';
+/**
+ * De unde vine grila: scrisă pe curriculum, dintr-un subiect oficial de admitere
+ * din anii trecuți, sau dintr-o culegere. Independentă de `capId` — o grilă
+ * dintr-un subiect oficial ține în continuare de un capitol real (`bio-nervos`,
+ * nu un "capitol" care ar însemna întreaga lucrare din 2026), ca să poată fi
+ * filtrată simultan pe materie și pe sursă.
+ */
+export type QuestionSursa = 'materie' | 'subiect_oficial' | 'culegere';
 
 /**
  * Identitatea unei grile. Până acum identitatea era poziția în `QUESTIONS`, ceea
@@ -32,6 +40,9 @@ export interface Question {
   /** De ce cade (sau de ce ține) fiecare variantă. */
   why: Partial<Record<OptionKey, string>>;
   src: string;
+  sursa: QuestionSursa;
+  /** Anul subiectului, doar la `subiect_oficial` — ex. 2026. */
+  an?: number;
 }
 
 export const OPTION_KEYS: OptionKey[] = ['A', 'B', 'C', 'D', 'E'];
@@ -68,6 +79,7 @@ export const QUESTIONS: Question[] = [
       E: 'Nu este dispusă în noduli; formațiunile nodulare sunt ganglionii spinali, situați în afara medulei.',
     },
     src: 'Biologie, manual clasa a XI-a · Sistemul nervos',
+    sursa: 'materie',
   },
   {
     tip: 'grupat',
@@ -97,6 +109,7 @@ export const QUESTIONS: Question[] = [
       E: 'Nu toate: 2 și 4 sunt false.',
     },
     src: 'Chimie organică, manual clasa a X-a · Alcooli',
+    sursa: 'materie',
   },
   {
     tip: 'simplu',
@@ -120,6 +133,7 @@ export const QUESTIONS: Question[] = [
       E: 'Celulele delta secretă somatostatină, care inhibă atât insulina, cât și glucagonul.',
     },
     src: 'Biologie, manual clasa a XI-a · Glandele endocrine',
+    sursa: 'materie',
   },
   {
     tip: 'grupat',
@@ -149,6 +163,7 @@ export const QUESTIONS: Question[] = [
       E: 'Nu toate: apărarea specifică revine limfocitelor.',
     },
     src: 'Biologie, manual clasa a XI-a · Sângele',
+    sursa: 'materie',
   },
   {
     tip: 'simplu',
@@ -172,6 +187,7 @@ export const QUESTIONS: Question[] = [
       E: '33–34 este numărul total al vertebrelor din întreaga coloană.',
     },
     src: 'Biologie, manual clasa a XI-a · Sistemul osos',
+    sursa: 'materie',
   },
   {
     tip: 'simplu',
@@ -195,6 +211,7 @@ export const QUESTIONS: Question[] = [
       E: 'C₂H₂ este acetilena, o alchină.',
     },
     src: 'Chimie organică, manual clasa a X-a · Arene',
+    sursa: 'materie',
   },
 ];
 

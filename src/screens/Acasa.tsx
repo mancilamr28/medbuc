@@ -6,7 +6,7 @@ import { Segmented } from '../components/Segmented';
 import { EXAM_DATE, EXAM_DATE_LABEL } from '../data/profile';
 import { useMemo } from 'react';
 import { usePersistentState } from '../lib/hooks';
-import { calculeazaProgres } from '../lib/progres';
+import { calculeazaProgres, capitoleSlabe } from '../lib/progres';
 import { urmatoareaScadenta } from '../lib/recapitulare';
 import { numar, primulNume } from '../lib/text';
 import { daysUntil } from '../lib/time';
@@ -48,10 +48,13 @@ export function Acasa() {
   const raspunse = Object.keys(session.answers).length;
   const inSesiune = raspunse > 0 && !session.finished;
   const prenume = primulNume(profile?.fullName ?? null, user?.email ?? '');
-  const capitoleSlabe = progress.capitole
-    .filter((c) => c.corecte < c.raspunsuri)
-    .sort((a, b) => a.pct - b.pct || b.raspunsuri - a.raspunsuri)
-    .slice(0, 4);
+  // Cardul de aici arată doar primele patru — spațiul cardului e limita, nu
+  // logica ce înseamnă „slab"; aceeași funcție, nelimitată, alimentează
+  // scopul „Puncte slabe" din configurarea sesiunii.
+  const capitoleSlabeAfisate = capitoleSlabe(
+    progress.capitole,
+    progress.capitole.map((c) => c.capId),
+  ).slice(0, 4);
   const capitoleGrafic = [...progress.capitole]
     .sort((a, b) => b.raspunsuri - a.raspunsuri)
     .slice(0, 8)
@@ -62,10 +65,12 @@ export function Acasa() {
   /**
    * O sesiune încheiată nu se poate „continua": ecranul de grile ar arăta iar
    * panoul de rezultat, deși butonul de aici scrie „Începe o sesiune". Una
-   * neîncheiată se reia ca atare, cu capitolele pe care le-a ales elevul.
+   * neîncheiată se reia ca atare; orice altceva cere configurarea din nou, ca
+   * elevul să aleagă materia, scopul și sursa, nu să repornească orbește pe
+   * toată biblioteca.
    */
   const deschideGrile = () => {
-    if (session.finished) session.start([]);
+    if (!inSesiune) session.cereConfigurare();
     go('grile');
   };
 
@@ -83,7 +88,7 @@ export function Acasa() {
         </p>
       </div>
 
-      <div style={{ ...autoGrid(290), alignItems: 'start' }}>
+      <div style={autoGrid(290)}>
         <div style={{ gridColumn: '1/-1', ...autoGrid(280) }}>
           <div className="card hero-card" style={{ padding: 24 }}>
             <div style={eyebrow('var(--acc)', 11)}>{inSesiune ? 'Continuă' : 'Începe'}</div>
@@ -107,10 +112,13 @@ export function Acasa() {
               <button
                 type="button"
                 className="btn-ghost"
-                onClick={() => go('materii')}
+                onClick={() => {
+                  session.cereConfigurare();
+                  go('grile');
+                }}
                 style={{ padding: '12px 16px', font: `500 14px ${SANS}` }}
               >
-                Vezi capitolele
+                Alege capitolele
               </button>
             </div>
           </div>
@@ -153,7 +161,7 @@ export function Acasa() {
                 </button>
               }
             />
-          ) : capitoleSlabe.length === 0 ? (
+          ) : capitoleSlabeAfisate.length === 0 ? (
             <EmptyState
               title="Nu avem încă greșeli înregistrate"
               hint="După ce termini o sesiune, capitolele în care ai pierdut puncte apar aici."
@@ -170,7 +178,7 @@ export function Acasa() {
             />
           ) : (
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column' }}>
-              {capitoleSlabe.map((c) => (
+              {capitoleSlabeAfisate.map((c) => (
                 <button
                   key={c.capId}
                   type="button"

@@ -137,3 +137,20 @@ export function calculeazaProgres(attempts: readonly AttemptRow[], questions: re
     evolutie,
   };
 }
+
+/**
+ * Capitolele unde elevul a răspuns deja și n-a luat tot punctajul, restrânse la
+ * `candidati` (de obicei capitolele unei singure materii). Sortate de la cel
+ * mai slab, ca „Puncte slabe" să înceapă cu ce merită exersat primul.
+ *
+ * Un capitol neîncercat nu e „slab" — e doar neînceput, ceea ce e altă stare.
+ */
+export function capitoleSlabe(
+  capitole: readonly ProgresCapitol[],
+  candidati: readonly ChapterId[],
+): ProgresCapitol[] {
+  const admise = new Set(candidati);
+  return capitole
+    .filter((c) => admise.has(c.capId) && c.corecte < c.raspunsuri)
+    .sort((a, b) => a.pct - b.pct || b.raspunsuri - a.raspunsuri);
+}

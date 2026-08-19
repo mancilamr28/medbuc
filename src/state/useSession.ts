@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ChapterId } from '../data/chapters';
-import type { OptionKey, Question } from '../data/questions';
+import type { OptionKey, Question, QuestionSursa } from '../data/questions';
 
 export interface SessionScore {
   corecte: number;
@@ -45,17 +45,25 @@ export function scoreOf(
 }
 
 /**
- * Banca restrânsă la capitolele cerute.
+ * Banca restrânsă la capitolele și sursele cerute.
  *
- * Lista goală înseamnă „toată biblioteca" — aceeași convenție ca la coloana
- * `sessions.chapter_ids` din bază, ca să nu existe două înțelesuri pentru gol.
- * În cazul acela se întoarce chiar banca primită, nu o copie: identitatea ei e
- * ce ține memo-ul din `useSession` să nu recalculeze la fiecare randare.
+ * Lista goală înseamnă „toată biblioteca" / „orice sursă" — aceeași convenție ca
+ * la coloana `sessions.chapter_ids` din bază, ca să nu existe două înțelesuri
+ * pentru gol. Fără niciun filtru se întoarce chiar banca primită, nu o copie:
+ * identitatea ei e ce ține memo-ul din `useSession` să nu recalculeze la fiecare
+ * randare.
  */
-export function filtreazaCapitole(questions: Question[], capitole: readonly ChapterId[]): Question[] {
-  if (capitole.length === 0) return questions;
-  const cerute = new Set(capitole);
-  return questions.filter((q) => cerute.has(q.capId));
+export function filtreazaCapitole(
+  questions: Question[],
+  capitole: readonly ChapterId[],
+  surse: readonly QuestionSursa[] = [],
+): Question[] {
+  if (capitole.length === 0 && surse.length === 0) return questions;
+  const cerute = capitole.length > 0 ? new Set(capitole) : null;
+  const surseCerute = surse.length > 0 ? new Set(surse) : null;
+  return questions.filter(
+    (q) => (!cerute || cerute.has(q.capId)) && (!surseCerute || surseCerute.has(q.sursa)),
+  );
 }
 
 export interface Session {
@@ -66,6 +74,8 @@ export interface Session {
    * Se scrie ca atare în `sessions.chapter_ids` la finalul sesiunii.
    */
   capitole: ChapterId[];
+  /** Sursele din care s-a compus sesiunea; gol înseamnă orice sursă. */
+  surse: QuestionSursa[];
   /** Indexul grilei curente. */
   qi: number;
   /**
@@ -97,6 +107,25 @@ export interface Session {
   finishedAt: number | null;
   /** Sesiunea a fost încheiată: ecranul de grile arată panoul de rezultat. */
   finished: boolean;
+  /** `start()` a fost chemată măcar o dată de la încărcarea aplicației. */
+  hasStarted: boolean;
+  /**
+   * Ecranul de grile trebuie să arate configurarea (materie, scop, sursă) în
+   * loc de sesiunea curentă: fie nu a fost pornită încă nicio sesiune, fie
+   * elevul a cerut explicit una nouă prin `cereConfigurare`.
+   */
+  configPending: boolean;
+  /**
+   * Redeschide configurarea fără să atingă sesiunea curentă — o sesiune
+   * neterminată nu se pierde, doar rămâne ascunsă până la un nou `start`.
+   */
+  cereConfigurare: () => void;
+  /**
+   * Opusul lui `cereConfigurare`: renunță la configurare fără să pornească
+   * nimic nou, revenind la sesiunea deja în curs. N-are efect dacă nu există
+   * încă nicio sesiune — `configPending` ar rămâne oricum adevărat.
+   */
+  renuntaConfigurare: () => void;
   pick: (key: OptionKey) => void;
   /** Enter: verifică răspunsul, iar dacă e deja verificat trece mai departe. */
   primary: () => void;
@@ -110,7 +139,7 @@ export interface Session {
    * Deschide o sesiune nouă peste capitolele date; lista goală ia toată
    * biblioteca. Ce era început se pierde — o sesiune trăiește doar în memorie.
    */
-  start: (capitole: ChapterId[]) => void;
+  start: (capitole: ChapterId[], surse?: QuestionSursa[]) => void;
   /** Reia sesiunea de la prima grilă, pe aceleași capitole, cu cronometrul de la zero. */
   restart: () => void;
   /** Câte grile sunt corecte / greșite / marcate în sesiunea curentă. */
@@ -134,14 +163,17 @@ export interface Session {
 export function useSession(questions: Question[]): Session {
   const [id, setId] = useState(() => crypto.randomUUID());
   const [capitole, setCapitole] = useState<ChapterId[]>([]);
+  const [surse, setSurse] = useState<QuestionSursa[]>([]);
   const [qi, setQi] = useState(0);
   const [answers, setAnswers] = useState<Record<number, OptionKey>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [marked, setMarked] = useState<Record<number, boolean>>({});
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [forcedConfig, setForcedConfig] = useState(false);
 
-  const banca = useMemo(() => filtreazaCapitole(questions, capitole), [capitole, questions]);
+  const banca = useMemo(() => filtreazaCapitole(questions, capitole, surse), [capitole, questions, surse]);
 
   const total = banca.length;
   const question = banca[qi];
@@ -169,8 +201,9 @@ export function useSession(questions: Question[]): Session {
   // Parametrul nu se numește `capitole`: `restart` chiar dedesubt închide peste
   // starea cu același nume, iar confuzia dintre ele ar schimba tăcut din ce
   // capitole se reia sesiunea.
-  const start = useCallback((noiCapitole: ChapterId[]) => {
+  const start = useCallback((noiCapitole: ChapterId[], noiSurse: QuestionSursa[] = []) => {
     setCapitole(noiCapitole);
+    setSurse(noiSurse);
     setId(crypto.randomUUID());
     setQi(0);
     setAnswers({});
@@ -178,10 +211,17 @@ export function useSession(questions: Question[]): Session {
     setMarked({});
     setFinishedAt(null);
     setStartedAt(Date.now());
+    setHasStarted(true);
+    setForcedConfig(false);
   }, []);
 
-  /** Aceleași capitole, de la zero: „Reia sesiunea" nu are voie să lărgească bazinul. */
-  const restart = useCallback(() => start(capitole), [capitole, start]);
+  /** Aceleași capitole și surse, de la zero: „Reia sesiunea" nu are voie să lărgească bazinul. */
+  const restart = useCallback(() => start(capitole, surse), [capitole, start, surse]);
+
+  /** Vezi documentația câmpurilor `cereConfigurare`/`renuntaConfigurare` din `Session`. */
+  const cereConfigurare = useCallback(() => setForcedConfig(true), []);
+  const renuntaConfigurare = useCallback(() => setForcedConfig(false), []);
+  const configPending = !hasStarted || forcedConfig;
 
   const primary = useCallback(() => {
     if (!revealed[qi]) {
@@ -220,6 +260,7 @@ export function useSession(questions: Question[]): Session {
     () => ({
       id,
       capitole,
+      surse,
       qi,
       question,
       banca,
@@ -234,6 +275,10 @@ export function useSession(questions: Question[]): Session {
       startedAt,
       finishedAt,
       finished: finishedAt !== null,
+      hasStarted,
+      configPending,
+      cereConfigurare,
+      renuntaConfigurare,
       pick,
       primary,
       next,
@@ -251,9 +296,12 @@ export function useSession(questions: Question[]): Session {
       answers,
       banca,
       capitole,
+      cereConfigurare,
+      configPending,
       finish,
       finishedAt,
       goTo,
+      hasStarted,
       id,
       isCorrect,
       isRevealed,
@@ -264,11 +312,13 @@ export function useSession(questions: Question[]): Session {
       primary,
       qi,
       question,
+      renuntaConfigurare,
       restart,
       revealed,
       score,
       start,
       startedAt,
+      surse,
       tally,
       toggleMark,
       total,

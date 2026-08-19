@@ -10,15 +10,18 @@ import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
 import { descriereScop, frazaCapitoleGoale, frazaCorecte } from './grileText';
+import { GrileConfig } from './GrileConfig';
 
 type Variant = 'a' | 'b';
 
-/** Ecranul de grile își alege faza: rezolvare sau panoul de rezultat. */
+/** Ecranul de grile își alege faza: configurare, rezolvare sau panoul de rezultat. */
 export function Grile() {
   const { session } = useApp();
   return (
     <PoartaContinut>
-      {session.total === 0 ? (
+      {session.configPending ? (
+        <GrileConfig />
+      ) : session.total === 0 ? (
         <CapitolGol />
       ) : session.finished ? (
         <GrileRezultat />
@@ -30,30 +33,32 @@ export function Grile() {
 }
 
 /**
- * Biblioteca are grile, dar niciuna din capitolele sesiunii.
+ * Biblioteca are grile, dar niciuna care se potrivește cu materia, scopul și
+ * sursa alese la configurare.
  *
- * `Materii` nu lasă să se ajungă aici — butonul e dezactivat pe capitolele goale
- * — dar o grilă retrasă între alegere și rezolvare golește bazinul, iar o
- * sesiune fără nicio grilă randează un ecran alb dacă nu se spune nimic. Starea
- * stă aici, nu în `PoartaContinut`: poarta e comună cu `Simulari`, care n-are
- * nicio treabă cu bazinul sesiunii de exersare.
+ * `GrileConfig` nu lasă să se ajungă aici cât timp poate — butonul „Începe" e
+ * dezactivat la zero grile — dar o grilă retrasă între configurare și
+ * rezolvare golește bazinul, iar o sesiune fără nicio grilă randează un ecran
+ * alb dacă nu se spune nimic. Starea stă aici, nu în `PoartaContinut`: poarta
+ * e comună cu `Simulari`, care n-are nicio treabă cu bazinul sesiunii de
+ * exersare.
  */
 function CapitolGol() {
-  const { go, session } = useApp();
+  const { session } = useApp();
   return (
     <div className="screen">
       <div className="card" style={{ padding: 8, maxWidth: 520 }}>
         <EmptyState
           title={frazaCapitoleGoale(session.capitole)}
-          hint="Alege alt capitol sau exersează din toată biblioteca."
+          hint="Alege alt capitol sau altă sursă."
           action={
             <button
               type="button"
               className="btn-primary"
-              onClick={() => go('materii')}
+              onClick={session.cereConfigurare}
               style={{ padding: '10px 16px', font: `600 13px ${SANS}` }}
             >
-              Înapoi la materii
+              Alege alt capitol
             </button>
           }
         />
@@ -128,6 +133,14 @@ function GrileRun() {
           style={{ padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
         >
           Încheie sesiunea
+        </button>
+        <button
+          type="button"
+          className="btn-ghost tinta-tactila"
+          onClick={session.cereConfigurare}
+          style={{ padding: '9px 14px', font: `500 13px ${SANS}`, background: 'var(--surf)' }}
+        >
+          Sesiune nouă
         </button>
         <Segmented
           items={[
@@ -377,14 +390,6 @@ function GrileRun() {
                   >
                     Adaugă la recapitulare
                   </button>
-                  <button
-                    type="button"
-                    className="btn-ghost tinta-tactila"
-                    onClick={() => go('materii')}
-                    style={{ padding: '8px 13px', borderRadius: 9, font: `500 12.5px ${SANS}`, background: 'var(--surf)' }}
-                  >
-                    Deschide capitolul
-                  </button>
                 </div>
               </div>
             )}
@@ -501,10 +506,10 @@ function GrileRezultat() {
             <button
               type="button"
               className="btn-ghost"
-              onClick={() => go('materii')}
+              onClick={session.cereConfigurare}
               style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}
             >
-              Înapoi la materii
+              Sesiune nouă
             </button>
             <button
               type="button"

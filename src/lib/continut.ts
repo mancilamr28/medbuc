@@ -1,4 +1,4 @@
-import { OPTION_KEYS, type OptionKey, type Question, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
 import { chapterById, type ChapterId, type MaterieId } from '../data/chapters';
 
 /**
@@ -35,6 +35,8 @@ export interface RandGrila {
   correct: string;
   expl: string;
   src: string;
+  sursa: string;
+  an: number | null;
   question_options: { key: string; text: string; why: string | null }[] | null;
 }
 
@@ -51,7 +53,7 @@ export interface RandGrila {
  */
 export const FK_VARIANTE = 'question_options_question_id_fkey';
 
-const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, question_options!${FK_VARIANTE}(key, text, why)`;
+const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, question_options!${FK_VARIANTE}(key, text, why)`;
 
 /**
  * Pură peste rândul primit, ca să poată fi testată fără rețea.
@@ -81,6 +83,8 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
     expl: rand.expl,
     why,
     src: rand.src,
+    sursa: rand.sursa as QuestionSursa,
+    ...(rand.an !== null ? { an: rand.an } : {}),
     status: rand.status as QuestionStatus,
   };
 }
@@ -132,6 +136,8 @@ export interface GrilaDeSalvat {
   correct: OptionKey;
   expl: string;
   src: string;
+  sursa: QuestionSursa;
+  an?: number;
   opts: { key: OptionKey; text: string; why?: string }[];
 }
 

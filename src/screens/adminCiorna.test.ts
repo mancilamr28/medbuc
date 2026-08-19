@@ -66,6 +66,12 @@ describe('valideaza', () => {
   it('nu cere afirmații la complementul simplu', () => {
     expect(valideaza(buna({ tip: 'simplu', enunturi: ['', '', '', ''] }))).toEqual([]);
   });
+
+  it('lasă anul gol să treacă, dar respinge unul absurd', () => {
+    expect(valideaza(buna({ an: '' }))).toEqual([]);
+    expect(valideaza(buna({ an: '1900' }))).toContain('Anul subiectului trebuie să fie un an valid.');
+    expect(valideaza(buna({ an: 'douămiișaișe' }))).toContain('Anul subiectului trebuie să fie un an valid.');
+  });
 });
 
 describe('catreSalvare', () => {
@@ -96,6 +102,12 @@ describe('catreSalvare', () => {
   it('duce starea cerută, nu una din ciornă', () => {
     expect(catreSalvare(buna(), 'publicata').status).toBe('publicata');
     expect(catreSalvare(buna(), 'ciorna').status).toBe('ciorna');
+  });
+
+  it('trimite sursa aleasă și anul doar când e completat', () => {
+    expect(catreSalvare(buna({ sursa: 'culegere' }), 'ciorna').sursa).toBe('culegere');
+    expect(catreSalvare(buna(), 'ciorna').an).toBeUndefined();
+    expect(catreSalvare(buna({ sursa: 'subiect_oficial', an: '2026' }), 'ciorna').an).toBe(2026);
   });
 });
 

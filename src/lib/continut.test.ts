@@ -11,6 +11,8 @@ const rand = (peste: Partial<RandGrila> = {}): RandGrila => ({
   correct: 'B',
   expl: 'Explicația',
   src: 'Manual',
+  sursa: 'materie',
+  an: null,
   question_options: [
     { key: 'B', text: 'a doua', why: 'de ce ține' },
     { key: 'A', text: 'prima', why: null },
@@ -47,6 +49,16 @@ describe('mapeazaGrila', () => {
 
   it('duce starea mai departe, pentru Admin', () => {
     expect(mapeazaGrila(rand({ status: 'ciorna' })).status).toBe('ciorna');
+  });
+
+  it('citește sursa și anul unui subiect oficial', () => {
+    const g = mapeazaGrila(rand({ sursa: 'subiect_oficial', an: 2026 }));
+    expect(g.sursa).toBe('subiect_oficial');
+    expect(g.an).toBe(2026);
+  });
+
+  it('lasă anul nedefinit când bază întoarce null', () => {
+    expect(mapeazaGrila(rand({ an: null })).an).toBeUndefined();
   });
 
   /** O grilă fără variante nu trebuie să arunce la randare, ci să arate goală. */

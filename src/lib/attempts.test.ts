@@ -6,6 +6,7 @@ import type { Session } from '../state/useSession';
 const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session => ({
   id: '00000000-0000-0000-0000-000000000001',
   capitole: [],
+  surse: [],
   qi: 0,
   question: QUESTIONS[0]!,
   banca: QUESTIONS,
@@ -20,6 +21,10 @@ const session = (answers: Record<number, 'A' | 'B' | 'C' | 'D' | 'E'>): Session 
   startedAt: 1_000,
   finishedAt: 2_000,
   finished: true,
+  hasStarted: true,
+  configPending: false,
+  cereConfigurare: () => undefined,
+  renuntaConfigurare: () => undefined,
   pick: () => undefined,
   primary: () => undefined,
   next: () => undefined,

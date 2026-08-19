@@ -11,7 +11,6 @@ import { Admin } from './screens/Admin';
 import { Autentificare, type ModAutentificare } from './screens/Autentificare';
 import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
-import { Materii } from './screens/Materii';
 import { Recapitulare } from './screens/Recapitulare';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
@@ -64,8 +63,6 @@ function Content() {
   if (!BUILT_SCREENS.includes(screen)) return <InLucru screen={screen} />;
 
   switch (screen) {
-    case 'materii':
-      return <Materii />;
     case 'grile':
       return <Grile />;
     case 'recapitulare':
