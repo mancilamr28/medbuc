@@ -34,7 +34,11 @@ describe('Topbar', () => {
     const tema = screen.getByRole('button', { name: 'Activează modul luminos' });
     expect(tema).toHaveAttribute('title', 'Activează modul luminos');
     expect(tema).toHaveTextContent('');
-    expect(tema).toHaveClass('tinta-tactila', 'tinta-tactila--patrata');
+    expect(tema).toHaveClass('row-btn', 'tinta-tactila', 'tinta-tactila--patrata');
+    // Fără chenar/fundal permanent — se comportă ca o iconiță din navigație,
+    // nu ca un buton separat cu bulină vizibilă în orice stare.
+    expect(tema).not.toHaveClass('btn-quiet', 'btn-ghost');
+    expect(tema).toHaveStyle({ color: 'var(--fg2)' });
     expect(tema.querySelector('path')).toHaveAttribute('d', cale(faLightbulb));
     await user.click(tema);
     expect(toggleTheme).toHaveBeenCalledTimes(1);
