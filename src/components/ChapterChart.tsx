@@ -1,5 +1,6 @@
 import { EmptyState } from './EmptyState';
 import { SANS } from '../lib/ui';
+import { numar } from '../lib/text';
 import { PRAG_RELUARE, barColor } from './chartTokens';
 import { TabelGrafic } from './TabelGrafic';
 
@@ -11,13 +12,34 @@ export interface ChapterProgress {
 }
 
 /**
+ * Din câte capitole s-au ales cele afișate și după ce criteriu.
+ *
+ * Ambele ecrane taie lista, dar altfel: „Acasă" ia primele 8 după numărul de
+ * răspunsuri, „Statistici" primele 12 de la cel mai slab. Fără nota asta,
+ * graficul arată ca un clasament complet după procent, ceea ce nu e în niciunul
+ * dintre cazuri.
+ */
+export interface SelectieCapitole {
+  /** Câte capitole începute există în total. */
+  total: number;
+  /** Cum au fost alese, ca fragment de frază: „după numărul de răspunsuri". */
+  criteriu: string;
+}
+
+/**
  * Procentul de corecte pe capitolele începute.
  *
  * Datele vin prin `rows`. Capitolele nu mai poartă un `pct` scris de mână — cât
  * timp nu există răspunsuri înregistrate, graficul spune asta, nu desenează
  * bare inventate.
  */
-export function ChapterChart({ rows }: { rows: readonly ChapterProgress[] }) {
+export function ChapterChart({
+  rows,
+  selectie,
+}: {
+  rows: readonly ChapterProgress[];
+  selectie?: SelectieCapitole;
+}) {
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -84,6 +106,12 @@ export function ChapterChart({ rows }: { rows: readonly ChapterProgress[] }) {
           </span>
         </div>
       ))}
+      {selectie && selectie.total > rows.length && (
+        <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg2)' }}>
+          Primele {rows.length} din {numar(selectie.total, 'capitol început', 'capitole începute')}, {selectie.criteriu}.
+        </div>
+      )}
+
       <div style={{ marginTop: 4, font: `400 11.5px ${SANS}`, color: 'var(--fg2)' }}>
         Linia verticală marchează {PRAG_RELUARE}%, pragul sub care recomandăm reluarea capitolului; barele care
         nu-l ating sunt colorate diferit.
