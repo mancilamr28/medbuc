@@ -7,6 +7,7 @@ import { PoartaContinut } from '../components/PoartaContinut';
 import { questionCap, questionMaterie, tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
 import { navWindow } from '../lib/navWindow';
+import { numar } from '../lib/text';
 import { formatClock } from '../lib/time';
 import {
   SANS,
@@ -216,7 +217,7 @@ function SimRun() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ font: `400 12.5px/1.4 ${SANS}`, opacity: 0.85 }}>
               {faraRaspuns > 0
-                ? `Mai ai ${faraRaspuns} ${faraRaspuns === 1 ? 'grilă' : 'de grile'} fără răspuns. Predai?`
+                ? `Mai ai ${numar(faraRaspuns, 'grilă', 'grile')} fără răspuns. Predai?`
                 : 'Predai lucrarea?'}
             </span>
             <button
@@ -626,7 +627,7 @@ function SimRezultat() {
           <div className="card-flat" style={{ padding: 20 }}>
             <div style={eyebrow(undefined, 11)}>Cum se citește</div>
             <p style={{ margin: '12px 0 0', font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)' }}>
-              Punctajul e raportat la toate cele {total} de grile: o grilă fără răspuns valorează 0, la fel ca
+              Punctajul e raportat la toate cele {numar(total, 'grilă', 'grile')}: o grilă fără răspuns valorează 0, la fel ca
               una greșită. Fără penalizări.
             </p>
           </div>

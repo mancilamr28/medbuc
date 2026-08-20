@@ -4,10 +4,31 @@ import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Grile } from './Grile';
 import { QUESTIONS } from '../data/questions';
+import type { AttemptRow } from '../lib/progres';
 import { AppProvider } from '../state/AppState';
 import { useApp } from '../state/appContextValue';
 
 vi.mock('../lib/supabase', () => import('../test/supabaseFals'));
+
+/**
+ * Jurnalul de răspunsuri, controlat din teste. Gol implicit, adică exact ce
+ * vede ecranul fără `ProgressProvider` deasupra — testele de dinainte rămân
+ * neschimbate. `vi.hoisted` e obligatoriu: fabrica lui `vi.mock` urcă deasupra
+ * declarațiilor obișnuite și ar citi variabila în zona moartă.
+ */
+const jurnal = vi.hoisted(() => ({ attempts: [] as AttemptRow[] }));
+vi.mock('../state/progressState', () => ({
+  useProgressOptional: () => ({ attempts: jurnal.attempts, loading: false, error: null, reload: () => {} }),
+}));
+
+const raspuns = (corect: boolean): AttemptRow => ({
+  question_id: 'bio-nervos-01',
+  is_correct: corect,
+  source: 'sesiune',
+  session_id: 's1',
+  sim_run_id: null,
+  answered_at: '2026-08-19T10:00:00Z',
+});
 
 /**
  * Pornește direct o sesiune pe toată biblioteca, sărind peste configurare —
@@ -172,5 +193,26 @@ describe('sesiunea de grile', () => {
     expect(screen.queryByText('68%')).not.toBeInTheDocument();
     expect(screen.queryByText('74%')).not.toBeInTheDocument();
     expect(screen.queryByText('41s')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Perechea testului de mai sus. Panoul era un `EmptyState` scris fix, deci
+   * rămânea pe „apar după primele răspunsuri" și pentru un elev cu sute de
+   * răspunsuri — o promisiune care nu se împlinea niciodată. Acum se derivă din
+   * același jurnal ca cifrele de pe Acasă.
+   */
+  it('arată cifrele reale ale capitolului odată ce există răspunsuri', async () => {
+    jurnal.attempts = [raspuns(true), raspuns(true), raspuns(false)];
+    deschide();
+    await userEvent.click(screen.getByRole('tab', { name: 'Cu context' }));
+
+    const panou = screen.getByText('Capitolul tău în cifre').parentElement!;
+    expect(within(panou).getByText('67%')).toBeInTheDocument();
+    expect(
+      within(panou).getByText('2 grile corecte din 3 răspunsuri date · ai atins 1 grilă distinctă'),
+    ).toBeInTheDocument();
+    expect(within(panou).queryByText('Statisticile apar după primele răspunsuri')).not.toBeInTheDocument();
+
+    jurnal.attempts = [];
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
 import { EmptyState } from '../components/EmptyState';
 import { PoartaContinut } from '../components/PoartaContinut';
@@ -7,9 +7,12 @@ import { Segmented } from '../components/Segmented';
 import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { navWindow } from '../lib/navWindow';
+import { calculeazaProgres } from '../lib/progres';
+import { numar } from '../lib/text';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
+import { useProgressOptional } from '../state/progressState';
 import { descriereScop, frazaCapitoleGoale, frazaCorecte } from './grileText';
 import { GrileConfig } from './GrileConfig';
 
@@ -384,13 +387,6 @@ function GrileRun() {
                   >
                     {question.src}
                   </span>
-                  <button
-                    type="button"
-                    className="btn-ghost tinta-tactila"
-                    style={{ marginLeft: 'auto', padding: '8px 13px', borderRadius: 9, font: `500 12.5px ${SANS}`, background: 'var(--surf)' }}
-                  >
-                    Adaugă la recapitulare
-                  </button>
                 </div>
               </div>
             )}
@@ -529,8 +525,18 @@ function GrileRezultat() {
 
 /** Coloana de context: navigatorul sesiunii, notița pe capitol și cifrele capitolului. */
 function ContextColumn() {
-  const { session } = useApp();
+  const { session, questions } = useApp();
   const capId = session.question?.capId;
+
+  // Panoul „Capitolul tău în cifre" era un `EmptyState` fix: rămânea gol și
+  // pentru un elev cu sute de răspunsuri. Cifrele se derivă din același jurnal
+  // ca pe Acasă — `questions` e biblioteca întreagă, nu `session.banca`.
+  const progressContext = useProgressOptional();
+  const progres = useMemo(
+    () => calculeazaProgres(progressContext?.attempts ?? [], questions),
+    [progressContext?.attempts, questions],
+  );
+  const capitol = capId ? progres.capitole.find((c) => c.capId === capId) ?? null : null;
   // Cheia ține de id-ul capitolului: o redenumire nu mai orfanizează notița.
   const [note, setNote] = usePersistentState<string>(`medbuc.note.${capId ?? 'fara-capitol'}`, '');
   const { start, end } = navWindow(session.qi, session.total);
@@ -617,11 +623,25 @@ function ContextColumn() {
 
       <div className="card-flat" style={{ padding: 18 }}>
         <div style={eyebrow()}>Capitolul tău în cifre</div>
-        <EmptyState
-          title="Statisticile apar după primele răspunsuri"
-          hint="Rezolvă câteva grile pentru a vedea progresul real pe acest capitol."
-          padding="18px 0 0"
-        />
+        {capitol ? (
+          <div style={{ marginTop: 12, display: 'grid', gap: 9 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span className="tabular" style={{ font: `600 24px/1 ${SANS}` }}>{capitol.pct}%</span>
+              <span style={{ font: `500 12px ${SANS}`, color: 'var(--fg2)' }}>corecte pe capitol</span>
+            </div>
+            <div style={{ font: `400 12.5px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
+              {numar(capitol.corecte, 'grilă corectă', 'grile corecte')} din{' '}
+              {numar(capitol.raspunsuri, 'răspuns dat', 'răspunsuri date')} · ai atins{' '}
+              {numar(capitol.grileIncercate, 'grilă distinctă', 'grile distincte')}
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            title="Statisticile apar după primele răspunsuri"
+            hint="Rezolvă câteva grile pentru a vedea progresul real pe acest capitol."
+            padding="18px 0 0"
+          />
+        )}
       </div>
     </div>
   );

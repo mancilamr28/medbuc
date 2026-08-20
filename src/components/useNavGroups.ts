@@ -24,7 +24,13 @@ export interface NavEntry {
 export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
   const { session } = useApp();
   const { role } = useAuth();
-  const ramase = session.total - Object.keys(session.revealed).length;
+
+  // Doar o sesiune pornită și neterminată are „rămase". Fără `hasStarted`,
+  // `session.total` e biblioteca întreagă (scop gol = toată materia), așa că un
+  // elev care n-a început nimic vedea lângă „Grile" un număr egal cu toată
+  // biblioteca, ca și cum ar avea o sesiune în așteptare.
+  const ramase =
+    session.hasStarted && !session.finished ? session.total - Object.keys(session.revealed).length : 0;
 
   return {
     main: [
