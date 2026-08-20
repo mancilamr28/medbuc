@@ -35,6 +35,8 @@ describe('Topbar', () => {
     expect(tema).toHaveAttribute('title', 'Activează modul luminos');
     expect(tema).toHaveTextContent('');
     expect(tema).toHaveClass('tinta-tactila', 'tinta-tactila--patrata');
+    expect(tema).toHaveStyle({ color: 'var(--fg2)' });
+    expect(tema.querySelector('svg')).not.toHaveAttribute('style');
     expect(tema.querySelector('path')).toHaveAttribute('d', cale(faLightbulb));
     await user.click(tema);
     expect(toggleTheme).toHaveBeenCalledTimes(1);
@@ -62,6 +64,8 @@ describe('Topbar', () => {
     const tema = screen.getByRole('button', { name: 'Activează modul întunecat' });
     expect(tema).toHaveAttribute('title', 'Activează modul întunecat');
     expect(tema).toHaveTextContent('');
+    expect(tema).toHaveStyle({ color: 'var(--fg2)' });
+    expect(tema.querySelector('svg')).not.toHaveAttribute('style');
     expect(tema.querySelector('path')).toHaveAttribute('d', cale(faMoon));
   });
 });

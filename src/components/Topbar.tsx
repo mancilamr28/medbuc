@@ -38,13 +38,9 @@ export function Topbar({ compact }: { compact: boolean }) {
         onClick={toggleTheme}
         aria-label={etichetaTema}
         title={etichetaTema}
-        style={{ width: 38, height: 38, padding: 0, display: 'grid', placeItems: 'center' }}
+        style={{ width: 38, height: 38, padding: 0, display: 'grid', placeItems: 'center', color: 'var(--fg2)' }}
       >
-        <Icon
-          icon={activeazaLuminos ? faLightbulb : faMoon}
-          size={17}
-          style={{ color: activeazaLuminos ? 'var(--acc)' : 'var(--brand)' }}
-        />
+        <Icon icon={activeazaLuminos ? faLightbulb : faMoon} size={17} />
       </button>
     </header>
   );
