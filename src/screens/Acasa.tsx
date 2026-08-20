@@ -280,7 +280,10 @@ export function Acasa() {
             ) : chart === 'a' ? (
               <ScoreChart points={evolutieGrafic} grileDistincte={progress.grileDistincte} />
             ) : (
-              <ChapterChart rows={capitoleGrafic} />
+              <ChapterChart
+                rows={capitoleGrafic}
+                selectie={{ total: progress.capitole.length, criteriu: 'după numărul de răspunsuri' }}
+              />
             )}
           </div>
         </div>

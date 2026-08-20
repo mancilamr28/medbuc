@@ -104,7 +104,9 @@ export function ScoreChart({
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', padding: '2px 8px 4px' }}>
         <div>
-          <span className="tabular" style={{ font: `600 28px/1 ${SANS}` }}>{ultimul.pct}%</span>
+          {/* Fără `tabular`: cifrele de lățime egală lasă goluri la 28px. Rămân
+              acolo unde chiar se aliniază pe verticală — repere și tabel. */}
+          <span style={{ font: `600 28px/1 ${SANS}` }}>{ultimul.pct}%</span>
           <span style={{ marginLeft: 8, font: `500 12px ${SANS}`, color: 'var(--fg2)' }}>stăpânire curentă</span>
         </div>
         <div style={{ font: `500 11.5px ${SANS}`, color: 'var(--fg2)' }}>
