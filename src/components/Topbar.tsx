@@ -32,19 +32,26 @@ export function Topbar({ compact }: { compact: boolean }) {
         </div>
       )}
 
+      {/* Fără chenar/fundal permanent — ca iconițele din Sidebar și MobileNav,
+          nu ca un buton „btn-quiet" separat: culoarea vine din var(--fg2), ca
+          restul navigației, iar `row-btn` dă doar starea de hover. */}
       <button
         type="button"
-        className="btn-quiet tinta-tactila tinta-tactila--patrata"
+        className="row-btn tinta-tactila tinta-tactila--patrata"
         onClick={toggleTheme}
         aria-label={etichetaTema}
         title={etichetaTema}
-        style={{ width: 38, height: 38, padding: 0, display: 'grid', placeItems: 'center' }}
+        style={{
+          width: 38,
+          height: 38,
+          padding: 0,
+          borderRadius: 10,
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--fg2)',
+        }}
       >
-        <Icon
-          icon={activeazaLuminos ? faLightbulb : faMoon}
-          size={17}
-          style={{ color: activeazaLuminos ? 'var(--acc)' : 'var(--brand)' }}
-        />
+        <Icon icon={activeazaLuminos ? faLightbulb : faMoon} size={17} />
       </button>
     </header>
   );
