@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { MIN_GRILE_EVOLUTIE, type PunctEvolutie } from '../lib/progres';
 import { numar } from '../lib/text';
 import { SANS } from '../lib/ui';
+import { TabelGrafic } from './TabelGrafic';
 
 const W = 720;
 const H = 226;
@@ -250,6 +251,18 @@ export function ScoreChart({
 
       <div style={{ margin: '-2px 8px 14px', paddingTop: 11, borderTop: '1px solid var(--line)', font: `400 11.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>
         Fiecare grilă are aceeași greutate. Contează primul răspuns al zilei, iar repetările imediate nu schimbă procentul.
+      </div>
+
+      <div style={{ margin: '0 8px 8px' }}>
+        <TabelGrafic
+          rezumat="Stăpânirea grilelor, zi cu zi."
+          coloane={['Ziua', 'Stăpânire', 'Grile distincte']}
+          randuri={points.map((punct) => ({
+            id: punct.id,
+            antet: punct.eticheta,
+            valori: [`${punct.pct}%`, String(punct.grile)],
+          }))}
+        />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { EmptyState } from './EmptyState';
 import { SANS } from '../lib/ui';
 import { PRAG_RELUARE, barColor } from './chartTokens';
+import { TabelGrafic } from './TabelGrafic';
 
 export interface ChapterProgress {
   id: string;
@@ -87,6 +88,22 @@ export function ChapterChart({ rows }: { rows: readonly ChapterProgress[] }) {
         Linia verticală marchează {PRAG_RELUARE}%, pragul sub care recomandăm reluarea capitolului; barele care
         nu-l ating sunt colorate diferit.
       </div>
+
+      {/*
+        Coloana „Față de prag" scrie în cuvinte exact ce spune culoarea barei.
+        Altfel singura formă a acelei informații e roșu-vs-albastru, adică
+        nimic pentru cine nu distinge cele două. Numele capitolului apare aici
+        întreg, netăiat de coloana îngustă din grafic.
+      */}
+      <TabelGrafic
+        rezumat={`Procentul de răspunsuri corecte pe capitol, față de pragul de ${PRAG_RELUARE}%.`}
+        coloane={['Capitol', 'Corecte', 'Față de prag']}
+        randuri={rows.map((capitol) => ({
+          id: capitol.id,
+          antet: capitol.name,
+          valori: [`${capitol.pct}%`, capitol.pct < PRAG_RELUARE ? 'sub prag' : 'peste prag'],
+        }))}
+      />
     </div>
   );
 }
