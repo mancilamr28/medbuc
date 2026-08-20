@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { EXAM_DATE, EXAM_DATE_LABEL } from '../../../data/profile';
+import { EXAM_DATE } from '../../../data/profile';
 import { numar } from '../../../lib/text';
 import { daysUntil } from '../../../lib/time';
 import { usePointerGlow } from '../motion';
@@ -25,14 +25,7 @@ export function Hero() {
       <div className="lp-erou__reflector" />
 
       <div>
-        <div className="lp-intro" style={{ '--i': 0 } as CSSProperties}>
-          <span className="lp-eyebrow">
-            <span className="lp-eyebrow__punct" />
-            Admitere UMFCD · {EXAM_DATE_LABEL}
-          </span>
-        </div>
-
-        <h1 className="lp-erou__titlu lp-intro" style={{ '--i': 1 } as CSSProperties}>
+        <h1 className="lp-erou__titlu lp-intro" style={{ '--i': 0 } as CSSProperties}>
           Pregătirea pentru medicină,{' '}
           <span className="lp-luminos" data-text="pusă în ordine" aria-label="pusă în ordine">
             pusă în ordine
@@ -40,12 +33,12 @@ export function Hero() {
           .
         </h1>
 
-        <p className="lp-erou__lead lp-intro" style={{ '--i': 2 } as CSSProperties}>
+        <p className="lp-erou__lead lp-intro" style={{ '--i': 1 } as CSSProperties}>
           Grile cu explicație la fiecare variantă, capitolele celor două probe și simulări cronometrate după formatul
           real al admiterii. Fără scoruri inventate — vezi doar ce ai făcut tu.
         </p>
 
-        <div className="lp-erou__actiuni lp-intro" style={{ '--i': 3 } as CSSProperties}>
+        <div className="lp-erou__actiuni lp-intro" style={{ '--i': 2 } as CSSProperties}>
           <CtaAuth ruta="inregistrare" marime="mare">
             Începe pregătirea
             <Sageata />
@@ -55,12 +48,12 @@ export function Hero() {
           </CtaAuth>
         </div>
 
-        <p className="lp-erou__nota lp-intro" style={{ '--i': 4 } as CSSProperties}>
+        <p className="lp-erou__nota lp-intro" style={{ '--i': 3 } as CSSProperties}>
           Mai sunt {numar(zile, 'zi', 'zile')} până la examen.
         </p>
       </div>
 
-      <div className="lp-intro lp-intro--obiect" style={{ '--i': 3 } as CSSProperties}>
+      <div className="lp-intro lp-intro--obiect" style={{ '--i': 2 } as CSSProperties}>
         <Corp />
       </div>
 
