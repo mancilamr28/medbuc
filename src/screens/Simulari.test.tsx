@@ -46,7 +46,11 @@ describe('predarea lucrării', () => {
     await userEvent.click(screen.getByRole('button', { name: /Începe simularea/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Predă lucrarea' }));
 
-    expect(screen.getByText(/fără răspuns/)).toBeInTheDocument();
+    // Aserțiunea de dinainte era `/fără răspuns/`, care trecea peste orice
+    // număr și orice acord. Fraza se cere întreagă. Cazul greu — 2..19, unde
+    // vechiul cod scria „5 de grile" — nu se poate atinge de aici, fiindcă cea
+    // mai mică simulare are 60 de grile; el e acoperit de testele lui `numar`.
+    expect(screen.getByText('Mai ai 100 de grile fără răspuns. Predai?')).toBeInTheDocument();
   });
 
   it('renunțarea la confirmare lasă lucrarea în desfășurare', async () => {
