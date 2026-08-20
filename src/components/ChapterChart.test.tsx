@@ -37,6 +37,34 @@ describe('ChapterChart', () => {
     expect(within(rand).getByText(`${PRAG_RELUARE - 1}%`)).toBeInTheDocument();
   });
 
+  /**
+   * Ambele ecrane taie lista, dar altfel — „Acasă" după numărul de răspunsuri,
+   * „Statistici" de la cel mai slab. Netrecut în UI, graficul arată ca un
+   * clasament complet după procent, ceea ce nu e în niciunul dintre cazuri.
+   */
+  it('spune din câte capitole sunt alese cele afișate și după ce criteriu', () => {
+    render(<ChapterChart rows={CAPITOLE} selectie={{ total: 20, criteriu: 'după numărul de răspunsuri' }} />);
+
+    expect(
+      screen.getByText('Primele 2 din 20 de capitole începute, după numărul de răspunsuri.'),
+    ).toBeInTheDocument();
+  });
+
+  /** Regula lui `de`: „3 capitole", dar „20 de capitole". */
+  it('acordă numeralul cu substantivul', () => {
+    render(<ChapterChart rows={CAPITOLE} selectie={{ total: 3, criteriu: 'de la cel mai slab' }} />);
+
+    expect(screen.getByText('Primele 2 din 3 capitole începute, de la cel mai slab.')).toBeInTheDocument();
+  });
+
+  it('nu spune nimic despre selecție când le arată pe toate', () => {
+    render(
+      <ChapterChart rows={CAPITOLE} selectie={{ total: CAPITOLE.length, criteriu: 'de la cel mai slab' }} />,
+    );
+
+    expect(screen.queryByText(/^Primele/)).not.toBeInTheDocument();
+  });
+
   it('nu desenează tabel când nu există capitole începute', () => {
     render(<ChapterChart rows={[]} />);
 

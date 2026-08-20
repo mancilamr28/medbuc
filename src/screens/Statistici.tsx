@@ -131,7 +131,12 @@ export function Statistici() {
             <div className="card" style={{ padding: 20 }}>
               <div style={{ font: `600 15px ${SANS}` }}>Capitole începute</div>
               <div style={{ marginTop: 4, font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>Cele mai slabe apar primele</div>
-              <div style={{ marginTop: 18 }}><ChapterChart rows={capitole} /></div>
+              <div style={{ marginTop: 18 }}>
+                <ChapterChart
+                  rows={capitole}
+                  selectie={{ total: progres.capitole.length, criteriu: 'de la cel mai slab' }}
+                />
+              </div>
             </div>
 
             <div className="card" style={{ padding: 20 }}>
