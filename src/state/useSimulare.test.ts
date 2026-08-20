@@ -10,6 +10,7 @@ const corectPentru = (id: string): OptionKey => questionById(id)!.correct;
 const gresitPentru = (id: string): OptionKey => (corectPentru(id) === 'A' ? 'E' : 'A');
 
 const lucrare = (order: string[], answers: Record<number, OptionKey> = {}): SimRun => ({
+  id: 'sim-test',
   startedAt: 1_000,
   endsAt: 1_000 + 120 * 60_000,
   finishedAt: null,

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { QUESTIONS } from '../data/questions';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -100,6 +100,38 @@ describe('predarea lucrării', () => {
     // A doua montare citește din localStorage, ca după un refresh.
     deschide();
     expect(screen.queryByRole('button', { name: /Începe simularea/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * `SimRun.id` a apărut odată cu sincronizarea lucrărilor. O lucrare începută
+   * înainte n-are câmpul, iar dacă validatorul l-ar fi cerut, examenul în curs
+   * ar fi fost aruncat la prima reîncărcare — pierdut, cu cronometrul pornit.
+   * E acceptată fără id și completată la montare.
+   */
+  it('păstrează o lucrare în curs salvată înainte să existe `id`, și îi dă unul', async () => {
+    const acum = Date.now();
+    localStorage.setItem(
+      'medbuc.sim.run',
+      JSON.stringify({
+        startedAt: acum - 60_000,
+        endsAt: acum + 3_600_000,
+        finishedAt: null,
+        config: { model: 'UMFCD · Medicină', nr: '100', durata: '180 minute', ordine: 'Amestecate' },
+        order: [QUESTIONS[0]!.id, QUESTIONS[1]!.id],
+        qi: 0,
+        answers: {},
+        marks: {},
+      }),
+    );
+
+    deschide();
+
+    // Lucrarea e în continuare deschisă, nu s-a revenit la configurare.
+    expect(screen.queryByRole('button', { name: /Începe simularea/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Predă lucrarea' })).toBeInTheDocument();
+
+    await waitFor(() => expect(lucrareaSalvata()?.id).toEqual(expect.any(String)));
+    expect(lucrareaSalvata().order).toEqual([QUESTIONS[0]!.id, QUESTIONS[1]!.id]);
   });
 
   it('o lucrare salvată dintr-o versiune veche e respinsă, nu duce la ecran alb', () => {

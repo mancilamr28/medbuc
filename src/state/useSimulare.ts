@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   questionCap,
   questionMaterie,
@@ -32,6 +32,15 @@ export const DEFAULT_SIM_CONFIG: SimConfig = {
 };
 
 export interface SimRun {
+  /**
+   * Identitatea lucrării, generată la pornire — devine `sim_runs.id` în bază și
+   * `client_key`-ul răspunsurilor, deci o resincronizare nu dublează nimic.
+   *
+   * Lucrările salvate înainte de sincronizare n-o au; `isSimRun` le acceptă
+   * fără ea, iar `useSimulare` o completează la montare, ca o lucrare în curs
+   * să nu fie aruncată doar fiindcă a apărut un câmp nou.
+   */
+  id: string;
   startedAt: number;
   /** Momentul la care expiră timpul — cronometrul curge și cu fereastra închisă. */
   endsAt: number;
@@ -114,6 +123,10 @@ const isSimRun = (v: unknown): v is SimRun => {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Partial<SimRun>;
   return (
+    // `id` lipsește din lucrările salvate înainte de sincronizare. Se acceptă
+    // fără ea și se completează la montare: o lucrare în curs nu se aruncă
+    // fiindcă schema clientului a crescut.
+    (r.id === undefined || (typeof r.id === 'string' && r.id.length > 0)) &&
     typeof r.startedAt === 'number' &&
     typeof r.endsAt === 'number' &&
     // Lucrările salvate înainte de ecranul de rezultat nu au `finishedAt`.
@@ -150,6 +163,12 @@ export interface Simulare {
   reset: () => void;
   /** Timpul a expirat, deci lucrarea s-a încheiat de la sine. */
   expired: boolean;
+  /**
+   * Ora predării, cu expirarea inclusă — `null` cât timp lucrarea e în curs.
+   * Expusă ca `AttemptSync` să nu rescrie regula: dedusă a doua oară acolo, ar
+   * fi ajuns să difere de cea după care ecranul decide că lucrarea s-a încheiat.
+   */
+  finishedAt: number | null;
   /** Bilanțul lucrării; zerouri cât timp nu există o lucrare. */
   score: SimScore;
   run: SimRun | null;
@@ -225,10 +244,18 @@ export function useSimulare(now: number, questions: Question[]): Simulare {
     [setConfigState],
   );
 
+  // O lucrare începută înainte ca lucrările să se sincronizeze n-are `id`.
+  // Se completează o singură dată, în loc să fie respinsă de validator și
+  // aruncată — altfel apariția câmpului ar șterge un examen în curs.
+  useEffect(() => {
+    if (run && !run.id) setRun((prev) => (prev && !prev.id ? { ...prev, id: crypto.randomUUID() } : prev));
+  }, [run, setRun]);
+
   const start = useCallback(() => {
     const count = Number.parseInt(config.nr, 10) || 100;
     const startedAt = Date.now();
     setRun({
+      id: crypto.randomUUID(),
       startedAt,
       endsAt: startedAt + minutesOf(config.durata) * 60_000,
       finishedAt: null,
@@ -320,6 +347,7 @@ export function useSimulare(now: number, questions: Question[]): Simulare {
       finish,
       reset,
       expired,
+      finishedAt,
       score,
       run,
       question,
@@ -342,6 +370,7 @@ export function useSimulare(now: number, questions: Question[]): Simulare {
       config,
       expired,
       finish,
+      finishedAt,
       goTo,
       isMarked,
       phase,
