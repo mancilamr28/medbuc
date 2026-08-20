@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { PunctEvolutie } from '../lib/progres';
@@ -28,7 +28,10 @@ describe('ScoreChart', () => {
   it('arată scara completă, dovezile și regula care împiedică repetările imediate să umfle scorul', () => {
     render(<ScoreChart points={[punct('2026-08-15', 60, 5), punct('2026-08-16', 80, 6)]} grileDistincte={6} />);
 
-    expect(screen.getByRole('group')).toHaveAccessibleName('Stăpânirea grilelor a ajuns la 80% pe baza a 6 grile distincte.');
+    // `<details>`-ul tabelului e tot un `group`, deci desenul se cere pe nume.
+    expect(screen.getByRole('group', { name: /^Stăpânirea grilelor/ })).toHaveAccessibleName(
+      'Stăpânirea grilelor a ajuns la 80% pe baza a 6 grile distincte.',
+    );
     expect(screen.getByText('6 grile distincte · 2 zile măsurate')).toBeInTheDocument();
     expect(screen.getByText(/repetările imediate nu schimbă procentul/)).toBeInTheDocument();
     expect(screen.getAllByText('0%')).not.toHaveLength(0);
@@ -49,8 +52,9 @@ describe('ScoreChart', () => {
 
     await user.hover(screen.getByLabelText('15 aug.: 60% din 5 grile distincte.'));
 
-    expect(screen.getByText('15 aug. · 5 grile distincte')).toBeInTheDocument();
-    expect(screen.getByText('60%')).toBeInTheDocument();
+    // Valorile apar și în tabel, deci căutarea se face în casetă, nu global.
+    const caseta = screen.getByText('15 aug. · 5 grile distincte').parentElement!;
+    expect(within(caseta).getByText('60%')).toBeInTheDocument();
   });
 
   /** „Aceleași detalii la focus ca la hover" — altfel tastatura rămâne fără valori. */
@@ -61,7 +65,29 @@ describe('ScoreChart', () => {
     await user.tab();
 
     expect(screen.getByLabelText('15 aug.: 60% din 5 grile distincte.')).toHaveFocus();
-    expect(screen.getByText('15 aug. · 5 grile distincte')).toBeInTheDocument();
-    expect(screen.getByText('60%')).toBeInTheDocument();
+    const caseta = screen.getByText('15 aug. · 5 grile distincte').parentElement!;
+    expect(within(caseta).getByText('60%')).toBeInTheDocument();
+  });
+
+  /**
+   * Perechea tabelară: aceleași valori, fără să fie nevoie de hover, de focus
+   * sau de vederea desenului. Un tooltip ajută, dar nu poate fi singurul drum
+   * către un număr.
+   */
+  it('pune aceleași valori într-un tabel, ajuns fără hover', async () => {
+    const user = userEvent.setup();
+    render(<ScoreChart points={[punct('2026-08-15', 60, 5), punct('2026-08-16', 80, 6)]} grileDistincte={6} />);
+
+    await user.click(screen.getByText('Datele în tabel'));
+
+    const rand = screen.getByRole('row', { name: /15 aug\./ });
+    expect(within(rand).getByText('60%')).toBeInTheDocument();
+    expect(within(rand).getByText('5')).toBeInTheDocument();
+  });
+
+  it('nu desenează tabel când n-are încă niciun punct', () => {
+    render(<ScoreChart points={[]} grileDistincte={2} />);
+
+    expect(screen.queryByText('Datele în tabel')).not.toBeInTheDocument();
   });
 });
