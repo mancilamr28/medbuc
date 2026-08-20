@@ -16,9 +16,20 @@ npm run test:watch # vitest
 npm run seed       # regenerate supabase/seed.sql from src/data/
 ```
 
+Run one test file, or one case by name:
+
+```bash
+npx vitest run src/state/useSession.test.ts     # one file
+npx vitest run -t "predarea lucrării"           # one test/describe, by name
+```
+
+**The app needs Supabase env vars to boot at all.** `src/lib/supabase.ts` **throws at module load** without `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, and `main.tsx` reaches that import before `createRoot()` — so a missing value is a white page with no `ErrorBoundary`, not a friendly message. Copy `.env.example` to `.env.local` (gitignored) before `npm run dev`. The publishable key is public by design; the real protection is RLS. `VITE_SENTRY_DSN` is the only optional one.
+
+Note the gap this leaves: `ci.yml` builds with **no env vars at all** and still passes, because the throw is at runtime. `deploy.yml` is the workflow that injects them from repository secrets.
+
 There is ESLint, tests, and CI. `.github/workflows/ci.yml` runs lint → typecheck → tests → build on every pull request and on pushes to `master`; `.github/workflows/deploy.yml` publishes to Pages separately. `npm run build` typechecks before bundling, so a type error fails the build. `tsc -b` is incremental via `tsconfig.tsbuildinfo`; if typecheck results look stale, delete that file.
 
-**Node ≥ 22.19 is required** (`package.json` `engines`, both workflows pinned to Node 24) — `jsdom` (`*.test.tsx`) requires `^22.22.2 || ^24.15.0 || >=26.0.0`, and its `undici` dependency requires `>=22.19.0`. On an older Node, every jsdom-environment test file fails to even start its worker (`webidl.util.markAsUncloneable is not a function`) while the `node`-environment tests still pass — a confusing split failure that looks like broken code rather than a runtime mismatch. This bit CI once already, pinned at Node 20.
+**Node `^22.22.2 || ^24.15.0 || >=26.0.0` is required** — that range is `package.json` `engines`, and it comes from `jsdom` (`*.test.tsx`); its `undici` dependency additionally requires `>=22.19.0`. Both workflows are pinned to Node 24. On an older Node, every jsdom-environment test file fails to even start its worker (`webidl.util.markAsUncloneable is not a function`) while the `node`-environment tests still pass — a confusing split failure that looks like broken code rather than a runtime mismatch. This bit CI once already, pinned at Node 20.
 
 `eslint.config.js` only enables `react-hooks/rules-of-hooks` and `react-hooks/exhaustive-deps`, not the plugin's full `recommended` config. Since v7 that config pulls in the React Compiler ruleset (`purity`, `refs`, `set-state-in-effect`, `immutability`, …), and those rules flag `usePersistentState`'s synchronous re-read on key change — the deliberate, tested fix for the note-overwrite bug — as an anti-pattern. Adopting the full set is a separate initiative (preparing for a compiler this project doesn't use); don't widen `extends` to `reactHooks.configs.recommended` without doing that work first.
 
@@ -37,7 +48,18 @@ UI strings, code comments, and domain identifiers are **Romanian** (`materie`, `
 
 ## Architecture
 
-Client-side React 19 + TypeScript + Vite SPA. No backend, no API calls yet — that's Faza 3. All content is hardcoded in `src/data/`; all user state lives in React state or `localStorage`. The one environment variable that exists, `VITE_SENTRY_DSN`, is optional and documented below; there are still no secrets checked in or otherwise required for the app to run.
+React 19 + TypeScript + Vite SPA on **Supabase** — Postgres, Auth and RLS. There is no server of our own: the browser talks to PostgREST directly, and every access rule is a policy in `supabase/migrations/`, not a check in a component.
+
+Which layer owns what:
+
+| Data | Lives in | Notes |
+|---|---|---|
+| Questions (`questions` + `question_options`) | Supabase | Written from Admin via the `salveaza_grila` RPC. `src/data/questions.ts` is now only a seed source and a test fixture — **adding a question there does not make it appear in the app** |
+| Chapters (`MATERII`) | Compiled constant | Deliberately *not* fetched — the public Landing page counts chapters with no session, and the `chapters` select policy is `authenticated`-only. Add one in a migration *and* in `chapters.ts`; `seed.test.ts` enforces the pair |
+| Answers (`attempts`) | Supabase | An immutable journal. Progress, statistics and the review queue are all *derived* from it — nothing stores a `pct` |
+| Notes, theme, settings, exam-in-progress | `localStorage` | `medbuc.*`, via `usePersistentState`. The `notes` table exists but nothing writes to it yet |
+
+**A practice session is memory-only** and syncs once, at `finish()`; **a simulation is never persisted at all** — there is no `syncFinishedSimulare` and `AttemptInsert.source` (`src/lib/attempts.ts`) cannot even express `'simulare'`, although the DB enum, the `sim_run_id` column and the Statistici filter all expect it. Consequences to know before touching that area: a finished exam contributes nothing to progress, its mistakes never reach Recapitulare, and Statistici's "Simulări" row is structurally always zero.
 
 ### Routing — `src/lib/router.ts`
 
@@ -100,7 +122,7 @@ It is the one screen with its own palette: `--lp-*` tokens on `.lp` in `landing.
 
 The global `prefers-reduced-motion` block in `styles.css` only kills `.screen`/`.logo`, so `landing.css` carries its own — **every new `@keyframes` here must be added to it**, and the hooks short-circuit themselves as well.
 
-**The honesty rule applies hardest here.** A landing page is exactly where "1000+ grile" and student counts want to appear. Every figure shown is derived: days from `EXAM_DATE`, chapters and past sessions counted from `MATERII`, per-chapter counts from `chapterQuestionCount()`. The bank's size is deliberately *not* used as a selling point, and only shipped features are promoted — no `statistici`, `plan`, `recapitulare` or `notite`, which are all `InLucru`. The interactive question in the mockup is a real one out of `QUESTIONS`, with its real explanation. Counted nouns still go through `numar()`: "1 grilă", not "1 grile".
+**The honesty rule applies hardest here.** A landing page is exactly where "1000+ grile" and student counts want to appear. Every figure shown is derived: days from `EXAM_DATE`, chapters and past sessions counted from `MATERII`, per-chapter counts from `chapterQuestionCount()`. The bank's size is deliberately *not* used as a selling point, and only shipped features are promoted. **`plan` is the only screen still `InLucru`** — `statistici`, `recapitulare` and `notite` all ship now, so the landing copy is free to name them, and a promise of anything else is a bug. The interactive question in the mockup is a real one out of `QUESTIONS`, with its real explanation. Counted nouns still go through `numar()`: "1 grilă", not "1 grile".
 
 ### Two independent quiz engines (different persistence semantics)
 
@@ -114,7 +136,7 @@ The simulation clock only ticks while its screen is open — `AppState.tsx` pass
 
 **A session is scoped to chapters, and the scope lives in `useSession`, not in the bank it is given.** The hook takes the *whole* library and narrows it itself through the pure `filtreazaCapitole()`; `session.capitole` is the chosen scope and an **empty list means the whole library** — the same convention as the `sessions.chapter_ids` column it is written to, so there is only one meaning for empty. `start(capitole)` opens a new session over a scope, `restart()` reopens the same scope, and `syncFinishedSession` writes `session.capitole` (it used to hardcode `[]`, so a chapter session was indistinguishable from a full-library one).
 
-The consequence to watch: **`session.banca` is the narrowed pool, so nothing that counts the library may read it.** `useApp().questions` is the full one, and that is what `Materii` counts per chapter and `Acasa` reports as the library size — with the session's own pool there, starting a session on one chapter emptied every other chapter in the list and disabled its button. The two are named differently on purpose: they are both `Question[]` and sit one destructuring line apart, so a shared name made that miscount compile.
+The consequence to watch: **`session.banca` is the narrowed pool, so nothing that counts the library may read it.** `useApp().questions` is the full one, and that is what `Acasa` reports as the library size and what `GrileConfig` counts per chapter — with the session's own pool there, starting a session on one chapter emptied every other chapter in the list and disabled its button. The two are named differently on purpose: they are both `Question[]` and sit one destructuring line apart, so a shared name made that miscount compile.
 
 **`PoartaContinut` gates on the library, never on the session.** The gate is shared with `Simulari`, so a session-shaped condition in it reaches a screen that has nothing to do with practice sessions — a chapter session left without questions would have blocked an exam in progress. An empty *scope* is `Grile`'s own state (`CapitolGol`), an empty *library* is the gate's.
 
@@ -124,7 +146,7 @@ The consequence to watch: **`session.banca` is the narrowed pool, so nothing tha
 
 Progress is read from Supabase's immutable `attempts` journal; it is never stored as a `pct` or `done` field. `ProgressProvider` mounts under `AuthProvider`, loads only for an authenticated user, and exposes the raw rows plus loading/error/reload. The context and hook live separately in `progressState.ts`, keeping the provider file a component-only Fast Refresh boundary. It keys the visible rows to the current user id so switching accounts cannot render the previous account's progress for even one frame.
 
-`calculeazaProgres()` is the pure derivation layer. It produces overall correctness, per-chapter coverage/correctness, and one score point per completed session or simulation. Repeated answers increase the answer count but only increase `grileIncercate` once. A response whose question is no longer in the visible runtime library still counts globally and in its run score, but is not guessed into a chapter. Home and Materii both consume this same result. `AttemptSync` calls `reload()` only after the retry-safe write succeeds, so a finished practice session appears without a page refresh.
+`calculeazaProgres()` is the pure derivation layer. It produces overall correctness, per-chapter coverage/correctness, and one score point per completed session or simulation. Repeated answers increase the answer count but only increase `grileIncercate` once. A response whose question is no longer in the visible runtime library still counts globally and in its run score, but is not guessed into a chapter. `Acasa`, `Statistici` and the per-chapter panel in `Grile` all consume this same result. `AttemptSync` calls `reload()` only after the retry-safe write succeeds, so a finished practice session appears without a page refresh.
 
 Real scores may range from 0 to 100. `ScoreChart` therefore uses a zero-based axis; do not restore the old minimum of 45, which came from the fabricated demo series and renders authentic low scores outside the SVG.
 
@@ -205,7 +227,11 @@ Counted figures still need Romanian grammar: `numar()` in `src/lib/text.ts` hand
 
 The counterpart to `EmptyState`: `EmptyState` says a screen has nothing yet, `useToast().notify(kind, message)` says an action just succeeded or failed. Before this there was no such mechanism anywhere in the app — a save with no visible result and a save that silently failed looked identical. `ToastProvider` is mounted in `main.tsx` outside `AppProvider`, since transient notifications don't belong in state that also holds session and exam data.
 
-Not wired to a screen yet — there is no real async action to attach it to until Faza 3 adds one (Admin's save, exam submission feedback). It exists now, tested, the same way the Supabase schema was written and verified before anything used it: don't force a demo call onto an existing button just to prove the primitive works, that recreates exactly the fabricated-feedback problem this was built to solve.
+It is wired now — roughly twenty `notify()` calls across Admin, ImportGrile, Autentificare, ResetareParolaFinalizare and Setari.
+
+**Reach for it instead of inventing a fourth mechanism.** There are already four ways a failure reaches the user, with no rule choosing between them: toasts, local inline error state (`Autentificare` uses *both* — inline for sign-in failure, toast for success), `EmptyState` with a retry action, and a bespoke fixed-position alert card in `AttemptSync.tsx` that reimplements the toast container at a higher `z-index`. Prefer `notify()`; converging the rest is a worthwhile cleanup, not a reason to add a fifth.
+
+Separately, **`reportError` from `src/lib/sentry.ts` has exactly one caller** (`ErrorBoundary.componentDidCatch`), so Sentry sees render crashes and nothing else — every failed save, RLS rejection and dropped sync is invisible in production. It is documented as safe to call unconditionally, so adding it to a `catch` block costs one line.
 
 **Questions have a stable `id`** (`QuestionId`, e.g. `bio-nervos-01`), and anything persisted or passed around must reference that id — never the array position. `QUESTION_BY_ID` / `questionById()` resolve it and `isQuestionId()` validates it. This is why `SimRun.order` stores ids: with positions, inserting one question into the middle of the bank silently rewrote the content of every saved paper. `QUESTION_BY_ID` is built at the bottom of the file, after `QUESTIONS` — building it earlier is a temporal-dead-zone crash at import time. Ids must be unique; a duplicate throws on module load rather than making a question unreachable.
 
@@ -217,7 +243,7 @@ Renaming a persisted key means the old one must be moved, not abandoned: `src/li
 
 ### Database schema — `supabase/`
 
-SQL for a backend that does not exist yet: the app still reads from `src/data/`, and nothing here is wired to it. The schema was written first, in SQL, so the model would be designed rather than translated from TypeScript types later. `supabase/README.md` carries the design decisions; the ones that constrain future work:
+This is live — the app reads and writes it. The schema was written first, in SQL, so the model would be designed rather than translated from TypeScript types later. `supabase/README.md` carries the design decisions; the ones that constrain future work:
 
 - **Content ids are human-written `text`** (`bio-nervos`, `bio-nervos-01`), not `uuid` — they are already the app's identity and are embedded in saved exam papers, so a simulation started before the migration stays valid after it.
 - **`attempts` is a journal, not state.** One row per answer, the single source for progress, statistics and spaced repetition. Nothing stores a denormalised `pct` or `done` — that is exactly how the fabricated figures appeared. There are deliberately no `update`/`delete` policies on it.
@@ -234,6 +260,16 @@ Note the harness detail that already bit once: it uses session-level `set role`,
 - **`noUncheckedIndexedAccess`** — array/record indexing yields `T | undefined`. Existing code uses `!` or `??` fallbacks after indexing (e.g. `QUESTIONS[index] ?? QUESTIONS[0]!`). Follow that pattern.
 - **`verbatimModuleSyntax`** — type-only imports must use `import type { ... }` (or inline `type` specifiers, as in `import { QUESTIONS, type Question }`).
 - **`noUnusedLocals` / `noUnusedParameters`** — an unused variable fails the build, not just lints.
+
+## Contributing conventions
+
+- **Work through a pull request**, never straight onto `master`. Every commit in the history arrived that way, squash-merged.
+- **Commit messages and PR bodies are Romanian**, like the rest of the project, and explain *why* — the shape of the bug, not just the change. Recent history is the reference.
+- **Do not add `Co-Authored-By` trailers**, and do not append "Generated with…" footers to PR bodies. The repository owner asked for these to stay out and the existing history was rewritten to remove them.
+
+## If you see an `AGENTS.md`
+
+It is **untracked and local** — not part of the repository, so a fresh clone will not have one. Where it exists it is byte-identical to this file apart from the title and the tool it names, kept for an agent that reads that filename. Nothing generates it, so editing this file leaves that copy stale; update both, or delete it.
 
 ## Deployment
 
