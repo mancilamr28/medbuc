@@ -65,6 +65,17 @@ const deschide = () =>
     </AppProvider>,
   );
 
+/**
+ * Remontare fără `PornesteBiblioteca` — exact ce se întâmplă la un refresh:
+ * aplicația pornește și trebuie să regăsească singură sesiunea din localStorage.
+ */
+const reincarca = (banca = QUESTIONS) =>
+  render(
+    <AppProvider questions={banca}>
+      <Grile />
+    </AppProvider>,
+  );
+
 const buton = (name: RegExp | string) => screen.getByRole('button', { name });
 
 /** Alege varianta corectă a grilei aflate pe ecran, oricare ar fi ea. */
@@ -214,5 +225,50 @@ describe('sesiunea de grile', () => {
     expect(within(panou).queryByText('Statisticile apar după primele răspunsuri')).not.toBeInTheDocument();
 
     jurnal.attempts = [];
+  });
+});
+
+describe('sesiunea supraviețuiește reîncărcării', () => {
+  /**
+   * Sesiunea trăia doar în `useState`: un refresh ștergea răspunsurile,
+   * cronometrul și rezultatul — deși „Reia sesiunea" de pe Acasă promitea
+   * contrariul. Din 18 sesiuni înregistrate, 8 n-au scris niciun răspuns.
+   */
+  it('păstrează răspunsurile și poziția după o remontare', async () => {
+    const { unmount } = deschide();
+    await raspundeCorect(0);
+    await userEvent.click(buton('Verifică răspunsul'));
+    await userEvent.click(buton(/Grila 2/));
+    unmount();
+
+    reincarca();
+
+    // Nu s-a revenit la configurare: „Scopul sesiunii" e al formularului.
+    expect(screen.queryByRole('tablist', { name: 'Scopul sesiunii' })).not.toBeInTheDocument();
+    expect(screen.getByText(`Grila 2 din ${QUESTIONS.length}`)).toBeInTheDocument();
+
+    // Prima grilă e în continuare verificată, cu răspunsul dat.
+    await userEvent.click(buton(/Grila 1/));
+    for (const optiune of screen.getAllByRole('radio')) {
+      expect(optiune).toBeDisabled();
+    }
+  });
+
+  /**
+   * Miezul reparației de integritate: `order` ține id-uri, nu poziții. Banca se
+   * recalcula din biblioteca vie, deci o grilă adăugată sau retrasă muta
+   * răspunsurile pe alte grile — iar `attemptsFromSession` scria apoi în
+   * jurnalul *imuabil* id-ul grilei aflate acum pe poziția aceea.
+   */
+  it('rămâne pe aceleași grile chiar dacă biblioteca s-a schimbat între timp', async () => {
+    const { unmount } = deschide();
+    expect(screen.getByText(QUESTIONS[0]!.text)).toBeInTheDocument();
+    unmount();
+
+    // Biblioteca revine cu altă ordine: poziția 0 e acum altă grilă.
+    reincarca([...QUESTIONS].reverse());
+
+    expect(screen.getByText(QUESTIONS[0]!.text)).toBeInTheDocument();
+    expect(screen.queryByText(QUESTIONS.at(-1)!.text)).not.toBeInTheDocument();
   });
 });

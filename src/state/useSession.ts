@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChapterId } from '../data/chapters';
-import type { OptionKey, Question, QuestionSursa } from '../data/questions';
+import type { OptionKey, Question, QuestionId, QuestionSursa } from '../data/questions';
+import { usePersistentState } from '../lib/hooks';
 
 export interface SessionScore {
   corecte: number;
@@ -21,7 +22,9 @@ export interface SessionScore {
  * raportat la total, deci grilele fără răspuns contează în minus.
  */
 export function scoreOf(
-  questions: readonly Question[],
+  // Poziția poate fi goală: banca se rezolvă din id-uri, iar o grilă retrasă
+  // după pornirea sesiunii lasă un gol care nu are voie să mute restul.
+  questions: readonly (Question | undefined)[],
   answers: Record<number, OptionKey>,
   durataMs: number,
 ): SessionScore {
@@ -31,7 +34,7 @@ export function scoreOf(
     const ales = answers[i];
     if (ales === undefined) return;
     raspunse += 1;
-    if (ales === q.correct) corecte += 1;
+    if (q !== undefined && ales === q.correct) corecte += 1;
   });
   const total = questions.length;
   return {
@@ -66,6 +69,56 @@ export function filtreazaCapitole(
   );
 }
 
+/**
+ * Sesiunea salvată, în forma care ajunge în `localStorage`.
+ *
+ * Până acum sesiunea trăia doar în `useState`: o reîncărcare ștergea
+ * răspunsurile, cronometrul și rezultatul, deși „Reia sesiunea" de pe Acasă
+ * promitea contrariul. Din 18 sesiuni înregistrate, 8 n-au ajuns să scrie
+ * niciun răspuns.
+ *
+ * `order` ține **id-uri, nu poziții**, ca la `SimRun`: banca se recalcula din
+ * biblioteca vie, deci o grilă adăugată sau retrasă între două randări muta
+ * răspunsurile pe alte grile — iar `attemptsFromSession` scria în jurnalul
+ * *imuabil* `attempts` id-ul grilei aflate acum pe poziția aceea.
+ */
+export interface SessionRun {
+  id: string;
+  capitole: ChapterId[];
+  surse: QuestionSursa[];
+  /** Ordinea grilelor, înghețată la pornire. */
+  order: QuestionId[];
+  qi: number;
+  answers: Record<number, OptionKey>;
+  revealed: Record<number, boolean>;
+  marked: Record<number, boolean>;
+  startedAt: number;
+  finishedAt: number | null;
+}
+
+const esteHartaDe = (v: unknown): boolean => typeof v === 'object' && v !== null;
+
+/** Ce nu trece e aruncat și șters, ca o formă veche să nu albească ecranul. */
+export const isSessionRun = (v: unknown): v is SessionRun => {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Partial<SessionRun>;
+  return (
+    typeof r.id === 'string' &&
+    r.id.length > 0 &&
+    Array.isArray(r.capitole) &&
+    Array.isArray(r.surse) &&
+    Array.isArray(r.order) &&
+    r.order.every((id) => typeof id === 'string' && id.length > 0) &&
+    typeof r.qi === 'number' &&
+    r.qi >= 0 &&
+    typeof r.startedAt === 'number' &&
+    (r.finishedAt === null || typeof r.finishedAt === 'number') &&
+    esteHartaDe(r.answers) &&
+    esteHartaDe(r.revealed) &&
+    esteHartaDe(r.marked)
+  );
+};
+
 export interface Session {
   /** Identificator stabil pentru sincronizarea sesiunii finalizate. */
   id: string;
@@ -85,15 +138,18 @@ export interface Session {
    */
   question: Question | undefined;
   /**
-   * Banca sesiunii: biblioteca restrânsă la `capitole`.
+   * Banca sesiunii: grilele din `order`, rezolvate prin biblioteca încărcată.
    *
-   * Se numește altfel decât `useApp().questions` intenționat. Cele două sunt
-   * amândouă `Question[]` și stau la o linie de destructurare una de alta, iar
-   * bug-ul care a impus scopul pe capitole a fost exact confuzia dintre ele —
-   * `Materii` număra biblioteca din bancă. Cu nume diferite, greșeala nu mai
-   * compilează în loc să dea o cifră greșită.
+   * O poziție poate fi goală — grilă retrasă după pornire — și golul se
+   * păstrează, nu se compactează: altfel răspunsurile de după ar aluneca pe
+   * alte grile.
+   *
+   * Se numește altfel decât `useApp().questions` intenționat. Cele două stau la
+   * o linie de destructurare una de alta, iar bug-ul care a impus scopul pe
+   * capitole a fost exact confuzia dintre ele. Cu nume diferite, greșeala nu
+   * mai compilează în loc să dea o cifră greșită.
    */
-  banca: Question[];
+  banca: (Question | undefined)[];
   total: number;
   answers: Record<number, OptionKey>;
   revealed: Record<number, boolean>;
@@ -161,19 +217,43 @@ export interface Session {
  * altfel „Exersează" pe un capitol ar face ca celelalte capitole să pară goale.
  */
 export function useSession(questions: Question[]): Session {
-  const [id, setId] = useState(() => crypto.randomUUID());
-  const [capitole, setCapitole] = useState<ChapterId[]>([]);
-  const [surse, setSurse] = useState<QuestionSursa[]>([]);
-  const [qi, setQi] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, OptionKey>>({});
-  const [revealed, setRevealed] = useState<Record<number, boolean>>({});
-  const [marked, setMarked] = useState<Record<number, boolean>>({});
-  const [startedAt, setStartedAt] = useState(() => Date.now());
-  const [finishedAt, setFinishedAt] = useState<number | null>(null);
-  const [hasStarted, setHasStarted] = useState(false);
+  const [run, setRun] = usePersistentState<SessionRun | null>(
+    'medbuc.sesiune',
+    null,
+    (v): v is SessionRun | null => v === null || isSessionRun(v),
+  );
+  // Intenție de interfață, nu date: după o reîncărcare vrem sesiunea reluată,
+  // nu formularul de configurare.
   const [forcedConfig, setForcedConfig] = useState(false);
 
-  const banca = useMemo(() => filtreazaCapitole(questions, capitole, surse), [capitole, questions, surse]);
+  /**
+   * `start` nu are voie să depindă de identitatea bibliotecii: `Grile` pornește
+   * sesiunea dintr-un efect care depinde de `start`, iar o reîncărcare a
+   * conținutului ar reporni sesiunea în curs.
+   */
+  const questionsRef = useRef(questions);
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
+
+  const byId = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
+
+  const id = run?.id ?? '';
+  const capitole = useMemo(() => run?.capitole ?? [], [run]);
+  const surse = useMemo(() => run?.surse ?? [], [run]);
+  const qi = run?.qi ?? 0;
+  const answers = useMemo(() => run?.answers ?? {}, [run]);
+  const revealed = useMemo(() => run?.revealed ?? {}, [run]);
+  const marked = useMemo(() => run?.marked ?? {}, [run]);
+  const startedAt = run?.startedAt ?? 0;
+  const finishedAt = run?.finishedAt ?? null;
+  const hasStarted = run !== null;
+
+  /** Golurile se păstrează: compactarea ar muta răspunsurile pe alte grile. */
+  const banca = useMemo(
+    () => (run ? run.order.map((qid) => byId.get(qid)) : []),
+    [byId, run],
+  );
 
   const total = banca.length;
   const question = banca[qi];
@@ -181,39 +261,62 @@ export function useSession(questions: Question[]): Session {
   const isRevealed = !!revealed[qi];
   const isCorrect = question !== undefined && answer === question.correct;
 
+  const patch = useCallback(
+    (change: (prev: SessionRun) => SessionRun) => setRun((prev) => (prev ? change(prev) : prev)),
+    [setRun],
+  );
+
   /** Odată verificată grila, răspunsul rămâne blocat. */
   const pick = useCallback(
-    (key: OptionKey) => {
-      if (revealed[qi]) return;
-      setAnswers((prev) => ({ ...prev, [qi]: key }));
-    },
-    [qi, revealed],
+    (key: OptionKey) =>
+      patch((prev) =>
+        prev.revealed[prev.qi] ? prev : { ...prev, answers: { ...prev.answers, [prev.qi]: key } },
+      ),
+    [patch],
   );
 
   /** Navigarea se oprește la capete: ultima grilă trebuie să rămână ultima. */
-  const goTo = useCallback((index: number) => setQi(Math.max(0, Math.min(index, total - 1))), [total]);
-  const next = useCallback(() => setQi((i) => Math.min(i + 1, total - 1)), [total]);
-  const prev = useCallback(() => setQi((i) => Math.max(i - 1, 0)), []);
+  const goTo = useCallback(
+    (index: number) =>
+      patch((prev) => ({ ...prev, qi: Math.max(0, Math.min(index, prev.order.length - 1)) })),
+    [patch],
+  );
+  const next = useCallback(
+    () => patch((prev) => ({ ...prev, qi: Math.min(prev.qi + 1, prev.order.length - 1) })),
+    [patch],
+  );
+  const prev = useCallback(() => patch((p) => ({ ...p, qi: Math.max(p.qi - 1, 0) })), [patch]);
 
   /** Idempotent: o sesiune încheiată nu-și rescrie momentul de final. */
-  const finish = useCallback(() => setFinishedAt((f) => f ?? Date.now()), []);
+  const finish = useCallback(
+    () => patch((prev) => (prev.finishedAt === null ? { ...prev, finishedAt: Date.now() } : prev)),
+    [patch],
+  );
 
   // Parametrul nu se numește `capitole`: `restart` chiar dedesubt închide peste
   // starea cu același nume, iar confuzia dintre ele ar schimba tăcut din ce
   // capitole se reia sesiunea.
-  const start = useCallback((noiCapitole: ChapterId[], noiSurse: QuestionSursa[] = []) => {
-    setCapitole(noiCapitole);
-    setSurse(noiSurse);
-    setId(crypto.randomUUID());
-    setQi(0);
-    setAnswers({});
-    setRevealed({});
-    setMarked({});
-    setFinishedAt(null);
-    setStartedAt(Date.now());
-    setHasStarted(true);
-    setForcedConfig(false);
-  }, []);
+  const start = useCallback(
+    (noiCapitole: ChapterId[], noiSurse: QuestionSursa[] = []) => {
+      // Ordinea se îngheață aici, ca id-uri: de acum înainte sesiunea nu se mai
+      // uită la ce e în bibliotecă, ci la ce avea când a pornit.
+      const bazin = filtreazaCapitole(questionsRef.current, noiCapitole, noiSurse);
+      setRun({
+        id: crypto.randomUUID(),
+        capitole: noiCapitole,
+        surse: noiSurse,
+        order: bazin.map((q) => q.id),
+        qi: 0,
+        answers: {},
+        revealed: {},
+        marked: {},
+        startedAt: Date.now(),
+        finishedAt: null,
+      });
+      setForcedConfig(false);
+    },
+    [setRun],
+  );
 
   /** Aceleași capitole și surse, de la zero: „Reia sesiunea" nu are voie să lărgească bazinul. */
   const restart = useCallback(() => start(capitole, surse), [capitole, start, surse]);
@@ -225,20 +328,23 @@ export function useSession(questions: Question[]): Session {
 
   const primary = useCallback(() => {
     if (!revealed[qi]) {
-      if (answers[qi]) setRevealed((prev) => ({ ...prev, [qi]: true }));
+      if (answers[qi]) patch((prev) => ({ ...prev, revealed: { ...prev.revealed, [prev.qi]: true } }));
       return;
     }
     if (qi >= total - 1) finish();
     else next();
-  }, [answers, finish, next, qi, revealed, total]);
+  }, [answers, finish, next, patch, qi, revealed, total]);
 
-  const toggleMark = useCallback(() => setMarked((prev) => ({ ...prev, [qi]: !prev[qi] })), [qi]);
+  const toggleMark = useCallback(
+    () => patch((p) => ({ ...p, marked: { ...p.marked, [p.qi]: !p.marked[p.qi] } })),
+    [patch],
+  );
 
   const tally = useMemo(() => {
     let corecte = 0;
     let gresite = 0;
     banca.forEach((q, i) => {
-      if (!revealed[i]) return;
+      if (!revealed[i] || q === undefined) return;
       if (answers[i] === q.correct) corecte += 1;
       else gresite += 1;
     });
