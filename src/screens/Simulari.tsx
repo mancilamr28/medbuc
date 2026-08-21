@@ -3,6 +3,7 @@ import { AnswerOptions } from '../components/AnswerOptions';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { EmptyState } from '../components/EmptyState';
+import { PasulUrmator } from '../components/PasulUrmator';
 import { PoartaContinut } from '../components/PoartaContinut';
 import { questionCap, questionMaterie, tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
@@ -536,6 +537,8 @@ function SimRezultat() {
               </button>
             </div>
           </div>
+
+          <PasulUrmator gresite={gresite} />
 
           <div className="card" style={{ padding: 26, marginTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

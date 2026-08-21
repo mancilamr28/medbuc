@@ -74,6 +74,25 @@ describe('recapitularea inteligentă', () => {
     });
   });
 
+  /**
+   * Cealaltă jumătate a buclei: recapitularea spune singură ce se întâmplă cu
+   * greșelile, dar nu ducea nicăieri unde se vede că progresul s-a mișcat.
+   */
+  it('duce de la rezultatul recapitulării la progres', async () => {
+    const user = userEvent.setup();
+    const question = QUESTIONS[0]!;
+    deschide([raspunsGresit()]);
+
+    await user.click(screen.getByRole('button', { name: /Începe recapitularea/ }));
+    const variantaCorecta = question.opts.find(([key]) => key === question.correct)![1];
+    await user.click(screen.getByRole('radio', { name: new RegExp(variantaCorecta.slice(0, 24), 'i') }));
+    await user.click(screen.getByRole('button', { name: 'Verifică răspunsul' }));
+    await user.click(screen.getByRole('button', { name: /Vezi rezultatul/ }));
+
+    await user.click(screen.getByRole('button', { name: /Vezi progresul/ }));
+    expect(window.location.hash).toBe('#/statistici');
+  });
+
   it('nu inventează o coadă înainte de prima greșeală', () => {
     deschide();
 

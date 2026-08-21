@@ -196,6 +196,44 @@ describe('sesiunea de grile', () => {
     expect(screen.getByText(`Grila 1 din ${QUESTIONS.length}`)).toBeInTheDocument();
   });
 
+  /**
+   * Panoul de rezultat era o fundătură: aflai scorul și puteai doar să reiei
+   * sesiunea sau să te întorci acasă. Momentul de după sesiune e chiar cel în
+   * care bucla trebuie să se închidă — greșelile tocmai au intrat în coadă.
+   */
+  it('duce de la rezultat la recapitulare și la progres', async () => {
+    window.location.hash = '#/grile';
+    deschide();
+    const q = QUESTIONS[0]!;
+    const gresita = q.opts.find(([k]) => k !== q.correct)![1];
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(gresita.slice(0, 24), 'i') }));
+    await userEvent.click(buton('Verifică răspunsul'));
+    await userEvent.click(buton('Încheie sesiunea'));
+
+    expect(screen.getByText('1 grilă greșită intră în coada de recapitulare.')).toBeInTheDocument();
+    await userEvent.click(buton(/Revezi greșelile/));
+    expect(window.location.hash).toBe('#/recapitulare');
+
+    await userEvent.click(buton(/Vezi progresul/));
+    expect(window.location.hash).toBe('#/statistici');
+  });
+
+  /**
+   * O grilă fără răspuns nu ajunge în jurnal, deci nu intră în coadă. Butonul
+   * ar promite o recapitulare pe care sesiunea n-a alimentat-o.
+   */
+  it('nu trimite la recapitulare o sesiune fără nicio greșeală', async () => {
+    window.location.hash = '#/grile';
+    deschide();
+    await userEvent.click(buton('Încheie sesiunea'));
+
+    expect(screen.queryByRole('button', { name: /Revezi greșelile/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText('N-ai greșit nicio grilă, deci n-ai ce adăuga în coada de recapitulare.'),
+    ).toBeInTheDocument();
+    expect(buton(/Vezi progresul/)).toBeInTheDocument();
+  });
+
   it('nu afișează statistici inventate înainte să existe răspunsuri', async () => {
     deschide();
     await userEvent.click(screen.getByRole('tab', { name: 'Cu context' }));
