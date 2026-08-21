@@ -4,17 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttemptSync } from './AttemptSync';
 
 const stare = vi.hoisted(() => ({
+  syncSesiune: vi.fn(),
   syncRecapitulare: vi.fn(),
   syncSimulare: vi.fn(),
+  raporteaza: vi.fn(),
   reload: vi.fn(async () => {}),
   user: { id: 'user-1' },
-  session: { id: 'sesiune-1', finished: false },
+  session: { id: 'sesiune-1', finished: false } as { id: string; finished: boolean; finishedAt?: number },
   recapitulare: { id: 'recap-1', phase: 'rezultat', finishedAt: 2_000 },
   // Fără lucrare predată, efectul de simulare nu pornește.
   sim: { run: null as { id: string } | null, finishedAt: null as number | null },
 }));
 
-vi.mock('../lib/syncAttempts', () => ({ syncFinishedSession: vi.fn() }));
+vi.mock('../lib/sentry', () => ({ reportError: (...a: unknown[]) => stare.raporteaza(...a) }));
+vi.mock('../lib/syncAttempts', () => ({
+  syncFinishedSession: (...args: unknown[]) => stare.syncSesiune(...args),
+}));
 vi.mock('../lib/syncRecapitulare', () => ({
   syncFinishedRecapitulare: (...args: unknown[]) => stare.syncRecapitulare(...args),
 }));
@@ -35,13 +40,16 @@ vi.mock('../state/appContextValue', () => ({
 }));
 
 beforeEach(() => {
-  // Implicit reușesc amândouă: testele care vor un eșec îl cer cu `…Once`.
+  // Implicit reușesc toate: testele care vor un eșec îl cer cu `…Once`.
   // Fără valoarea implicită, `mockReset` lasă mock-ul să întoarcă `undefined`,
   // iar `.then()` din efect crapă.
+  stare.syncSesiune.mockReset().mockResolvedValue(undefined);
   stare.syncRecapitulare.mockReset().mockResolvedValue(undefined);
   stare.syncSimulare.mockReset().mockResolvedValue(undefined);
+  stare.raporteaza.mockReset();
   stare.reload.mockClear();
   stare.sim = { run: null, finishedAt: null };
+  stare.session = { id: 'sesiune-1', finished: false };
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -93,5 +101,74 @@ describe('sincronizarea simulării', () => {
     rerender(<AttemptSync />);
 
     expect(stare.syncSimulare).toHaveBeenCalledOnce();
+  });
+});
+
+describe('eșecul salvării', () => {
+  /**
+   * Miezul reparației. Recapitularea avea de mult card de reîncercare, dar o
+   * sesiune care nu se salva scria doar un `console.warn`: elevul își vedea
+   * scorul, pleca de pe ecran, iar răspunsurile nu existau nicăieri. Aceeași
+   * cale, două tratamente, în același fișier.
+   */
+  it('anunță o sesiune nesalvată, nu doar în consolă', async () => {
+    stare.session = { id: 'sesiune-1', finished: true, finishedAt: 1_000 };
+    stare.syncSesiune.mockRejectedValueOnce(new Error('offline'));
+
+    render(<AttemptSync />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sesiunea nu a fost salvată.');
+  });
+
+  it('anunță și o simulare nesalvată', async () => {
+    stare.sim = { run: { id: 'sim-1' }, finishedAt: 5_000 };
+    stare.syncSimulare.mockRejectedValueOnce(new Error('offline'));
+
+    render(<AttemptSync />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Simularea nu a fost salvată.');
+  });
+
+  /** Sentry vedea doar căderile de randare; o respingere RLS era invizibilă. */
+  it('raportează eșecul, ca să nu rămână doar pe ecranul elevului', async () => {
+    stare.session = { id: 'sesiune-1', finished: true, finishedAt: 1_000 };
+    const eroare = new Error('rls');
+    stare.syncSesiune.mockRejectedValueOnce(eroare);
+
+    render(<AttemptSync />);
+
+    await waitFor(() => expect(stare.raporteaza).toHaveBeenCalled());
+    expect(stare.raporteaza.mock.calls[0]![0]).toBe(eroare);
+  });
+
+  it('reîncercarea salvează și face cardul să dispară', async () => {
+    const user = userEvent.setup();
+    stare.session = { id: 'sesiune-1', finished: true, finishedAt: 1_000 };
+    stare.syncSesiune.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined);
+
+    render(<AttemptSync />);
+    await screen.findByRole('alert');
+
+    await user.click(screen.getByRole('button', { name: 'Reîncearcă salvarea' }));
+
+    await waitFor(() => expect(stare.syncSesiune).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  /** Două căi picate deodată (offline) se spun amândouă, într-un singur card. */
+  it('adună mai multe eșecuri într-un singur card', async () => {
+    stare.session = { id: 'sesiune-1', finished: true, finishedAt: 1_000 };
+    stare.sim = { run: { id: 'sim-1' }, finishedAt: 5_000 };
+    stare.syncSesiune.mockRejectedValueOnce(new Error('offline'));
+    stare.syncSimulare.mockRejectedValueOnce(new Error('offline'));
+
+    render(<AttemptSync />);
+
+    // Se recitește de fiecare dată: React înlocuiește nodul la re-randare, iar
+    // o referință păstrată ar rămâne detașată din document.
+    await screen.findByRole('alert');
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Sesiunea nu a fost salvată.'));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Simularea nu a fost salvată.'));
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
   });
 });
