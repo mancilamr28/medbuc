@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
 import type { Screen } from '../lib/router';
+import type { Taxonomie } from '../lib/taxonomie';
 import type { Session } from './useSession';
 import type { Simulare } from './useSimulare';
 import type { Recapitulare } from './useRecapitulare';
@@ -17,6 +18,8 @@ export interface AppValue {
   setMaterie: (id: MaterieId) => void;
   /** Biblioteca întreagă; `session.banca` este doar domeniul sesiunii curente. */
   questions: Question[];
+  /** Materiile și capitolele, din bază. Etichetele de capitol vin de aici. */
+  taxonomie: Taxonomie;
   session: Session;
   recapitulare: Recapitulare;
   sim: Simulare;

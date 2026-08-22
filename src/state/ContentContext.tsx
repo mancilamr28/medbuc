@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { incarcaGrile, type GrilaCuStare } from '../lib/continut';
+import { incarcaGrile, incarcaTaxonomie, type GrilaCuStare } from '../lib/continut';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { useAuth } from './authState';
 import { ContentContext, type ContentValue } from './contentState';
 
@@ -28,6 +29,7 @@ import { ContentContext, type ContentValue } from './contentState';
 export function ContentProvider({ children }: { children: ReactNode }) {
   const { user, loading: sesiuneaSeIncarca } = useAuth();
   const [grile, setGrile] = useState<GrilaCuStare[]>([]);
+  const [taxonomie, setTaxonomie] = useState<Taxonomie>(TAXONOMIE_GOALA);
   const [seIncarca, setSeIncarca] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +65,26 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     void incarca();
   }, [incarca, user]);
 
+  /**
+   * Taxonomia se cere o dată, cu sau fără cont.
+   *
+   * Spre deosebire de grile, materiile și capitolele publicate se citesc și de
+   * `anon`, iar pagina de prezentare le numără fără sesiune. O eroare aici nu
+   * oprește nimic: fiecare funcție din `Taxonomie` cade înapoi pe id-ul brut,
+   * deci ecranul arată id-uri în loc de titluri — vizibil, nu stricat.
+   */
+  useEffect(() => {
+    let anulat = false;
+    void incarcaTaxonomie()
+      .then((t) => {
+        if (!anulat) setTaxonomie(t);
+      })
+      .catch((e: unknown) => console.warn('[medbuc] Încărcarea taxonomiei a eșuat.', e));
+    return () => {
+      anulat = true;
+    };
+  }, []);
+
   // Cât timp sesiunea încă se rezolvă, biblioteca e „în curs", nu „goală": altfel
   // ecranele ar apuca să anunțe o bibliotecă fără grile înainte să fi cerut una.
   const loading = sesiuneaSeIncarca || seIncarca;
@@ -73,11 +95,12 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       // Motoarele primesc doar publicatele. Filtrarea se face aici, nu în
       // interogare: administratorul are nevoie și de ciorne, în aceeași încărcare.
       questions: grile.filter((g) => g.status === 'publicata'),
+      taxonomie,
       loading,
       error,
       reload: incarca,
     }),
-    [grile, loading, error, incarca],
+    [grile, taxonomie, loading, error, incarca],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

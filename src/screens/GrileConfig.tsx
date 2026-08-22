@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import { Icon } from '../components/Icon';
 import { Segmented } from '../components/Segmented';
-import { MATERII, MATERIE_TABS, chapterLabel, type ChapterId, type MaterieId } from '../data/chapters';
+import { chapterLabel, type ChapterId, type MaterieId } from '../data/chapters';
 import type { QuestionSursa } from '../data/questions';
 import { numaraGrile } from '../lib/continut';
 import { calculeazaProgres, capitoleSlabe } from '../lib/progres';
@@ -34,21 +34,24 @@ const SURSA_ITEMS: { id: QuestionSursa | 'toate'; label: string }[] = [
  * porni imediat cu „Toată materia" / „Toate sursele" sau le poate ajusta.
  */
 export function GrileConfig() {
-  const { materie, setMaterie, questions, session } = useApp();
+  const { materie, setMaterie, questions, session, taxonomie } = useApp();
   const progressContext = useProgressOptional();
   const [scop, setScop] = useState<Scop>('materie');
   const [sursaAleasa, setSursaAleasa] = useState<QuestionSursa | 'toate'>('toate');
   const [capitoleAlese, setCapitoleAlese] = useState<ChapterId[]>([]);
 
-  const mat = MATERII[materie];
-  const { peCapitol } = useMemo(() => numaraGrile(questions), [questions]);
+  // Materia aleasă poate lipsi cât timp taxonomia încă se încarcă, sau dacă a
+  // fost depublicată din administrare între timp: se cade pe prima disponibilă.
+  const mat = taxonomie.materie(materie) ?? taxonomie.materii[0] ?? null;
+  const capitole = useMemo(() => mat?.list ?? [], [mat]);
+  const { peCapitol } = useMemo(() => numaraGrile(questions, taxonomie), [questions, taxonomie]);
   const progres = useMemo(
-    () => calculeazaProgres(progressContext?.attempts ?? [], questions),
-    [progressContext?.attempts, questions],
+    () => calculeazaProgres(progressContext?.attempts ?? [], questions, taxonomie),
+    [progressContext?.attempts, questions, taxonomie],
   );
   const slabe = useMemo(
-    () => capitoleSlabe(progres.capitole, mat.list.map((c) => c.id)),
-    [mat, progres.capitole],
+    () => capitoleSlabe(progres.capitole, capitole.map((c) => c.id)),
+    [capitole, progres.capitole],
   );
 
   const alegeMaterie = (id: MaterieId) => {
@@ -61,7 +64,7 @@ export function GrileConfig() {
 
   const capitoleFinale: ChapterId[] =
     scop === 'materie'
-      ? mat.list.map((c) => c.id)
+      ? capitole.map((c) => c.id)
       : scop === 'capitole'
         ? capitoleAlese
         : slabe.map((c) => c.capId);
@@ -91,8 +94,8 @@ export function GrileConfig() {
           <div>
             <div style={eyebrow(undefined, 11)}>Materie</div>
             <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {MATERIE_TABS.map((t) => {
-                const activ = materie === t.id;
+              {taxonomie.materii.map((t) => {
+                const activ = mat?.id === t.id;
                 return (
                   <button
                     key={t.id}
@@ -110,7 +113,7 @@ export function GrileConfig() {
                       color: activ ? 'var(--onBrand)' : 'var(--fg2)',
                     }}
                   >
-                    {t.label}
+                    {t.name}
                   </button>
                 );
               })}
@@ -125,7 +128,7 @@ export function GrileConfig() {
 
             {scop === 'capitole' && (
               <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {mat.list.map((c) => {
+                {capitole.map((c) => {
                   const grile = peCapitol.get(c.id) ?? 0;
                   const ales = capitoleAlese.includes(c.id);
                   return (
@@ -178,7 +181,7 @@ export function GrileConfig() {
               <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {slabe.length === 0 ? (
                   <p style={{ margin: 0, font: `400 13px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
-                    Nu ai încă niciun capitol cu răspunsuri greșite la {mat.name.toLowerCase()} — rezolvă
+                    Nu ai încă niciun capitol cu răspunsuri greșite la {(mat?.name ?? 'materia asta').toLowerCase()} — rezolvă
                     câteva grile ca să apară aici.
                   </p>
                 ) : (

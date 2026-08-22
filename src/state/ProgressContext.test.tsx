@@ -13,11 +13,19 @@ vi.mock('./authState', () => ({
   useAuth: () => ({ user: stare.user, loading: false }),
 }));
 
+// Lanțul e cel real — `select(...).order(...).range(...)` — fiindcă citirile trec
+// acum prin `citesteTot`, care paginează. Un fals oprit la `order` ar trece
+// verde peste tocmai bucata care s-a schimbat.
 vi.mock('../lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({
-        order: async () => ({ data: stare.randuri[stare.user?.id ?? ''] ?? [], error: null }),
+        order: () => ({
+          range: async () => {
+            const randuri = stare.randuri[stare.user?.id ?? ''] ?? [];
+            return { data: randuri, error: null, count: randuri.length };
+          },
+        }),
       }),
     }),
   },

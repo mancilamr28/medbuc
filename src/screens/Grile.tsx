@@ -530,7 +530,7 @@ function GrileRezultat() {
 
 /** Coloana de context: navigatorul sesiunii, notița pe capitol și cifrele capitolului. */
 function ContextColumn() {
-  const { session, questions } = useApp();
+  const { session, questions, taxonomie } = useApp();
   const capId = session.question?.capId;
 
   // Panoul „Capitolul tău în cifre" era un `EmptyState` fix: rămânea gol și
@@ -538,8 +538,8 @@ function ContextColumn() {
   // ca pe Acasă — `questions` e biblioteca întreagă, nu `session.banca`.
   const progressContext = useProgressOptional();
   const progres = useMemo(
-    () => calculeazaProgres(progressContext?.attempts ?? [], questions),
-    [progressContext?.attempts, questions],
+    () => calculeazaProgres(progressContext?.attempts ?? [], questions, taxonomie),
+    [progressContext?.attempts, questions, taxonomie],
   );
   const capitol = capId ? progres.capitole.find((c) => c.capId === capId) ?? null : null;
   // Notița stă acum și pe cont, nu doar pe dispozitiv; `useNotita` ține cheia

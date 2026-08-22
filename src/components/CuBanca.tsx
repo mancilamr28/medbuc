@@ -5,10 +5,10 @@ import { useProgressOptional } from '../state/progressState';
 
 /** Leagă biblioteca încărcată de starea aplicației. */
 export function CuBanca() {
-  const { questions } = useContent();
+  const { questions, taxonomie } = useContent();
   const attempts = useProgressOptional()?.attempts ?? [];
   return (
-    <AppProvider questions={questions} attempts={attempts}>
+    <AppProvider questions={questions} attempts={attempts} taxonomie={taxonomie}>
       <App />
     </AppProvider>
   );

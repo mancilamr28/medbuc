@@ -8,7 +8,8 @@ export async function syncFinishedRecapitulare(
   recapitulare: Pick<Recapitulare, 'id' | 'banca' | 'answers' | 'startedAt'>,
   finishedAt: number,
 ): Promise<void> {
-  const chapterIds = [...new Set(recapitulare.banca.map((question) => question.capId))];
+  // Banca poate avea goluri (grile retrase după pornire), deci nu `map`.
+  const chapterIds = [...new Set(recapitulare.banca.flatMap((q) => (q ? [q.capId] : [])))];
   const { error: sessionError } = await supabase.from('sessions').upsert(
     {
       id: recapitulare.id,

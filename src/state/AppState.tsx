@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
 import type { AttemptRow } from '../lib/progres';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute } from '../lib/router';
 import { AppContext, type AppValue, type Theme } from './appContextValue';
@@ -25,10 +26,12 @@ const readInitialTheme = (): Theme => {
 export function AppProvider({
   questions,
   attempts = [],
+  taxonomie = TAXONOMIE_GOALA,
   children,
 }: {
   questions: Question[];
   attempts?: readonly AttemptRow[];
+  taxonomie?: Taxonomie;
   children: ReactNode;
 }) {
   const [screen, go] = useHashRoute();
@@ -41,7 +44,7 @@ export function AppProvider({
   const recapitulare = useRecapitulare(recapNow, questions, attempts);
   // Ceasul simulării bate doar cât timp ecranul de simulare este deschis.
   const now = useNow(screen === 'simulari');
-  const sim = useSimulare(now, questions);
+  const sim = useSimulare(now, questions, taxonomie);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
@@ -62,11 +65,12 @@ export function AppProvider({
       materie,
       setMaterie,
       questions,
+      taxonomie,
       session,
       recapitulare,
       sim,
     }),
-    [go, materie, questions, recapitulare, screen, session, sim, theme, toggleTheme],
+    [go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

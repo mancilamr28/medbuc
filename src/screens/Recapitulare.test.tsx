@@ -32,12 +32,21 @@ const raspunsGresit = (): AttemptRow => ({
   answered_at: new Date(Date.now() - 60_000).toISOString(),
 });
 
-const deschide = (attempts: readonly AttemptRow[] = []) =>
+const deschide = (attempts: readonly AttemptRow[] = [], questions = QUESTIONS) =>
   render(
-    <AppProvider questions={QUESTIONS} attempts={attempts}>
+    <AppProvider questions={questions} attempts={attempts}>
       <Recapitulare />
     </AppProvider>,
   );
+
+const gresealaLa = (question_id: string, cuCateMinuteInUrma: number): AttemptRow => ({
+  question_id,
+  is_correct: false,
+  source: 'sesiune',
+  session_id: 'sesiune-initiala',
+  sim_run_id: null,
+  answered_at: new Date(Date.now() - cuCateMinuteInUrma * 60_000).toISOString(),
+});
 
 beforeEach(() => {
   window.location.hash = '#/recapitulare';
@@ -113,6 +122,35 @@ describe('recapitularea inteligentă', () => {
 
     expect(window.location.hash).toBe('#/acasa');
     expect(screen.getByText('Grila 1 din 1')).toBeInTheDocument();
+  });
+
+  /**
+   * Răspunsurile sunt cheiate pe poziția din bancă, iar banca se rezolvă din
+   * id-uri. Dacă o grilă retrasă între timp e **scoasă** din bancă în loc să
+   * lase un gol, tot ce urmează alunecă cu o poziție: elevul vede grila
+   * următoare în locul celei lipsă, iar la salvare răspunsul lui intră în
+   * jurnalul imutabil pe id-ul greșit de grilă. Sesiunea de exersare păstrează
+   * golurile de la bun început; recapitularea le compacta.
+   */
+  it('nu alunecă pe grila următoare când una dispare din bibliotecă în timpul recapitulării', async () => {
+    const user = userEvent.setup();
+    const [prima, adoua] = [QUESTIONS[0]!, QUESTIONS[1]!];
+    const gresite = [gresealaLa(prima.id, 2), gresealaLa(adoua.id, 1)];
+    const { rerender } = deschide(gresite);
+
+    await user.click(screen.getByRole('button', { name: /Începe recapitularea/ }));
+    expect(screen.getByText('Grila 1 din 2')).toBeInTheDocument();
+    expect(screen.getByText(prima.text)).toBeInTheDocument();
+
+    // Prima grilă e retrasă din Administrare cât timp recapitularea e deschisă.
+    rerender(
+      <AppProvider questions={QUESTIONS.filter((q) => q.id !== prima.id)} attempts={gresite}>
+        <Recapitulare />
+      </AppProvider>,
+    );
+
+    expect(screen.getByText('Grila nu mai este disponibilă')).toBeInTheDocument();
+    expect(screen.queryByText(adoua.text)).not.toBeInTheDocument();
   });
 
   it('nu prezintă o eroare de citire drept o coadă goală și permite reîncercarea', async () => {
