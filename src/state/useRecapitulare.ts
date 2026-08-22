@@ -12,7 +12,8 @@ export interface Recapitulare {
   items: GrilaDeRecapitulat[];
   scadente: GrilaDeRecapitulat[];
   order: QuestionId[];
-  banca: Question[];
+  /** Golurile se păstrează, ca la `useSession`: o grilă retrasă rămâne poziție. */
+  banca: (Question | undefined)[];
   qi: number;
   question: Question | undefined;
   total: number;
@@ -47,7 +48,16 @@ export function useRecapitulare(
   const items = useMemo(() => calculeazaRecapitulare(attempts, questions, now), [attempts, now, questions]);
   const scadente = useMemo(() => items.filter((item) => item.scadenta), [items]);
   const byId = useMemo(() => new Map(questions.map((question) => [question.id, question])), [questions]);
-  const banca = useMemo(() => order.flatMap((questionId) => byId.get(questionId) ?? []), [byId, order]);
+  /**
+   * Golurile se păstrează: compactarea ar muta răspunsurile pe alte grile.
+   *
+   * `answers` și `revealed` sunt cheiate pe poziție, iar `attemptsFromRecapitulare`
+   * citește `banca[pozitie]` ca să afle id-ul grilei. Un `flatMap` care sare
+   * peste grilele lipsă scurtează banca, iar tot ce urmează alunecă cu o poziție
+   * — răspunsul elevului ar intra în jurnalul imutabil pe altă grilă. Ecranul
+   * știe deja să arate „Grila nu mai este disponibilă" pentru un gol.
+   */
+  const banca = useMemo(() => order.map((questionId) => byId.get(questionId)), [byId, order]);
   const question = banca[qi];
   const answer = answers[qi];
   const isRevealed = !!revealed[qi];
