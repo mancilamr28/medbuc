@@ -36,3 +36,15 @@ export function useAuth(): AuthValue {
   if (!ctx) throw new Error('useAuth trebuie folosit în interiorul <AuthProvider>');
   return ctx;
 }
+
+/**
+ * Ca `useAuth`, dar `null` în afara providerului.
+ *
+ * Perechea lui `useProgressOptional`, din același motiv: notițele se salvează pe
+ * cont, deci hook-ul lor trebuie să știe cine e conectat — dar `AppProvider` nu
+ * depinde de autentificare, iar testele care montează un ecran singur n-au
+ * `<AuthProvider>` deasupra. Fără sesiune, notița rămâne doar pe dispozitiv.
+ */
+export function useAuthOptional(): AuthValue | null {
+  return useContext(AuthContext);
+}

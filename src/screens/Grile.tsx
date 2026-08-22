@@ -3,10 +3,12 @@ import { AnswerOptions } from '../components/AnswerOptions';
 import { EmptyState } from '../components/EmptyState';
 import { PasulUrmator } from '../components/PasulUrmator';
 import { PoartaContinut } from '../components/PoartaContinut';
+import { StareNotitaText } from '../components/StareNotita';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
 import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
+import { useNotita } from '../state/useNotita';
 import { navWindow } from '../lib/navWindow';
 import { calculeazaProgres } from '../lib/progres';
 import { numar } from '../lib/text';
@@ -540,8 +542,9 @@ function ContextColumn() {
     [progressContext?.attempts, questions],
   );
   const capitol = capId ? progres.capitole.find((c) => c.capId === capId) ?? null : null;
-  // Cheia ține de id-ul capitolului: o redenumire nu mai orfanizează notița.
-  const [note, setNote] = usePersistentState<string>(`medbuc.note.${capId ?? 'fara-capitol'}`, '');
+  // Notița stă acum și pe cont, nu doar pe dispozitiv; `useNotita` ține cheia
+  // pe id-ul capitolului, deci o redenumire tot n-o orfanizează.
+  const notita = useNotita(capId ?? null);
   const { start, end } = navWindow(session.qi, session.total);
 
   return (
@@ -614,11 +617,14 @@ function ContextColumn() {
       </div>
 
       <div className="card-flat" style={{ padding: 18 }}>
-        <div style={eyebrow()}>Notița mea pentru capitol</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={eyebrow()}>Notița mea pentru capitol</div>
+          <StareNotitaText stare={notita.stare} onReincearca={notita.reincearca} />
+        </div>
         <textarea
           className="field"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          value={notita.body}
+          onChange={(e) => notita.scrie(e.target.value)}
           placeholder="Scrie ce vrei să ții minte…"
           style={{ marginTop: 12, minHeight: 96, resize: 'vertical', padding: '11px 12px', font: `400 13px/1.5 ${SANS}` }}
         />
