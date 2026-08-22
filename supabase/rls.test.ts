@@ -542,6 +542,112 @@ describe('ștergerea grilelor', () => {
   });
 });
 
+/**
+ * Taxonomia publică.
+ *
+ * Materiile și capitolele existau în două locuri — tabelele astea și constanta
+ * compilată din `src/data/chapters.ts` — și au și divergit: baza are materia
+ * `ant` cu 8 capitole pe care fișierul nu le cunoaște. Constanta exista fiindcă
+ * pagina de prezentare numără capitole fără sesiune, iar citirea era dată doar
+ * lui `authenticated`. Politicile de mai jos sunt ce face fișierul de prisos, așa
+ * că merită verificate prin rulare: fără ele, pagina publică s-ar goli tăcut.
+ */
+describe('taxonomia', () => {
+  it('se citește de un vizitator fără cont, cât timp e publicată', async () => {
+    const r = await baza.caVizitator(() =>
+      baza.db.query<{ materii: number; capitole: number; centre: number }>(
+        `select (select count(*)::int from materii)         as materii,
+                (select count(*)::int from chapters)        as capitole,
+                (select count(*)::int from centre_admitere) as centre`,
+      ),
+    );
+
+    expect(r.rows[0]!.materii).toBe(2);
+    expect(r.rows[0]!.capitole).toBe(22);
+    expect(r.rows[0]!.centre).toBe(1);
+  });
+
+  it('ascunde de vizitator materia nepublicată', async () => {
+    await baza.db.query("update materii set publicat = false where id = 'chim'");
+
+    const r = await baza.caVizitator(() =>
+      baza.db.query<{ id: string }>('select id from materii order by id'),
+    );
+
+    expect(r.rows.map((m) => m.id)).toEqual(['bio']);
+  });
+
+  /**
+   * Capitolul are propriul `publicat`, dar a-l lăsa singur ar însemna că
+   * ascunderea unei materii îi lasă capitolele numărabile de pe pagina publică —
+   * adică exact cifra pe care pagina o afișează.
+   */
+  it('ascunde de vizitator și capitolele unei materii nepublicate', async () => {
+    await baza.db.query("update materii set publicat = false where id = 'chim'");
+
+    const r = await baza.caVizitator(() =>
+      baza.db.query<{ n: number }>(
+        "select count(*)::int as n from chapters where materie_id = 'chim'",
+      ),
+    );
+
+    expect(r.rows[0]!.n).toBe(0);
+  });
+
+  it('nu deschide și grilele către un vizitator', async () => {
+    const r = await baza.caVizitator(() =>
+      baza.db.query<{ grile: number; variante: number }>(
+        `select (select count(*)::int from questions)        as grile,
+                (select count(*)::int from question_options) as variante`,
+      ),
+    );
+
+    expect(r.rows[0]!.grile).toBe(0);
+    expect(r.rows[0]!.variante).toBe(0);
+  });
+
+  it('ascunde de elev materia nepublicată, dar i-o arată administratorului', async () => {
+    await baza.db.query("update materii set publicat = false where id = 'chim'");
+
+    const aleElevului = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from materii'),
+    );
+    await baza.faAdmin(ana);
+    const aleAdminului = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from materii'),
+    );
+
+    expect(aleElevului.rows[0]!.n).toBe(1);
+    expect(aleAdminului.rows[0]!.n).toBe(2);
+  });
+
+  it('nu se lasă scrisă de un elev, dar primește un centru de la administrator', async () => {
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("insert into centre_admitere (id, nume) values ('umfiasi', 'UMF Iași')"),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("insert into centre_admitere (id, nume) values ('umfiasi', 'UMF Iași')"),
+    );
+
+    const r = await baza.db.query<{ n: number }>('select count(*)::int as n from centre_admitere');
+    expect(r.rows[0]!.n).toBe(2);
+  });
+
+  it('leagă fiecare materie de un centru existent', async () => {
+    const r = await baza.db.query<{ centru_id: string }>('select distinct centru_id from materii');
+    expect(r.rows.map((m) => m.centru_id)).toEqual(['umfcd']);
+
+    await expect(
+      baza.db.query("update materii set centru_id = 'inexistent' where id = 'bio'"),
+    ).rejects.toThrow(/foreign key|violates/i);
+  });
+});
+
+
 describe('biblioteca', () => {
   it('e citibilă de orice elev autentificat', async () => {
     const r = await baza.caUtilizator(ana, () =>
