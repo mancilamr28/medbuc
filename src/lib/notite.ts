@@ -7,11 +7,80 @@ const capIdDinCheie = (key: string): ChapterId | null => {
   return isChapterId(id) ? id : null;
 };
 
+/**
+ * Notița așa cum stă pe disc, de când are și un moment al scrierii.
+ *
+ * Textul singur nu ajungea: cu notițele ținute și pe cont, cineva care scrie pe
+ * telefon și deschide laptopul are două versiuni, iar fără o oră a fiecăreia
+ * n-ai cum să alegi între ele decât ghicind.
+ */
+export interface NotitaLocala {
+  body: string;
+  /** Milisecunde. `0` pentru notițele scrise înainte să existe câmpul. */
+  updatedAt: number;
+}
+
+/** Forma veche — doar textul — încă zace în `localStorage` la mulți. */
+export type NotitaStocata = string | NotitaLocala;
+
+export const esteNotitaStocata = (v: unknown): v is NotitaStocata =>
+  typeof v === 'string' ||
+  (typeof v === 'object' &&
+    v !== null &&
+    typeof (v as NotitaLocala).body === 'string' &&
+    typeof (v as NotitaLocala).updatedAt === 'number');
+
+/**
+ * Aduce orice formă salvată la cea curentă.
+ *
+ * O notiță veche primește `updatedAt: 0`, adică „mai veche decât orice": dacă
+ * pe cont există deja una, aceea câștigă. Textul local nu se șterge niciodată,
+ * doar nu mai e cel afișat.
+ */
+export const normalizeazaNotita = (stocata: NotitaStocata): NotitaLocala =>
+  typeof stocata === 'string' ? { body: stocata, updatedAt: 0 } : stocata;
+
+/** Notița citită de pe cont. */
+export interface NotitaBaza {
+  chapter_id: string;
+  body: string;
+  updated_at: string;
+}
+
+export type Provenienta = 'local' | 'cont' | 'goala';
+
+export interface NotitaAleasa {
+  body: string;
+  updatedAt: number;
+  /** De unde vine textul afișat — hotărăște și dacă local trebuie urcat. */
+  provenienta: Provenienta;
+}
+
+/**
+ * Alege între ce e pe dispozitiv și ce e pe cont: câștigă cea scrisă ultima.
+ *
+ * La egalitate câștigă contul, fiindcă acolo a ajuns deja — altfel o notiță
+ * scrisă și sincronizată pe alt dispozitiv ar fi rescrisă de copia locală
+ * identică, la fiecare deschidere, fără să se schimbe nimic.
+ */
+export function alegeNotita(local: NotitaLocala | null, server: NotitaBaza | null): NotitaAleasa {
+  const serverLa = server ? Date.parse(server.updated_at) : Number.NaN;
+  const areServer = server !== null && Number.isFinite(serverLa);
+  const areLocal = local !== null && local.body.trim() !== '';
+
+  if (areServer && (!areLocal || serverLa >= local.updatedAt)) {
+    return { body: server.body, updatedAt: serverLa, provenienta: 'cont' };
+  }
+  if (areLocal) return { body: local.body, updatedAt: local.updatedAt, provenienta: 'local' };
+  return { body: '', updatedAt: 0, provenienta: 'goala' };
+}
+
 const areTextNegol = (raw: string | null): boolean => {
   if (raw === null) return false;
   try {
     const value = JSON.parse(raw) as unknown;
-    return typeof value === 'string' && value.trim() !== '';
+    if (!esteNotitaStocata(value)) return false;
+    return normalizeazaNotita(value).body.trim() !== '';
   } catch {
     return false;
   }

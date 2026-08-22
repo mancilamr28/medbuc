@@ -1,24 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
-import { chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
+import { StareNotitaText } from '../components/StareNotita';
+import { CHAPTER_BY_ID, chapterLabelById, isChapterId, materieNameOf, type ChapterId } from '../data/chapters';
 import { citesteCapitoleCuNotita } from '../lib/notite';
-import { usePersistentState } from '../lib/hooks';
-import { NOTE_PREFIX } from '../lib/migrations';
+import { citesteNotite } from '../lib/notiteBaza';
+import { reportError } from '../lib/sentry';
 import { numar } from '../lib/text';
 import { SANS, eyebrow, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
+import { useAuthOptional } from '../state/authState';
+import { useNotita } from '../state/useNotita';
 
-const esteText = (v: unknown): v is string => typeof v === 'string';
-
-/** O notiță de capitol, cu editare pe loc. Fiecare card ține propria stare persistentă. */
+/** O notiță de capitol, cu editare pe loc. Fiecare card își ține propria sincronizare. */
 function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => void }) {
-  const [note, setNote, stergeNota] = usePersistentState<string>(`${NOTE_PREFIX}${capId}`, '', esteText);
+  const notita = useNotita(capId);
   const [editare, setEditare] = useState(false);
 
-  // `stergeNota()`, nu `setNote('')`: cardul se demontează imediat după, prin
-  // `onSters()`, iar o scriere lăsată în updater s-ar pierde odată cu el.
+  // Ștergerea scoate cardul imediat după, deci trebuie să plece și local, și de
+  // pe cont într-un singur gest — `notita.sterge()` le face pe amândouă.
   const sterge = () => {
-    stergeNota();
+    notita.sterge();
     onSters();
   };
 
@@ -26,7 +27,10 @@ function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => vo
     <div className="card-flat" style={{ padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={eyebrow()}>{materieNameOf(capId)}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <div style={eyebrow()}>{materieNameOf(capId)}</div>
+            <StareNotitaText stare={notita.stare} onReincearca={notita.reincearca} />
+          </div>
           <div style={{ marginTop: 4, font: `500 14px/1.3 ${SANS}` }}>{chapterLabelById(capId)}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
@@ -52,15 +56,15 @@ function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => vo
       {editare ? (
         <textarea
           className="field"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          value={notita.body}
+          onChange={(e) => notita.scrie(e.target.value)}
           autoFocus
           placeholder="Scrie ce vrei să ții minte…"
           style={{ marginTop: 12, minHeight: 96, resize: 'vertical', padding: '11px 12px', font: `400 13px/1.5 ${SANS}` }}
         />
       ) : (
         <p style={{ margin: '12px 0 0', font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)', whiteSpace: 'pre-wrap' }}>
-          {note}
+          {notita.body}
         </p>
       )}
     </div>
@@ -68,17 +72,43 @@ function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => vo
 }
 
 /**
- * Toate notițele scrise pe capitole, într-un singur loc. Nu introduce
- * persistență nouă — citește ce s-a scris deja din ecranul de Grile
- * (`medbuc.note.${capId}`) și editează prin același `usePersistentState`.
+ * Toate notițele scrise pe capitole, într-un singur loc.
  *
- * Lista de capitole se citește o singură dată, la montare: nu are sens s-o
- * urmărească live, fiindcă acesta e singurul alt ecran care scrie notițe și
- * cele două nu pot fi deschise deodată.
+ * Lista pornește din `localStorage`, ca să apară instantaneu, și se completează
+ * cu ce e pe cont — altfel o notiță scrisă pe telefon ar lipsi de pe laptop
+ * chiar dacă e salvată. Ordinea rămâne cea din bibliografie, nu ordinea în care
+ * s-a scris.
  */
 export function Notite() {
   const { go } = useApp();
+  const auth = useAuthOptional();
+  const userId = auth?.user?.id ?? null;
   const [capIds, setCapIds] = useState<ChapterId[]>(() => citesteCapitoleCuNotita());
+
+  useEffect(() => {
+    if (!userId) return;
+    let renuntat = false;
+    void citesteNotite()
+      .then((deLaCont) => {
+        if (renuntat) return;
+        const dinCont = deLaCont
+          .filter((n) => n.body.trim() !== '' && isChapterId(n.chapter_id))
+          .map((n) => n.chapter_id as ChapterId);
+        setCapIds((prev) => {
+          const toate = new Set([...prev, ...dinCont]);
+          return Array.from(CHAPTER_BY_ID.keys()).filter((id) => toate.has(id));
+        });
+      })
+      .catch((e: unknown) => {
+        // Lista locală rămâne pe ecran: o citire căzută nu are voie să ascundă
+        // notițele de pe dispozitiv.
+        reportError(e, 'Notite: listă');
+        console.warn('[medbuc] Nu am putut citi notițele de pe cont.', e);
+      });
+    return () => {
+      renuntat = true;
+    };
+  }, [userId]);
 
   const stergeCard = (capId: ChapterId) => setCapIds((prev) => prev.filter((id) => id !== capId));
 

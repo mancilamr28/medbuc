@@ -1,10 +1,34 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS } from '../data/questions';
 import { NOTE_PREFIX } from '../lib/migrations';
 import { AppProvider } from '../state/AppState';
 import { Notite } from './Notite';
+
+/**
+ * Fără sesiune, ecranul se poartă exact ca înainte: totul din `localStorage` și
+ * nicio cerere. Testele vechi rămân așa; cel nou pornește o sesiune.
+ */
+const sesiune = vi.hoisted(() => ({ user: null as { id: string } | null }));
+vi.mock('../state/authState', () => ({ useAuthOptional: () => ({ user: sesiune.user }) }));
+
+const cont = vi.hoisted(() => ({
+  notite: [] as { chapter_id: string; body: string; updated_at: string }[],
+}));
+vi.mock('../lib/notiteBaza', () => ({
+  citesteNotite: async () => cont.notite,
+  citesteNotita: async (capId: string) => cont.notite.find((n) => n.chapter_id === capId) ?? null,
+  salveazaNotita: async () => {},
+  stergeNotitaDinBaza: async (capId: string) => {
+    cont.notite = cont.notite.filter((n) => n.chapter_id !== capId);
+  },
+}));
+
+beforeEach(() => {
+  sesiune.user = null;
+  cont.notite = [];
+});
 
 const CHEIE = `${NOTE_PREFIX}bio-nervos`;
 const CAPITOL = '03. Sistemul nervos';
@@ -76,5 +100,37 @@ describe('Notițele mele', () => {
     monteaza();
     expect(screen.queryByText(CAPITOL)).not.toBeInTheDocument();
     expect(screen.getByText('Nicio notiță încă')).toBeInTheDocument();
+  });
+  /**
+   * Notițele stăteau pe un singur dispozitiv. Cine scria pe telefon și deschidea
+   * laptopul nu-și găsea nimic — și nici exportul GDPR nu le cuprindea, deși
+   * sunt singurul lucru din aplicație pe care nu-l poate reface nimeni.
+   */
+  it('arată și notițele scrise pe alt dispozitiv, aduse de pe cont', async () => {
+    sesiune.user = { id: 'elev-1' };
+    cont.notite = [
+      { chapter_id: 'bio-celula', body: 'scrisă pe telefon', updated_at: new Date().toISOString() },
+    ];
+
+    monteaza();
+    expect(screen.getByText('Nicio notiță încă')).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByText('01. Celula. Țesuturile')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('scrisă pe telefon')).toBeInTheDocument());
+  });
+
+  it('ștergerea unei notițe o scoate și de pe cont', async () => {
+    const user = userEvent.setup();
+    sesiune.user = { id: 'elev-1' };
+    cont.notite = [
+      { chapter_id: 'bio-celula', body: 'scrisă pe telefon', updated_at: new Date().toISOString() },
+    ];
+
+    monteaza();
+    await waitFor(() => expect(screen.getByText('01. Celula. Țesuturile')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Șterge' }));
+
+    await waitFor(() => expect(cont.notite).toEqual([]));
+    expect(screen.queryByText('01. Celula. Țesuturile')).not.toBeInTheDocument();
   });
 });
