@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { NOTE_PREFIX } from './migrations';
-import { alegeNotita, capitoleCuNotita, normalizeazaNotita, type NotitaBaza } from './notite';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
+import { alegeNotita, capitoleCuNotita as capitoleCuNotitaPure, normalizeazaNotita, type NotitaBaza } from './notite';
+
+/** Ordinea și „mai există capitolul?" vin acum din taxonomie, nu dintr-o constantă. */
+const capitoleCuNotita = (keys: readonly string[], getValue: (key: string) => string | null) =>
+  capitoleCuNotitaPure(keys, getValue, TAXONOMIE_SEED);
 
 const val = (map: Record<string, string | null>) => (key: string) => map[key] ?? null;
 

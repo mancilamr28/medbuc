@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { StareNotitaText } from '../components/StareNotita';
-import { CHAPTER_BY_ID, chapterLabelById, isChapterId, materieNameOf, type ChapterId } from '../data/chapters';
+import type { ChapterId } from '../data/chapters';
 import { citesteCapitoleCuNotita } from '../lib/notite';
 import { citesteNotite } from '../lib/notiteBaza';
 import { reportError } from '../lib/sentry';
@@ -13,6 +13,7 @@ import { useNotita } from '../state/useNotita';
 
 /** O notiță de capitol, cu editare pe loc. Fiecare card își ține propria sincronizare. */
 function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => void }) {
+  const { taxonomie } = useApp();
   const notita = useNotita(capId);
   const [editare, setEditare] = useState(false);
 
@@ -28,10 +29,10 @@ function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => vo
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <div style={eyebrow()}>{materieNameOf(capId)}</div>
+            <div style={eyebrow()}>{taxonomie.numeMaterie(capId)}</div>
             <StareNotitaText stare={notita.stare} onReincearca={notita.reincearca} />
           </div>
-          <div style={{ marginTop: 4, font: `500 14px/1.3 ${SANS}` }}>{chapterLabelById(capId)}</div>
+          <div style={{ marginTop: 4, font: `500 14px/1.3 ${SANS}` }}>{taxonomie.eticheta(capId)}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
           <button
@@ -80,10 +81,26 @@ function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => vo
  * s-a scris.
  */
 export function Notite() {
-  const { go } = useApp();
+  const { go, taxonomie } = useApp();
   const auth = useAuthOptional();
   const userId = auth?.user?.id ?? null;
-  const [capIds, setCapIds] = useState<ChapterId[]>(() => citesteCapitoleCuNotita());
+  const [capIds, setCapIds] = useState<ChapterId[]>([]);
+
+  /**
+   * Lista locală se recitește când sosește taxonomia.
+   *
+   * Ordinea capitolelor și „mai există capitolul ăsta?" vin acum din bază, care
+   * răspunde după primul render. Citită o singură dată, la montare, lista ar
+   * rămâne goală pentru totdeauna — notițele ar exista în storage, dar ecranul
+   * ar arăta starea de „n-ai scris încă nimic".
+   */
+  useEffect(() => {
+    const locale = citesteCapitoleCuNotita(taxonomie);
+    setCapIds((prev) => {
+      const toate = new Set([...prev, ...locale]);
+      return taxonomie.capitole.map((c) => c.id).filter((id) => toate.has(id));
+    });
+  }, [taxonomie]);
 
   useEffect(() => {
     if (!userId) return;
@@ -92,11 +109,11 @@ export function Notite() {
       .then((deLaCont) => {
         if (renuntat) return;
         const dinCont = deLaCont
-          .filter((n) => n.body.trim() !== '' && isChapterId(n.chapter_id))
+          .filter((n) => n.body.trim() !== '' && taxonomie.esteCapitol(n.chapter_id))
           .map((n) => n.chapter_id as ChapterId);
         setCapIds((prev) => {
           const toate = new Set([...prev, ...dinCont]);
-          return Array.from(CHAPTER_BY_ID.keys()).filter((id) => toate.has(id));
+          return taxonomie.capitole.map((c) => c.id).filter((id) => toate.has(id));
         });
       })
       .catch((e: unknown) => {
@@ -108,7 +125,7 @@ export function Notite() {
     return () => {
       renuntat = true;
     };
-  }, [userId]);
+  }, [taxonomie, userId]);
 
   const stergeCard = (capId: ChapterId) => setCapIds((prev) => prev.filter((id) => id !== capId));
 

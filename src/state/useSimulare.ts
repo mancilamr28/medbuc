@@ -7,6 +7,7 @@ import {
   type QuestionId,
 } from '../data/questions';
 import { usePersistentState } from '../lib/hooks';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 
 export type SimPhase = 'config' | 'rulare' | 'rezultat';
 
@@ -199,15 +200,20 @@ const minutesOf = (durata: string): number => Number.parseInt(durata, 10) || 180
  * apărea o dată. Cu banca goală întoarce o listă goală, iar ecranul de simulări
  * refuză să pornească.
  */
-export function buildOrder(count: number, ordine: string, questions: Question[]): QuestionId[] {
+export function buildOrder(
+  count: number,
+  ordine: string,
+  questions: Question[],
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
+): QuestionId[] {
   if (questions.length === 0) return [];
 
   const base = questions.map((q) => q.id);
   const grouped = [...questions]
     .sort(
       (a, b) =>
-        questionMaterie(a).localeCompare(questionMaterie(b), 'ro') ||
-        questionCap(a).localeCompare(questionCap(b), 'ro'),
+        questionMaterie(a, taxonomie).localeCompare(questionMaterie(b, taxonomie), 'ro') ||
+        questionCap(a, taxonomie).localeCompare(questionCap(b, taxonomie), 'ro'),
     )
     .map((q) => q.id);
 
@@ -227,7 +233,11 @@ export function buildOrder(count: number, ordine: string, questions: Question[])
   return order;
 }
 
-export function useSimulare(now: number, questions: Question[]): Simulare {
+export function useSimulare(
+  now: number,
+  questions: Question[],
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
+): Simulare {
   // `order` ține id-uri, deci căutarea are nevoie de o hartă peste banca încărcată
   // — nu mai poate fi harta de la nivel de modul, construită din fișier.
   const byId = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
@@ -260,12 +270,12 @@ export function useSimulare(now: number, questions: Question[]): Simulare {
       endsAt: startedAt + minutesOf(config.durata) * 60_000,
       finishedAt: null,
       config,
-      order: buildOrder(count, config.ordine, questions),
+      order: buildOrder(count, config.ordine, questions, taxonomie),
       qi: 0,
       answers: {},
       marks: {},
     });
-  }, [config, questions, setRun]);
+  }, [config, questions, setRun, taxonomie]);
 
   /**
    * Predarea păstrează lucrarea și notează ora. Ștergerea ei aici a fost multă

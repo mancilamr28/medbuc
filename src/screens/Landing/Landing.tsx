@@ -1,3 +1,5 @@
+import { TAXONOMIE_GOALA } from '../../lib/taxonomie';
+import { useContentOptional } from '../../state/contentState';
 import { Nav } from './parts/Nav';
 import { Capabilitati } from './sections/Capabilitati';
 import { CtaFinal } from './sections/CtaFinal';
@@ -28,16 +30,25 @@ import './landing.css';
  *
  * `Landing.test.tsx` verifică prima regulă pe fișiere, pentru că un test de
  * randare n-ar prinde-o.
+ *
+ * Taxonomia se citește o singură dată, aici, și coboară prin prop-uri. Nu încalcă
+ * regula 1: interdicția e pe `useApp`/`useAuth` fiindcă amândouă aduc navigarea
+ * aplicației cu ele; `useContentOptional` aduce doar date, nu `go()`, și nu
+ * aruncă în afara provider-ului. Materiile și capitolele publicate se citesc și
+ * fără sesiune (migrarea 0009), tocmai ca pagina asta să nu mai numere dintr-o
+ * listă compilată care se învechește.
  */
 export function Landing() {
+  const taxonomie = useContentOptional()?.taxonomie ?? TAXONOMIE_GOALA;
+
   return (
     <div className="lp">
       <Fundal />
       <Nav />
       <main>
         <Hero />
-        <Cifre />
-        <Capabilitati />
+        <Cifre taxonomie={taxonomie} />
+        <Capabilitati taxonomie={taxonomie} />
         <Parcurs />
         <Drum />
         <CtaFinal />

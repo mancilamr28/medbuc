@@ -1,4 +1,5 @@
-import { chapterById, chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
+import type { ChapterId } from '../data/chapters';
+import { TAXONOMIE_GOALA, type Taxonomie } from './taxonomie';
 import type { Question } from '../data/questions';
 
 /** Rândul minim citit din jurnalul de răspunsuri. */
@@ -55,7 +56,11 @@ const etichetaData = (iso: string): string =>
  * nu este atribuit pe ghicite altui capitol și nu influențează stăpânirea
  * bibliotecii curente.
  */
-export function calculeazaProgres(attempts: readonly AttemptRow[], questions: readonly Question[]): ProgresCalculat {
+export function calculeazaProgres(
+  attempts: readonly AttemptRow[],
+  questions: readonly Question[],
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
+): ProgresCalculat {
   const intrebare = new Map(questions.map((q) => [q.id as string, q]));
   const peCapitol = new Map<ChapterId, { raspunsuri: number; corecte: number; grile: Set<string> }>();
   let corecte = 0;
@@ -75,11 +80,11 @@ export function calculeazaProgres(attempts: readonly AttemptRow[], questions: re
   }
 
   const capitole = [...peCapitol.entries()]
-    .filter(([capId]) => chapterById(capId) !== undefined)
+    .filter(([capId]) => taxonomie.capitol(capId) !== undefined)
     .map(([capId, row]): ProgresCapitol => ({
       capId,
-      nume: chapterLabelById(capId),
-      materie: materieNameOf(capId),
+      nume: taxonomie.eticheta(capId),
+      materie: taxonomie.numeMaterie(capId),
       raspunsuri: row.raspunsuri,
       corecte: row.corecte,
       grileIncercate: row.grile.size,

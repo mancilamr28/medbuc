@@ -20,7 +20,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const { outputFiles } = await build({
   stdin: {
-    contents: `export * from './src/data/chapters';\nexport * from './src/data/questions';\n`,
+    contents: `export * from './src/data/taxonomieSeed';\nexport * from './src/data/questions';\n`,
     resolveDir: root,
     loader: 'ts',
   },
@@ -32,7 +32,7 @@ const { outputFiles } = await build({
 
 const cod = outputFiles[0].text;
 const modul = await import(`data:text/javascript;base64,${Buffer.from(cod).toString('base64')}`);
-const { MATERII, QUESTIONS, OPTION_KEYS } = modul;
+const { MATERII_SEED, CAPITOLE_SEED, QUESTIONS, OPTION_KEYS } = modul;
 
 /** Ghilimele simple dublate — singura scăpare de care are nevoie un literal SQL. */
 const sql = (value) => (value === undefined || value === null ? 'null' : `'${String(value).replaceAll("'", "''")}'`);
@@ -56,21 +56,21 @@ scrie(
 );
 
 scrie('-- materii ---------------------------------------------------------------', '');
-Object.values(MATERII).forEach((m, i) => {
+// `unit` a rămas în tabel dar nu-l mai citește nimic; seed-ul îi dă valoarea
+// istorică, ca migrarea care îl scoate să fie o decizie separată.
+MATERII_SEED.forEach((m) => {
   scrie(
-    `insert into materii (id, name, unit, position) values (${sql(m.id)}, ${sql(m.name)}, ${sql(m.unit)}, ${i})`,
-    '  on conflict (id) do update set name = excluded.name, unit = excluded.unit, position = excluded.position;',
+    `insert into materii (id, name, unit, position) values (${sql(m.id)}, ${sql(m.name)}, 'grile', ${m.position})`,
+    '  on conflict (id) do update set name = excluded.name, position = excluded.position;',
   );
 });
 
 scrie('', '-- capitole --------------------------------------------------------------', '');
-Object.values(MATERII).forEach((m) => {
-  m.list.forEach((c, i) => {
-    scrie(
-      `insert into chapters (id, materie_id, nr, name, position) values (${sql(c.id)}, ${sql(m.id)}, ${sql(c.nr)}, ${sql(c.name)}, ${i})`,
-      '  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;',
-    );
-  });
+CAPITOLE_SEED.forEach((c) => {
+  scrie(
+    `insert into chapters (id, materie_id, nr, name, position) values (${sql(c.id)}, ${sql(c.materie_id)}, ${sql(c.nr)}, ${sql(c.name)}, ${c.position})`,
+    '  on conflict (id) do update set materie_id = excluded.materie_id, nr = excluded.nr, name = excluded.name, position = excluded.position;',
+  );
 });
 
 scrie(
@@ -126,6 +126,5 @@ const iesire = resolve(root, 'supabase/seed.sql');
 writeFileSync(iesire, linii.join('\n'), 'utf8');
 
 console.log(
-  `Scris ${iesire}: ${Object.keys(MATERII).length} materii, ` +
-    `${Object.values(MATERII).reduce((n, m) => n + m.list.length, 0)} capitole, ${QUESTIONS.length} grile.`,
+  `Scris ${iesire}: ${MATERII_SEED.length} materii, ${CAPITOLE_SEED.length} capitole, ${QUESTIONS.length} grile.`,
 );

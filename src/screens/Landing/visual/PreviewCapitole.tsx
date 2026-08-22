@@ -1,23 +1,27 @@
-import { MATERII } from '../../../data/chapters';
+import { CAPITOLE_SEED } from '../../../data/taxonomieSeed';
 import { chapterQuestionCount } from '../../../data/questions';
 import { numar } from '../../../lib/text';
 
 /**
  * Macheta ecranului de materii.
  *
- * Capitolele sunt cele reale din `MATERII`, iar numărul de grile e numărat din
- * bancă prin `chapterQuestionCount` — exact ca în `Materii.tsx`. Un capitol în
- * care încă nu e scrisă nicio grilă arată „—", nu un procent inventat: aceeași
- * regulă ca în restul aplicației.
+ * E o **machetă**: o imagine a ecranului, nu ecranul. De aceea e singurul loc din
+ * pagină care se uită la taxonomia de pornire și la fixtura de grile, nu la bază
+ * — desenul trebuie să arate la fel indiferent de ce s-a scris în administrare,
+ * iar un vizitator fără cont n-are cum să numere grile publicate. Cifrele reale
+ * ale paginii — capitolele din `Cifre` și `Capabilitati` — vin din bază.
+ *
+ * Un capitol în care încă nu e scrisă nicio grilă arată „—", nu o cifră
+ * inventată: aceeași regulă ca în restul aplicației.
  */
-const CAPITOLE = MATERII.bio.list.slice(0, 6);
+const CAPITOLE = CAPITOLE_SEED.filter((c) => c.materie_id === 'bio').slice(0, 6);
 
 export function PreviewCapitole() {
   return (
     <div className="lp-preview">
       <div className="lp-preview__bara">
         <span className="lp-preview__bec" />
-        <span>Biologie · {numar(MATERII.bio.list.length, 'capitol', 'capitole')}</span>
+        <span>Biologie · {numar(CAPITOLE_SEED.filter((c) => c.materie_id === 'bio').length, 'capitol', 'capitole')}</span>
       </div>
 
       <div className="lp-preview__corp">
