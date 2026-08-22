@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { QUESTIONS, QUESTION_BY_ID } from '../data/questions';
 import type { AttemptRow } from './progres';
 import {
@@ -8,6 +8,14 @@ import {
   type RaspunsLucrare,
   type SimRunRow,
 } from './istoricSimulari';
+
+/**
+ * Modulul citește și din Supabase, deci îl atinge pe `lib/supabase`, care aruncă
+ * la încărcare fără variabile de mediu. Local trece pe `.env.local`; în CI, unde
+ * nu există niciuna, tot fișierul pica înainte de primul test — exact capcana
+ * descrisă în CLAUDE.md. Funcțiile verificate aici sunt pure oricum.
+ */
+vi.mock('./supabase', () => import('../test/supabaseFals'));
 
 const ORA = 60 * 60 * 1000;
 const inceput = Date.parse('2026-08-20T09:00:00.000Z');
