@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { citesteSimulari, type SimRunRow } from '../lib/istoricSimulari';
+import { citesteTot } from '../lib/paginare';
 import { supabase } from '../lib/supabase';
 import type { AttemptRow } from '../lib/progres';
 import { useAuth } from './authState';
@@ -22,14 +23,19 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       // Cele două citiri pleacă odată: istoricul simulărilor n-are de ce să
       // aștepte jurnalul, iar ecranul le folosește împreună.
       const [raspunsuri, lucrari] = await Promise.all([
-        supabase
-          .from('attempts')
-          .select('question_id,is_correct,source,session_id,sim_run_id,answered_at')
-          .order('answered_at', { ascending: true }),
+        // Jurnalul e tabelul care crește cel mai repede, deci primul care ar fi
+        // atins plafonul PostgREST și ar fi scăzut progresul de la sine.
+        citesteTot<AttemptRow>(async (de, la) => {
+          const r = await supabase
+            .from('attempts')
+            .select('question_id,is_correct,source,session_id,sim_run_id,answered_at', { count: 'exact' })
+            .order('answered_at', { ascending: true })
+            .range(de, la);
+          return { data: r.data as AttemptRow[] | null, error: r.error, count: r.count };
+        }),
         citesteSimulari(),
       ]);
-      if (raspunsuri.error) throw raspunsuri.error;
-      setAttempts((raspunsuri.data ?? []) as AttemptRow[]);
+      setAttempts(raspunsuri);
       setSimRuns(lucrari);
     } catch (e: unknown) {
       setError('Nu am putut încărca progresul tău.');

@@ -1,5 +1,6 @@
 import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
 import { chapterById, type ChapterId, type MaterieId } from '../data/chapters';
+import { citesteTot } from './paginare';
 
 /**
  * Biblioteca de grile, citită din Supabase.
@@ -98,9 +99,15 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
  */
 export async function incarcaGrile(): Promise<GrilaCuStare[]> {
   const { supabase } = await import('./supabase');
-  const { data, error } = await supabase.from('questions').select(CAMPURI).order('id');
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as RandGrila[]).map(mapeazaGrila);
+  const randuri = await citesteTot<RandGrila>(async (de, la) => {
+    const r = await supabase
+      .from('questions')
+      .select(CAMPURI, { count: 'exact' })
+      .order('id')
+      .range(de, la);
+    return { data: r.data as unknown as RandGrila[] | null, error: r.error, count: r.count };
+  });
+  return randuri.map(mapeazaGrila);
 }
 
 /**
