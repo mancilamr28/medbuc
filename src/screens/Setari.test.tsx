@@ -23,6 +23,8 @@ const updateProfil = vi.fn(async () => ({ error: null }));
 const updateUser = vi.fn(async () => ({ error: null }));
 const rpc = vi.fn(async () => ({ error: null }));
 const signOut = vi.fn(async () => ({ error: null }));
+/** Reautentificarea prin care se verifică parola actuală. */
+const signInWithPassword = vi.fn(async (_date: unknown) => ({ error: null as Error | null }));
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -30,6 +32,7 @@ vi.mock('../lib/supabase', () => ({
       getSession: async () => ({ data: { session: { user: { id: 'u1', email: 'mihai@exemplu.ro' } } } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       updateUser: (...a: unknown[]) => updateUser(...(a as [])),
+      signInWithPassword: (...a: unknown[]) => signInWithPassword(...(a as [unknown])),
       signOut: () => signOut(),
     },
     rpc: (...a: unknown[]) => rpc(...(a as [])),
@@ -129,6 +132,69 @@ describe('Profil și setări', () => {
    * Un singur clic nu are voie să o pornească — aceeași lecție ca la „Predă
    * lucrarea", care ștergea examenul fără să întrebe.
    */
+  /**
+   * Schimbarea parolei lipsea cu totul: cine își știa parola și voia alta
+   * trebuia să se deconecteze, să ceară „Ai uitat parola?" și să treacă prin
+   * inbox — pe emailuri limitate la câteva pe oră.
+   */
+  it('schimbă parola după ce o verifică pe cea actuală', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await user.click(screen.getByRole('button', { name: 'Schimbă' }));
+    await user.type(screen.getByLabelText('Parola actuală'), 'parolaVeche1');
+    await user.type(screen.getByLabelText('Parola nouă'), 'parolaNoua123');
+    await user.type(screen.getByLabelText('Confirmă parola nouă'), 'parolaNoua123');
+    await user.click(screen.getByRole('button', { name: 'Schimbă parola' }));
+
+    await waitFor(() =>
+      expect(signInWithPassword).toHaveBeenCalledWith({
+        email: 'mihai@exemplu.ro',
+        password: 'parolaVeche1',
+      }),
+    );
+    expect(updateUser).toHaveBeenCalledWith({ password: 'parolaNoua123' });
+    await waitFor(() => expect(screen.getByText('Parola a fost schimbată.')).toBeInTheDocument());
+  });
+
+  /**
+   * Fără pasul ăsta, un laptop lăsat descuiat un minut ajunge să însemne contul
+   * pierdut: `updateUser` schimbă parola oricui are sesiunea deschisă.
+   */
+  it('nu schimbă nimic dacă parola actuală e greșită', async () => {
+    const user = userEvent.setup();
+    // Supabase întoarce un `AuthError`, adică un `Error` — `mesajEroare` pe asta se bazează.
+    signInWithPassword.mockResolvedValueOnce({ error: new Error('Invalid login credentials') });
+    monteaza();
+    await gata();
+
+    await user.click(screen.getByRole('button', { name: 'Schimbă' }));
+    await user.type(screen.getByLabelText('Parola actuală'), 'gresita');
+    await user.type(screen.getByLabelText('Parola nouă'), 'parolaNoua123');
+    await user.type(screen.getByLabelText('Confirmă parola nouă'), 'parolaNoua123');
+    await user.click(screen.getByRole('button', { name: 'Schimbă parola' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Parola actuală nu e corectă.'));
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it('oprește o confirmare greșită înainte de orice cerere', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await user.click(screen.getByRole('button', { name: 'Schimbă' }));
+    await user.type(screen.getByLabelText('Parola actuală'), 'parolaVeche1');
+    await user.type(screen.getByLabelText('Parola nouă'), 'parolaNoua123');
+    await user.type(screen.getByLabelText('Confirmă parola nouă'), 'altceva123');
+    await user.click(screen.getByRole('button', { name: 'Schimbă parola' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Confirmarea nu se potrivește cu parola nouă.');
+    expect(signInWithPassword).not.toHaveBeenCalled();
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
   it('nu șterge contul de la primul clic', async () => {
     const user = userEvent.setup();
     monteaza();
