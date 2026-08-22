@@ -3,9 +3,10 @@ import { Segmented } from '../components/Segmented';
 import { salveazaGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
 import { descarcaText, ziua } from '../lib/exportDate';
 import { numar } from '../lib/text';
-import { MONO, SANS, label } from '../lib/ui';
+import { MONO, SANS, autoGrid, label } from '../lib/ui';
 import { useToast } from '../state/toastState';
 import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } from './importLot';
+import { SURSE, type QuestionSursa } from '../data/questions';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -39,10 +40,16 @@ export function ImportGrile({ grile, reload }: { grile: GrilaCuStare[]; reload: 
 
   const [brut, setBrut] = useState('');
   const [implicit, setImplicit] = useState<QuestionStatus>('ciorna');
+  // Proveniența lotului: se scrie o dată, nu pe fiecare din cele cincizeci de rânduri.
+  const [sursa, setSursa] = useState<QuestionSursa>('materie');
+  const [colectie, setColectie] = useState('');
   const [progres, setProgres] = useState<{ facut: number; total: number } | null>(null);
   const [bilant, setBilant] = useState<BilantImport | null>(null);
 
-  const citire = useMemo(() => citesteImport(brut, implicit, grile), [brut, implicit, grile]);
+  const citire = useMemo(
+    () => citesteImport(brut, { status: implicit, sursa, colectie }, grile),
+    [brut, implicit, sursa, colectie, grile],
+  );
 
   const valide = citire.randuri.filter((r) => r.grila !== null);
   const cuProbleme = citire.randuri.filter((r) => r.grila === null);
@@ -128,8 +135,8 @@ export function ImportGrile({ grile, reload }: { grile: GrilaCuStare[]; reload: 
             La <code>tip: "grupat"</code> se adaugă <code>enunturi</code> cu exact patru afirmații.
           </li>
           <li>
-            Variantele merg și ca <code>{'{ "A": "text" }'}</code>, iar <code>status</code> per grilă bate
-            starea aleasă mai jos.
+            Variantele merg și ca <code>{'{ "A": "text" }'}</code>. <code>status</code>, <code>sursa</code> și{' '}
+            <code>colectie</code> scrise pe o grilă bat ce e ales mai jos pentru tot lotul.
           </li>
           <li>Un id care există deja rescrie grila, deci același lot se poate corecta și relipi.</li>
         </ul>
@@ -147,6 +154,54 @@ export function ImportGrile({ grile, reload }: { grile: GrilaCuStare[]; reload: 
           style={{ minHeight: 260, resize: 'vertical', padding: 12, font: `400 12.5px/1.6 ${MONO}` }}
         />
       </label>
+
+      <div
+        style={{
+          marginTop: 16,
+          padding: 14,
+          border: '1px solid var(--line)',
+          borderRadius: 11,
+          display: 'grid',
+          gap: 12,
+        }}
+      >
+        <div style={{ font: `600 12.5px ${SANS}` }}>De unde vine lotul</div>
+
+        <div style={autoGrid(220, 12)}>
+          <label style={{ display: 'block' }}>
+            <span style={label}>Sursă</span>
+            <select
+              className="field"
+              value={sursa}
+              onChange={(e) => setSursa(e.target.value as QuestionSursa)}
+              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
+            >
+              {SURSE.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.eticheta}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: 'block' }}>
+            <span style={label}>Colecția</span>
+            <input
+              className="field"
+              value={colectie}
+              onChange={(e) => setColectie(e.target.value)}
+              placeholder="ex. Simulare 2026 UMFCD"
+              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
+            />
+          </label>
+        </div>
+
+        <div style={{ font: `400 11.5px/1.6 ${SANS}`, color: 'var(--fg3)' }}>
+          Se aplică tuturor grilelor din lot. O grilă care își scrie propria{' '}
+          <code>sursa</code> sau <code>colectie</code> și-o păstrează, deci un export al bibliotecii
+          se poate relipi întreg fără să fie uniformizat de câmpurile de aici.
+        </div>
+      </div>
 
       <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>Grilele fără stare proprie intră ca</span>

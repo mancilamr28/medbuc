@@ -211,6 +211,21 @@ Admin has two modes over the same library, both reaching the database through th
 
 **The import validates through `valideaza()` — the form's own function — not a parallel rule set.** This is the point of the file, not an implementation detail: a second copy of the rules would drift the first time a rule is added to one side, and the import would start accepting what the form rejects. Only the checks that *cannot* exist in a form live in `importLot.ts`: broken JSON, a `tip` outside the two, an option letter past E, an id repeated inside the same batch. Everything about content itself belongs in `valideaza()`, and the database stays the real gate either way.
 
+**Trei câmpuri spun de unde vine o grilă, și nu sunt interschimbabile.** `sursa` e
+felul materialului — o listă închisă (`materie`, `subiect_oficial`, `culegere`)
+verificată și de `salveaza_grila`, cu etichetele în `SURSE` din `data/questions.ts`,
+una singură fiindcă o citesc formularul, importul și validarea lotului. `colectie`
+e lotul, text liber: „Simulare 2026 UMFCD", „Corint – Sistemul nervos". `src` e
+citarea de pagină („Celula, p. 11") și era deja acolo — cele 181 de grile scrise îl
+folosesc așa, una per câteva grile, deci nu putea fi refolosit ca proveniență fără
+să le piardă. Colecția e nivelul după care se grupează un import întreg.
+
+**Sursa și colecția se aleg o dată pentru tot lotul, în ecranul de import, și cad
+peste rândurile care nu le spun.** Regula de precedență e rândul-bate-lotul, și nu
+e o preferință: `catreJson` scrie `sursa` și `colectie` pe fiecare grilă exportată,
+deci fără ea un export al unei biblioteci mixte ar ieși dintr-un dus-întors cu
+totul aceeași sursă. `importLot.test.ts` pinează ambele sensuri.
+
 **One RPC call per question, sequential, deliberately not a batch RPC.** `salveaza_grila` upserts on `id`, so re-pasting a corrected batch is safe and re-running one changes nothing. A batch of fifty with three bad rows therefore saves forty-seven and names the three, which is what you want while authoring — a single transaction would roll back all fifty over one typo. It also means no new migration, so the import needs nothing run by hand in the SQL editor.
 
 The JSON shape is exactly the `questions.ts` entry shape (`opts` as `[key, text]` pairs, `why` as a map), so `catreJson()` round-trips: export the library, fix it in an editor, paste it back. `importLot.test.ts` pins that round trip. Two friendlier `opts` spellings are accepted on the way in (`{ "A": "text" }`, and `[{ key, text, why }]`) because they are predictable things to write, not out of generosity — but the canonical form is what export emits.

@@ -22,6 +22,7 @@ const grila = (correct: OptionKey, capId: ChapterId = 'bio-celula', sursa: Quest
   why: {},
   src: '',
   sursa,
+  colectie: '',
 });
 
 const SASE = [grila('A'), grila('B'), grila('C'), grila('D'), grila('E'), grila('A')];

@@ -24,6 +24,8 @@ export interface Ciorna {
   expl: string;
   src: string;
   sursa: QuestionSursa;
+  /** Lotul din care vine grila, ex. „Simulare 2026 UMFCD". Liber, poate fi gol. */
+  colectie: string;
   /** Anul subiectului, ca text în formular; gol dacă nu se aplică. */
   an: string;
 }
@@ -43,6 +45,7 @@ export const ciornaGoala = (capId: ChapterId = 'bio-celula'): Ciorna => ({
   expl: '',
   src: '',
   sursa: 'materie',
+  colectie: '',
   an: '',
 });
 
@@ -62,6 +65,7 @@ export function dinGrila(g: GrilaCuStare): Ciorna {
     expl: g.expl,
     src: g.src,
     sursa: g.sursa,
+    colectie: g.colectie,
     an: g.an === undefined ? '' : String(g.an),
   };
 }
@@ -127,6 +131,7 @@ export function catreSalvare(c: Ciorna, status: QuestionStatus): GrilaDeSalvat {
     expl: c.expl.trim(),
     src: c.src.trim(),
     sursa: c.sursa,
+    colectie: c.colectie.trim(),
     ...(c.an.trim() !== '' ? { an: Number(c.an.trim()) } : {}),
     opts,
   };

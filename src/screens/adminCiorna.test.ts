@@ -104,6 +104,13 @@ describe('catreSalvare', () => {
     expect(catreSalvare(buna(), 'ciorna').status).toBe('ciorna');
   });
 
+  it('trimite colecția, curățată de spații', () => {
+    expect(catreSalvare(buna({ colectie: '  Simulare 2026 UMFCD  ' }), 'ciorna').colectie).toBe(
+      'Simulare 2026 UMFCD',
+    );
+    expect(catreSalvare(buna(), 'ciorna').colectie).toBe('');
+  });
+
   it('trimite sursa aleasă și anul doar când e completat', () => {
     expect(catreSalvare(buna({ sursa: 'culegere' }), 'ciorna').sursa).toBe('culegere');
     expect(catreSalvare(buna(), 'ciorna').an).toBeUndefined();

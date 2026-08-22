@@ -18,6 +18,22 @@ export type QuestionType = 'simplu' | 'grupat';
 export type QuestionSursa = 'materie' | 'subiect_oficial' | 'culegere';
 
 /**
+ * Cele trei surse, cu eticheta lor.
+ *
+ * Una singură, fiindcă o citesc trei locuri: formularul, importul în masă și
+ * validarea lotului. Două copii ar diverge la prima sursă adăugată într-una din
+ * ele — exact felul în care importul ar ajunge să accepte ce formularul refuză.
+ * Ordinea e cea din `enum question_sursa` (migrarea 0007).
+ */
+export const SURSE: readonly { id: QuestionSursa; eticheta: string }[] = [
+  { id: 'materie', eticheta: 'Curriculum' },
+  { id: 'subiect_oficial', eticheta: 'Subiecte oficiale și simulări' },
+  { id: 'culegere', eticheta: 'Culegere' },
+];
+
+export const esteSursa = (v: string): v is QuestionSursa => SURSE.some((s) => s.id === v);
+
+/**
  * Identitatea unei grile. Până acum identitatea era poziția în `QUESTIONS`, ceea
  * ce lega tot ce se salvează (ordinea unei simulări) de ordinea din fișier:
  * o grilă inserată la mijloc muta răspunsurile tuturor lucrărilor salvate.
@@ -41,6 +57,14 @@ export interface Question {
   why: Partial<Record<OptionKey, string>>;
   src: string;
   sursa: QuestionSursa;
+  /**
+   * Lotul din care vine grila — „Simulare 2026 UMFCD", „Corint – Sistemul nervos".
+   *
+   * Deosebită de `src`, care e citarea de pagină („Celula, p. 11"), și de `sursa`,
+   * care e felul materialului. Colecția e nivelul după care se grupează un import
+   * întreg, deci și cel după care se filtrează. Gol înseamnă nespus.
+   */
+  colectie: string;
   /** Anul subiectului, doar la `subiect_oficial` — ex. 2026. */
   an?: number;
 }
@@ -80,6 +104,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Sistemul nervos',
     sursa: 'materie',
+    colectie: '',
   },
   {
     tip: 'grupat',
@@ -110,6 +135,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Chimie organică, manual clasa a X-a · Alcooli',
     sursa: 'materie',
+    colectie: '',
   },
   {
     tip: 'simplu',
@@ -134,6 +160,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Glandele endocrine',
     sursa: 'materie',
+    colectie: '',
   },
   {
     tip: 'grupat',
@@ -164,6 +191,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Sângele',
     sursa: 'materie',
+    colectie: '',
   },
   {
     tip: 'simplu',
@@ -188,6 +216,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Sistemul osos',
     sursa: 'materie',
+    colectie: '',
   },
   {
     tip: 'simplu',
@@ -212,6 +241,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Chimie organică, manual clasa a X-a · Arene',
     sursa: 'materie',
+    colectie: '',
   },
 ];
 
