@@ -1,4 +1,5 @@
 import type { OptionKey, Question, QuestionId } from '../data/questions';
+import { citesteTot } from './paginare';
 import type { AttemptRow } from './progres';
 import { supabase } from './supabase';
 
@@ -145,12 +146,14 @@ export function reconstituieLucrarea(
 
 /** Lucrările contului, cele mai recente întâi. RLS le limitează la ale lui. */
 export async function citesteSimulari(): Promise<SimRunRow[]> {
-  const { data, error } = await supabase
-    .from('sim_runs')
-    .select('id,started_at,finished_at,config,question_ids')
-    .order('started_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as SimRunRow[];
+  return citesteTot<SimRunRow>(async (de, la) => {
+    const r = await supabase
+      .from('sim_runs')
+      .select('id,started_at,finished_at,config,question_ids', { count: 'exact' })
+      .order('started_at', { ascending: false })
+      .range(de, la);
+    return { data: r.data as SimRunRow[] | null, error: r.error, count: r.count };
+  });
 }
 
 /** Răspunsurile unei singure lucrări, citite abia când e deschisă. */
