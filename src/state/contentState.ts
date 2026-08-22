@@ -1,10 +1,18 @@
 import { createContext, useContext } from 'react';
 import type { Question } from '../data/questions';
 import type { GrilaCuStare } from '../lib/continut';
+import type { Taxonomie } from '../lib/taxonomie';
 
 export interface ContentValue {
   grile: GrilaCuStare[];
   questions: Question[];
+  /**
+   * Materiile și capitolele, din bază.
+   *
+   * Se încarcă și fără sesiune — politicile publice din migrarea 0009 — fiindcă
+   * pagina de prezentare numără capitole înainte de orice cont.
+   */
+  taxonomie: Taxonomie;
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;

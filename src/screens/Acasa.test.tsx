@@ -1,18 +1,37 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS } from '../data/questions';
+import type { AttemptRow } from '../lib/progres';
 import { Acasa } from './Acasa';
 
 const go = vi.fn();
 
-vi.mock('../state/appContextValue', () => ({
-  useApp: () => ({
-    go,
-    questions: QUESTIONS,
-    session: { answers: {}, finished: false, total: 5, start: vi.fn() },
-    recapitulare: { items: [], scadente: [] },
-  }),
-}));
+const stare = vi.hoisted(() => ({ attempts: [] as AttemptRow[] }));
+
+vi.mock('../data/taxonomieSeed', async (original) => original());
+
+vi.mock('../state/appContextValue', async () => {
+  const { TAXONOMIE_SEED } = await import('../data/taxonomieSeed');
+  return {
+    useApp: () => ({
+      go,
+      questions: QUESTIONS,
+      taxonomie: TAXONOMIE_SEED,
+      session: { answers: {}, finished: false, total: 5, start: vi.fn() },
+      recapitulare: { items: [], scadente: [] },
+    }),
+  };
+});
+
+/** Un răspuns pe o grilă din fixtură, ca progresul să aibă din ce deriva. */
+const raspuns = (question_id: string, is_correct: boolean): AttemptRow => ({
+  question_id,
+  is_correct,
+  source: 'sesiune',
+  session_id: 's1',
+  sim_run_id: null,
+  answered_at: '2026-08-20T10:00:00.000Z',
+});
 
 vi.mock('../state/authState', () => ({
   useAuth: () => ({
@@ -23,8 +42,12 @@ vi.mock('../state/authState', () => ({
 
 vi.mock('../state/contentState', () => ({ useContentOptional: () => null }));
 vi.mock('../state/progressState', () => ({
-  useProgressOptional: () => ({ attempts: [], loading: false, error: null, reload: vi.fn() }),
+  useProgressOptional: () => ({ attempts: stare.attempts, loading: false, error: null, reload: vi.fn() }),
 }));
+
+beforeEach(() => {
+  stare.attempts = [];
+});
 
 describe('Acasă', () => {
   it('afișează acțiunea de recapitulare ca buton secundar complet', () => {
@@ -35,4 +58,27 @@ describe('Acasă', () => {
     expect(buton).toHaveStyle({ padding: '11px 16px' });
     expect(buton.style.font).toContain('system-ui');
   });
+
+  /**
+   * Capitolele slabe se numesc din taxonomie, iar taxonomia vine acum din bază.
+   *
+   * Regresia pe care o pinează: dacă ecranul cheamă `calculeazaProgres` fără
+   * taxonomie, derivarea nu mai poate atribui niciun răspuns unui capitol —
+   * `progres.capitole` iese gol și cardul arată „Nu avem încă greșeli
+   * înregistrate" unui elev care are jumătate din răspunsuri greșite. Tăcut, și
+   * exact pe ecranul care ar trebui să-i spună unde pierde puncte.
+   */
+  it('numește capitolele slabe din taxonomie, nu le declară inexistente', () => {
+    stare.attempts = [
+      raspuns('bio-nervos-01', false),
+      raspuns('bio-nervos-01', false),
+      raspuns('bio-osos-01', true),
+    ];
+
+    render(<Acasa />);
+
+    expect(screen.getByText('03. Sistemul nervos')).toBeInTheDocument();
+    expect(screen.queryByText('Nu avem încă greșeli înregistrate')).not.toBeInTheDocument();
+  });
+
 });

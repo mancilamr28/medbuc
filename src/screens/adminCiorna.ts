@@ -1,4 +1,5 @@
-import { chapterById, type ChapterId } from '../data/chapters';
+import type { ChapterId } from '../data/chapters';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 
@@ -80,7 +81,7 @@ export const variantScrise = (c: Ciorna): OptionKey[] =>
  * Lista goală înseamnă că se poate salva. Mesajele sunt în aceeași ordine în care
  * apar câmpurile, ca ochiul să meargă de sus în jos.
  */
-export function valideaza(c: Ciorna): string[] {
+export function valideaza(c: Ciorna, taxonomie: Taxonomie = TAXONOMIE_GOALA): string[] {
   const probleme: string[] = [];
   const scrise = variantScrise(c);
 
@@ -89,7 +90,10 @@ export function valideaza(c: Ciorna): string[] {
     probleme.push('Identificatorul poate conține doar litere mici, cifre și cratime.');
   }
 
-  if (!chapterById(c.capId)) probleme.push('Alege un capitol.');
+  if (c.capId.trim() === '') probleme.push('Alege un capitol.');
+  else if (taxonomie.capitole.length > 0 && !taxonomie.capitol(c.capId)) {
+    probleme.push('Alege un capitol.');
+  }
   if (c.text.trim() === '') probleme.push('Enunțul nu poate fi gol.');
 
   if (c.tip === 'grupat' && c.enunturi.filter((e) => e.trim() !== '').length !== 4) {

@@ -1,6 +1,7 @@
 import { OPTION_KEYS, esteSursa, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 import { catreSalvare, ciornaGoala, opturiGoale, valideaza, type Ciorna } from './adminCiorna';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import type { ChapterId } from '../data/chapters';
 
 /**
@@ -183,6 +184,7 @@ export function citesteImport(
   brut: string,
   implicite: LotImplicit,
   existente: readonly { id: string }[],
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
 ): RezultatCitire {
   if (brut.trim() === '') return { eroare: null, randuri: [] };
 
@@ -208,7 +210,7 @@ export function citesteImport(
     }
 
     const { ciorna, probleme } = catreCiorna(el, implicite);
-    probleme.push(...valideaza(ciorna));
+    probleme.push(...valideaza(ciorna, taxonomie));
     if (ciorna.id !== '') deCateOri.set(ciorna.id, (deCateOri.get(ciorna.id) ?? 0) + 1);
 
     return {

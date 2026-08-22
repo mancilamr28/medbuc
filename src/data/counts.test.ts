@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MATERII } from './chapters';
+import { MATERII_SEED, TAXONOMIE_SEED } from './taxonomieSeed';
 import {
   QUESTIONS,
   chapterQuestionCount,
@@ -27,19 +27,17 @@ describe('numărătoarea grilelor', () => {
   });
 
   it('adună pe materie exact cât e în bancă', () => {
-    expect(materieQuestionCount('bio')).toBe(4);
-    expect(materieQuestionCount('chim')).toBe(2);
+    expect(materieQuestionCount('bio', TAXONOMIE_SEED)).toBe(4);
+    expect(materieQuestionCount('chim', TAXONOMIE_SEED)).toBe(2);
   });
 
   it('suma pe materii dă exact banca, fără grile pierdute pe drum', () => {
-    const suma = Object.values(MATERII).reduce((n, m) => n + materieQuestionCount(m.id), 0);
+    const suma = MATERII_SEED.reduce((n, m) => n + materieQuestionCount(m.id, TAXONOMIE_SEED), 0);
     expect(suma).toBe(QUESTIONS.length);
   });
 
   it('suma pe capitole dă tot banca', () => {
-    const suma = Object.values(MATERII)
-      .flatMap((m) => m.list)
-      .reduce((n, c) => n + chapterQuestionCount(c.id), 0);
+    const suma = TAXONOMIE_SEED.capitole.reduce((n, c) => n + chapterQuestionCount(c.id), 0);
     expect(suma).toBe(QUESTIONS.length);
   });
 });

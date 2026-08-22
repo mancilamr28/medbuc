@@ -10,9 +10,9 @@ begin;
 -- materii ---------------------------------------------------------------
 
 insert into materii (id, name, unit, position) values ('bio', 'Biologie', 'grile', 0)
-  on conflict (id) do update set name = excluded.name, unit = excluded.unit, position = excluded.position;
+  on conflict (id) do update set name = excluded.name, position = excluded.position;
 insert into materii (id, name, unit, position) values ('chim', 'Chimie organică', 'grile', 1)
-  on conflict (id) do update set name = excluded.name, unit = excluded.unit, position = excluded.position;
+  on conflict (id) do update set name = excluded.name, position = excluded.position;
 
 -- capitole --------------------------------------------------------------
 

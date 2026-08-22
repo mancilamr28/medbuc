@@ -1,5 +1,6 @@
 import type { Question } from '../data/questions';
 import { calculeazaProgres, type AttemptRow, type ProgresCalculat } from './progres';
+import { TAXONOMIE_GOALA, type Taxonomie } from './taxonomie';
 
 const ZI_MS = 24 * 60 * 60 * 1000;
 
@@ -36,6 +37,7 @@ export function calculeazaStatistici(
   questions: readonly Question[],
   perioada: PerioadaStatistici,
   acum: number,
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
 ): StatisticiCalculate {
   const limita = durata(perioada);
   const valide = attempts.filter((attempt) => {
@@ -57,7 +59,7 @@ export function calculeazaStatistici(
   for (const attempt of valide) surse[attempt.source] += 1;
 
   return {
-    progres: calculeazaProgres(valide, questions),
+    progres: calculeazaProgres(valide, questions, taxonomie),
     grileUnice: new Set(valide.map((attempt) => attempt.question_id)).size,
     zileActive: peZi.size,
     surse,

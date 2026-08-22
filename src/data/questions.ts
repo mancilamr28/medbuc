@@ -1,10 +1,5 @@
-import {
-  chapterById,
-  chapterLabelById,
-  materieNameOf,
-  type ChapterId,
-  type MaterieId,
-} from './chapters';
+import type { ChapterId, MaterieId } from './chapters';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
 export type QuestionType = 'simplu' | 'grupat';
@@ -74,11 +69,18 @@ export const OPTION_KEYS: OptionKey[] = ['A', 'B', 'C', 'D', 'E'];
 export const tipLabel = (tip: QuestionType): string =>
   tip === 'simplu' ? 'Complement simplu' : 'Complement grupat';
 
-/** „Biologie” — pentru antetul grilei. */
-export const questionMaterie = (q: Question): string => materieNameOf(q.capId);
+/**
+ * „Biologie” — pentru antetul grilei.
+ *
+ * Taxonomia vine ca parametru fiindcă materiile trăiesc în bază, nu într-o
+ * constantă compilată. Fără ea antetul arată gol, nu greșit.
+ */
+export const questionMaterie = (q: Question, taxonomie: Taxonomie = TAXONOMIE_GOALA): string =>
+  taxonomie.numeMaterie(q.capId);
 
-/** „03. Sistemul nervos” — pentru antetul grilei. */
-export const questionCap = (q: Question): string => chapterLabelById(q.capId);
+/** „03. Sistemul nervos” — pentru antetul grilei; id-ul brut dacă nu se știe. */
+export const questionCap = (q: Question, taxonomie: Taxonomie = TAXONOMIE_GOALA): string =>
+  taxonomie.eticheta(q.capId);
 
 export const QUESTIONS: Question[] = [
   {
@@ -276,6 +278,6 @@ export const QUESTION_COUNT_BY_CHAPTER: ReadonlyMap<ChapterId, number> = (() => 
 
 export const chapterQuestionCount = (id: ChapterId): number => QUESTION_COUNT_BY_CHAPTER.get(id) ?? 0;
 
-/** Câte grile are o materie, adunate din capitolele ei. */
-export const materieQuestionCount = (materie: MaterieId): number =>
-  QUESTIONS.reduce((n, q) => (chapterById(q.capId)?.materie === materie ? n + 1 : n), 0);
+/** Câte grile de fixtură are o materie. Numărul de la runtime e `numaraGrile`. */
+export const materieQuestionCount = (materie: MaterieId, taxonomie: Taxonomie): number =>
+  QUESTIONS.reduce((n, q) => (taxonomie.capitol(q.capId)?.materie === materie ? n + 1 : n), 0);

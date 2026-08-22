@@ -1,15 +1,21 @@
-import { MATERII, chapterLabel, type ChapterId } from '../data/chapters';
+import { chapterLabel, type ChapterId } from '../data/chapters';
+import { CAPITOLE_SEED } from '../data/taxonomieSeed';
 
 export const NOTE_PREFIX = 'medbuc.note.';
 
-/** Eticheta veche a capitolului („03. Sistemul nervos”) → id-ul lui. */
-const ID_BY_LABEL: ReadonlyMap<string, ChapterId> = (() => {
-  const map = new Map<string, ChapterId>();
-  for (const materie of Object.values(MATERII)) {
-    for (const c of materie.list) map.set(chapterLabel(c), c.id);
-  }
-  return map;
-})();
+/**
+ * Eticheta veche a capitolului („03. Sistemul nervos”) → id-ul lui.
+ *
+ * Construită din taxonomia de pornire, nu din cea citită la runtime, și asta e
+ * deliberat: migrarea rulează o singură dată, din `main.tsx`, **înainte de
+ * primul render** — deci înainte ca vreo cerere să fi ajuns la bază. Mai mult,
+ * cheile pe care le repară sunt istorice: etichetele care contează sunt cele
+ * care existau când notițele au fost scrise. O hartă care se mișcă odată cu baza
+ * ar repara azi altceva decât ieri.
+ */
+const ID_BY_LABEL: ReadonlyMap<string, ChapterId> = new Map(
+  CAPITOLE_SEED.map((c) => [chapterLabel({ id: c.id, materie: c.materie_id, nr: c.nr, name: c.name }), c.id]),
+);
 
 export interface NoteMove {
   from: string;

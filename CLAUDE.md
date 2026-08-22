@@ -55,7 +55,7 @@ Which layer owns what:
 | Data | Lives in | Notes |
 |---|---|---|
 | Questions (`questions` + `question_options`) | Supabase | Written from Admin via the `salveaza_grila` RPC. `src/data/questions.ts` is now only a seed source and a test fixture — **adding a question there does not make it appear in the app** |
-| Chapters (`MATERII`) | Compiled constant | Deliberately *not* fetched — the public Landing page counts chapters with no session, and the `chapters` select policy is `authenticated`-only. Add one in a migration *and* in `chapters.ts`; `seed.test.ts` enforces the pair |
+| Subjects and chapters (`materii`, `chapters`) | Supabase | Read at runtime into `ContentContext.taxonomie` and passed down as a value. `src/data/taxonomieSeed.ts` is **only** a seed source for `npm run seed` and a test fixture — nothing in the running app imports it |
 | Answers (`attempts`) | Supabase | An immutable journal. Progress, statistics and the review queue are all *derived* from it — nothing stores a `pct` |
 | Notes, theme, settings, exam-in-progress | `localStorage` | `medbuc.*`, via `usePersistentState`. The `notes` table exists but nothing writes to it yet |
 
@@ -201,7 +201,17 @@ Typed constants. `chapters.ts` (`MATERII` keyed by `MaterieId`), `questions.ts` 
 
 **`QUESTIONS` is no longer the runtime truth.** Since Faza 4 the question bank is read from Supabase (`src/lib/continut.ts` → `src/state/ContentContext.tsx`), so **adding a question to `questions.ts` does not make it appear in the app** — it appears in `seed.sql` for a fresh project, and in tests as a fixture. Real content is written from Admin, which calls the `salveaza_grila` RPC. The file stays because `npm run seed` generates from it and because the Landing page needs a question it can render with no session.
 
-**Chapters deliberately did not move.** `MATERII` stays a compiled constant: the public Landing page counts chapters (`Cifre`, `Capabilitati`, `PreviewCapitole`) and renders with no session, while the `chapters` select policy is granted to `authenticated` only — a fetched chapter list would be empty there. Chapters are ~30 and change rarely; add them in a migration *and* in `chapters.ts`, keeping the two in step (`seed.test.ts` enforces it). A `capId` that reaches the database without a match in the file renders its raw id rather than a label, which is visible and fixable instead of silent.
+**Chapters used to be a compiled constant, and that broke in production.** `MATERII` was typed `MaterieId = 'bio' | 'chim'` with 22 chapters while the live database had **three subjects and 30 chapters** — a third subject `ant` plus 8 exam-paper chapters the code did not know about. Nothing signalled: `chapterLabelById` fell back to the raw id, so those chapters rendered as `ant-2026-mg`, and `numaraGrile` could not attribute their questions to any subject.
+
+**Taxonomy is now read from the database and travels as a value, not an import** — the same inversion the question bank already uses. `incarcaTaxonomie()` (in `continut.ts`) builds a `Taxonomie` through the pure `construiesteTaxonomie()` in `lib/taxonomie.ts`; `ContentContext` holds it and `AppProvider` takes it as a prop. Every pure function that needs chapter labels takes it as a parameter (`calculeazaProgres`, `descriereScop`, `capitoleCuNotita`, `valideaza`, `numaraGrile`, `buildOrder`, `questionMaterie`/`questionCap`), defaulting to `TAXONOMIE_GOALA` so a caller that forgets degrades to raw ids rather than crashing.
+
+Three constraints to preserve:
+
+- **`lib/taxonomie.ts` must stay pure.** `scripts/genereaza-seed.mjs` imports it through esbuild with `platform: 'neutral'`; an `import('./supabase')` there — even dynamic — pulls the whole client into the bundle and breaks `npm run seed`. The fetch lives in `continut.ts` for exactly this reason.
+- **`src/data/taxonomieSeed.ts` is not runtime truth.** It seeds a fresh project and serves as the test fixture (`TAXONOMIE_SEED`). Importing it from a file that runs in the browser recreates the drift this replaced. The one deliberate exception is `lib/migrations.ts`, which maps *historical* note keys and must run before first render — a moving label map would repair something different every day.
+- **The landing page reads it too.** Migration 0009 grants `anon` select on published `materii`/`chapters`/`centre_admitere`, which is what let the compiled constant go. `Landing.tsx` reads `useContentOptional()` and passes the taxonomy down as props; that does not violate the isolation rule, which bans `useApp`/`useAuth` because they carry `go()`, not because they carry data.
+
+A `capId` with no row in the database still renders its raw id rather than vanishing — visible and fixable instead of silent.
 
 The bank flows in as a **parameter, not an import**: `AppProvider` takes `questions` as a prop and passes it to `useSession`/`useSimulare`, which is what keeps `AppState.test.tsx` able to mount the provider alone with no network. `numaraGrile()` in `continut.ts` replaces the old module-level count maps, since a bank that changes at runtime cannot be counted once at import time.
 

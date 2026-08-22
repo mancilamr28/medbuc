@@ -32,15 +32,15 @@ const DATA = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long' })
  * curentă. Restul spune deschis că nu are încă date.
  */
 export function Acasa() {
-  const { go, questions, session, recapitulare } = useApp();
+  const { go, questions, session, recapitulare, taxonomie } = useApp();
   const { user, profile } = useAuth();
   const loading = useContentOptional()?.loading ?? false;
   const progressContext = useProgressOptional();
   const progressLoading = progressContext?.loading ?? false;
   const progressError = progressContext?.error ?? null;
   const progress = useMemo(
-    () => calculeazaProgres(progressContext?.attempts ?? [], questions),
-    [progressContext?.attempts, questions],
+    () => calculeazaProgres(progressContext?.attempts ?? [], questions, taxonomie),
+    [progressContext?.attempts, questions, taxonomie],
   );
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
