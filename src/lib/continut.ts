@@ -37,6 +37,7 @@ export interface RandGrila {
   src: string;
   sursa: string;
   an: number | null;
+  colectie: string;
   question_options: { key: string; text: string; why: string | null }[] | null;
 }
 
@@ -53,7 +54,7 @@ export interface RandGrila {
  */
 export const FK_VARIANTE = 'question_options_question_id_fkey';
 
-const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, question_options!${FK_VARIANTE}(key, text, why)`;
+const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie, question_options!${FK_VARIANTE}(key, text, why)`;
 
 /**
  * Pură peste rândul primit, ca să poată fi testată fără rețea.
@@ -84,6 +85,7 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
     why,
     src: rand.src,
     sursa: rand.sursa as QuestionSursa,
+    colectie: rand.colectie,
     ...(rand.an !== null ? { an: rand.an } : {}),
     status: rand.status as QuestionStatus,
   };
@@ -138,6 +140,7 @@ export interface GrilaDeSalvat {
   src: string;
   sursa: QuestionSursa;
   an?: number;
+  colectie: string;
   opts: { key: OptionKey; text: string; why?: string }[];
 }
 

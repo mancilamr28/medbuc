@@ -21,7 +21,7 @@ const valida = (peste: Record<string, unknown> = {}) => ({
 });
 
 const citeste = (v: unknown, existente: { id: string }[] = []) =>
-  citesteImport(JSON.stringify(v), 'ciorna', existente);
+  citesteImport(JSON.stringify(v), { status: 'ciorna' }, existente);
 
 describe('citesteImport', () => {
   it('acceptă un lot valid și îl pregătește pentru salvare', () => {
@@ -49,13 +49,13 @@ describe('citesteImport', () => {
   });
 
   it('spune ce n-a mers când JSON-ul e stricat, fără să arunce', () => {
-    const { eroare, randuri } = citesteImport('[{ "id": ', 'ciorna', []);
+    const { eroare, randuri } = citesteImport('[{ "id": ', { status: 'ciorna' }, []);
     expect(eroare).toMatch(/nu se poate citi/);
     expect(randuri).toEqual([]);
   });
 
   it('nu raportează nimic pentru un câmp gol', () => {
-    expect(citesteImport('   ', 'ciorna', [])).toEqual({ eroare: null, randuri: [] });
+    expect(citesteImport('   ', { status: 'ciorna' }, [])).toEqual({ eroare: null, randuri: [] });
   });
 });
 
@@ -163,18 +163,70 @@ describe('citesteImport, formele în care se scriu variantele', () => {
 
 describe('citesteImport, starea grilelor', () => {
   it('pune starea aleasă pentru lot', () => {
-    const r = citesteImport(JSON.stringify([valida()]), 'publicata', []);
+    const r = citesteImport(JSON.stringify([valida()]), { status: 'publicata' }, []);
     expect(r.randuri[0]!.grila!.status).toBe('publicata');
   });
 
   it('lasă rândul să-și ceară propria stare, ca reimportarea să nu publice o ciornă', () => {
-    const r = citesteImport(JSON.stringify([valida({ status: 'ciorna' })]), 'publicata', []);
+    const r = citesteImport(JSON.stringify([valida({ status: 'ciorna' })]), { status: 'publicata' }, []);
     expect(r.randuri[0]!.grila!.status).toBe('ciorna');
   });
 
   it('ignoră o stare necunoscută și o folosește pe cea a lotului', () => {
-    const r = citesteImport(JSON.stringify([valida({ status: 'arhivata' })]), 'publicata', []);
+    const r = citesteImport(JSON.stringify([valida({ status: 'arhivata' })]), { status: 'publicata' }, []);
     expect(r.randuri[0]!.grila!.status).toBe('publicata');
+  });
+});
+
+/**
+ * Proveniența lotului.
+ *
+ * Un import e aproape întotdeauna o singură colecție, deci se alege o dată,
+ * deasupra casetei. Ce contează e regula de precedență: rândul bate lotul, altfel
+ * exportul bibliotecii — care poartă `sursa` și `colectie` pe fiecare grilă — ar
+ * fi uniformizat la reintrare de câmpurile din ecran, iar o bibliotecă mixtă ar
+ * ieși dintr-un dus-întors cu totul aceeași sursă.
+ */
+describe('citesteImport, proveniența lotului', () => {
+  it('pune sursa și colecția alese pentru lot pe grilele care nu le spun', () => {
+    const r = citesteImport(JSON.stringify([valida()]), {
+      status: 'ciorna',
+      sursa: 'subiect_oficial',
+      colectie: 'Simulare 2026 UMFCD',
+    }, []);
+
+    expect(r.randuri[0]!.grila).toMatchObject({
+      sursa: 'subiect_oficial',
+      colectie: 'Simulare 2026 UMFCD',
+    });
+  });
+
+  it('lasă rândul să-și păstreze propria sursă și propria colecție', () => {
+    const r = citesteImport(
+      JSON.stringify([valida({ sursa: 'culegere', colectie: 'Corint – Sistemul nervos' })]),
+      { status: 'ciorna', sursa: 'subiect_oficial', colectie: 'Simulare 2026 UMFCD' },
+      [],
+    );
+
+    expect(r.randuri[0]!.grila).toMatchObject({
+      sursa: 'culegere',
+      colectie: 'Corint – Sistemul nervos',
+    });
+  });
+
+  it('lasă colecția goală când n-o cere nici rândul, nici lotul', () => {
+    const r = citesteImport(JSON.stringify([valida()]), { status: 'ciorna' }, []);
+    expect(r.randuri[0]!.grila!.colectie).toBe('');
+    expect(r.randuri[0]!.grila!.sursa).toBe('materie');
+  });
+
+  it('curăță spațiile din colecția lotului, ca două loturi să nu iasă etichete diferite', () => {
+    const r = citesteImport(JSON.stringify([valida()]), {
+      status: 'ciorna',
+      colectie: '  Simulare 2026 UMFCD  ',
+    }, []);
+
+    expect(r.randuri[0]!.grila!.colectie).toBe('Simulare 2026 UMFCD');
   });
 });
 
@@ -274,11 +326,12 @@ describe('catreJson', () => {
     why: { A: 'Cade fiindcă…' },
     src: 'Manual, p. 1',
     sursa: 'materie',
+    colectie: '',
     status: 'publicata',
   };
 
   it('scoate biblioteca într-o formă pe care importul o citește înapoi', () => {
-    const { eroare, randuri } = citesteImport(catreJson([dinBiblioteca]), 'ciorna', []);
+    const { eroare, randuri } = citesteImport(catreJson([dinBiblioteca]), { status: 'ciorna' }, []);
 
     expect(eroare).toBeNull();
     expect(randuri[0]!.probleme).toEqual([]);
@@ -295,16 +348,37 @@ describe('catreJson', () => {
     });
   });
 
+  it('păstrează colecția prin export și import', () => {
+    const dintrUnLot: GrilaCuStare = {
+      ...dinBiblioteca,
+      id: 'bio-nervos-04',
+      sursa: 'subiect_oficial',
+      colectie: 'Simulare 2026 UMFCD',
+    };
+    // Lotul cere altceva: exportul are voie să reintre neatins.
+    const { randuri } = citesteImport(catreJson([dintrUnLot]), {
+      status: 'ciorna',
+      sursa: 'culegere',
+      colectie: 'Corint – Sistemul nervos',
+    }, []);
+
+    expect(randuri[0]!.probleme).toEqual([]);
+    expect(randuri[0]!.grila).toMatchObject({
+      sursa: 'subiect_oficial',
+      colectie: 'Simulare 2026 UMFCD',
+    });
+  });
+
   it('păstrează sursa și anul unui subiect oficial', () => {
     const oficiala: GrilaCuStare = { ...dinBiblioteca, id: 'bio-nervos-03', sursa: 'subiect_oficial', an: 2026 };
-    const { randuri } = citesteImport(catreJson([oficiala]), 'ciorna', []);
+    const { randuri } = citesteImport(catreJson([oficiala]), { status: 'ciorna' }, []);
 
     expect(randuri[0]!.probleme).toEqual([]);
     expect(randuri[0]!.grila).toMatchObject({ sursa: 'subiect_oficial', an: 2026 });
   });
 
   it('respinge o sursă necunoscută', () => {
-    const { randuri } = citesteImport(JSON.stringify([{ ...JSON.parse(catreJson([dinBiblioteca]))[0], sursa: 'ziar' }]), 'ciorna', []);
+    const { randuri } = citesteImport(JSON.stringify([{ ...JSON.parse(catreJson([dinBiblioteca]))[0], sursa: 'ziar' }]), { status: 'ciorna' }, []);
     expect(randuri[0]!.probleme).toContain('Sursă necunoscută: ziar.');
   });
 
@@ -315,7 +389,7 @@ describe('catreJson', () => {
       tip: 'grupat',
       enunturi: ['una', 'doua', 'trei', 'patru'],
     };
-    const { randuri } = citesteImport(catreJson([grupata]), 'ciorna', []);
+    const { randuri } = citesteImport(catreJson([grupata]), { status: 'ciorna' }, []);
 
     expect(randuri[0]!.probleme).toEqual([]);
     expect(randuri[0]!.grila!.enunturi).toEqual(['una', 'doua', 'trei', 'patru']);

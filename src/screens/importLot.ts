@@ -1,4 +1,4 @@
-import { OPTION_KEYS, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, esteSursa, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 import { catreSalvare, ciornaGoala, opturiGoale, valideaza, type Ciorna } from './adminCiorna';
 import type { ChapterId } from '../data/chapters';
@@ -36,6 +36,25 @@ export interface RandImport {
   suprascrie: boolean;
 }
 
+/**
+ * Ce se alege o dată, pentru tot lotul lipit.
+ *
+ * Un import e aproape întotdeauna *o* colecție — o lucrare, un capitol dintr-o
+ * culegere — deci repetarea aceluiași `"colectie"` pe cincizeci de rânduri e
+ * muncă de copiat, nu informație. Se aleg deasupra casetei și cad peste rândurile
+ * care nu spun altceva; un rând care își scrie propria valoare o păstrează, ca
+ * exportul bibliotecii (`catreJson`) să se poată relipi întreg fără să fie
+ * uniformizat de câmpurile din ecran.
+ */
+export interface LotImplicit {
+  /** Starea grilelor fără `status` propriu. */
+  status: QuestionStatus;
+  /** Felul materialului, când rândul nu îl spune. */
+  sursa?: QuestionSursa;
+  /** Eticheta lotului, când rândul nu o spune. */
+  colectie?: string;
+}
+
 export interface RezultatCitire {
   /** Ce a împiedicat citirea întregului lot; atunci `randuri` e gol. */
   eroare: string | null;
@@ -48,7 +67,6 @@ const esteObiect = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const STARI: QuestionStatus[] = ['ciorna', 'publicata', 'retrasa'];
-const SURSE: QuestionSursa[] = ['materie', 'subiect_oficial', 'culegere'];
 
 /**
  * Variantele, din oricare dintre cele trei forme în care ajung să fie scrise.
@@ -92,7 +110,10 @@ function citesteVariante(brut: unknown): { triple: [string, string, string][]; p
  * fiindcă în formular n-au cum să apară: acolo tipul vine dintr-un `select`, iar
  * literele variantelor sunt fixe.
  */
-function catreCiorna(brut: Record<string, unknown>): { ciorna: Ciorna; probleme: string[] } {
+function catreCiorna(
+  brut: Record<string, unknown>,
+  implicite: LotImplicit,
+): { ciorna: Ciorna; probleme: string[] } {
   const probleme: string[] = [];
   const ciorna = ciornaGoala(sir(brut['capId']) as ChapterId);
 
@@ -101,10 +122,15 @@ function catreCiorna(brut: Record<string, unknown>): { ciorna: Ciorna; probleme:
   ciorna.expl = sir(brut['expl']);
   ciorna.src = sir(brut['src']);
 
+  const colectie = sir(brut['colectie']).trim();
+  ciorna.colectie = colectie !== '' ? colectie : (implicite.colectie ?? '').trim();
+
   const sursa = sir(brut['sursa']);
   if (sursa !== '') {
-    if (!(SURSE as string[]).includes(sursa)) probleme.push(`Sursă necunoscută: ${sursa}.`);
-    else ciorna.sursa = sursa as QuestionSursa;
+    if (!esteSursa(sursa)) probleme.push(`Sursă necunoscută: ${sursa}.`);
+    else ciorna.sursa = sursa;
+  } else if (implicite.sursa) {
+    ciorna.sursa = implicite.sursa;
   }
   ciorna.an = typeof brut['an'] === 'number' ? String(brut['an']) : sir(brut['an']);
 
@@ -155,7 +181,7 @@ function stareaRandului(brut: Record<string, unknown>, implicit: QuestionStatus)
  */
 export function citesteImport(
   brut: string,
-  implicit: QuestionStatus,
+  implicite: LotImplicit,
   existente: readonly { id: string }[],
 ): RezultatCitire {
   if (brut.trim() === '') return { eroare: null, randuri: [] };
@@ -181,14 +207,14 @@ export function citesteImport(
       return { pozitie, id: '', grila: null, probleme: ['Rândul nu e o grilă.'], suprascrie: false };
     }
 
-    const { ciorna, probleme } = catreCiorna(el);
+    const { ciorna, probleme } = catreCiorna(el, implicite);
     probleme.push(...valideaza(ciorna));
     if (ciorna.id !== '') deCateOri.set(ciorna.id, (deCateOri.get(ciorna.id) ?? 0) + 1);
 
     return {
       pozitie,
       id: ciorna.id,
-      grila: probleme.length === 0 ? catreSalvare(ciorna, stareaRandului(el, implicit)) : null,
+      grila: probleme.length === 0 ? catreSalvare(ciorna, stareaRandului(el, implicite.status)) : null,
       probleme,
       suprascrie: idExistent.has(ciorna.id),
     };
@@ -275,6 +301,7 @@ export function catreJson(grile: readonly GrilaCuStare[]): string {
       expl: g.expl,
       src: g.src,
       sursa: g.sursa,
+      ...(g.colectie !== '' ? { colectie: g.colectie } : {}),
       ...(g.an !== undefined ? { an: g.an } : {}),
     })),
     null,
