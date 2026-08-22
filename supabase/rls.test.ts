@@ -356,6 +356,56 @@ describe('scrierea grilelor', () => {
     expect(o.rows[2]!.why).toBeNull();
   });
 
+  /**
+   * Proveniența ajunge chiar în tabel, nu doar în formular.
+   *
+   * Testul rulează RPC-ul, deci prinde exact ce n-ar prinde un test de randare:
+   * o coloană uitată din `insert` sau din `on conflict do update` ar lăsa
+   * interfața să pară că salvează, iar colecția s-ar pierde tăcut între ecran și
+   * bază — invizibil până la primul import de cincizeci de grile.
+   */
+  it('scrie colecția și sursa, și le rescrie la reimportare', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      salveaza(grila({ sursa: 'subiect_oficial', an: 2026, colectie: '  Simulare 2026 UMFCD  ' })),
+    );
+
+    const dupaPrima = await baza.db.query<{ sursa: string; colectie: string; an: number }>(
+      "select sursa, colectie, an from questions where id = 'bio-nervos-99'",
+    );
+    // Curățată de spații în bază, nu doar în formular: cererea poate veni de oriunde.
+    expect(dupaPrima.rows[0]).toMatchObject({
+      sursa: 'subiect_oficial',
+      colectie: 'Simulare 2026 UMFCD',
+      an: 2026,
+    });
+
+    // Upsert-ul pe id e felul în care se relipește un lot corectat: colecția
+    // corectată trebuie s-o înlocuiască pe cea greșită, nu s-o păstreze.
+    await baza.caUtilizator(ana, () =>
+      salveaza(grila({ sursa: 'culegere', colectie: 'Corint – Sistemul nervos' })),
+    );
+
+    const dupaAdoua = await baza.db.query<{ sursa: string; colectie: string }>(
+      "select sursa, colectie from questions where id = 'bio-nervos-99'",
+    );
+    expect(dupaAdoua.rows[0]).toMatchObject({
+      sursa: 'culegere',
+      colectie: 'Corint – Sistemul nervos',
+    });
+  });
+
+  /** Colecția lipsă e cazul obișnuit: 181 de grile existente n-au una. */
+  it('lasă colecția goală când payload-ul n-o trimite', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () => salveaza(grila()));
+
+    const q = await baza.db.query<{ colectie: string }>(
+      "select colectie from questions where id = 'bio-nervos-99'",
+    );
+    expect(q.rows[0]!.colectie).toBe('');
+  });
+
   /** Exact constrângerea amânată care a impus RPC-ul; merită verificată prin rulare. */
   it('refuză un răspuns corect care nu e printre variante', async () => {
     await baza.faAdmin(ana);

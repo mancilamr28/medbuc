@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { Segmented } from '../components/Segmented';
 import { MATERII, chapterLabel, chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
-import { OPTION_KEYS, tipLabel, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, SURSE, tipLabel, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
@@ -61,12 +61,6 @@ const STARI: { id: QuestionStatus; eticheta: string; culoare: [string, string] }
 
 const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[0]!;
 
-const SURSE: { id: QuestionSursa; eticheta: string }[] = [
-  { id: 'materie', eticheta: 'Curriculum' },
-  { id: 'subiect_oficial', eticheta: 'Subiect oficial' },
-  { id: 'culegere', eticheta: 'Culegere' },
-];
-
 /**
  * Administrarea conținutului.
  *
@@ -102,6 +96,7 @@ function AdminPanel() {
       return (
         g.id.toLowerCase().includes(q) ||
         g.text.toLowerCase().includes(q) ||
+        g.colectie.toLowerCase().includes(q) ||
         chapterLabelById(g.capId).toLowerCase().includes(q)
       );
     });
@@ -426,6 +421,20 @@ function AdminPanel() {
             />
           </label>
 
+          <label style={{ display: 'block', marginTop: 14 }}>
+            <span style={label}>Colecția</span>
+            <input
+              className="field"
+              value={ciorna.colectie}
+              onChange={(e) => camp('colectie', e.target.value)}
+              placeholder="ex. Simulare 2026 UMFCD, Corint – Sistemul nervos"
+              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
+            />
+            <span style={{ display: 'block', marginTop: 6, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+              Lotul din care vine grila. Referința de mai sus e pagina; asta e materialul întreg.
+            </span>
+          </label>
+
           <div style={{ marginTop: 14, ...autoGrid(200, 14) }}>
             <label style={{ display: 'block' }}>
               <span style={label}>Sursă</span>
@@ -613,6 +622,7 @@ function AdminPanel() {
                       </div>
                       <div style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
                         {materieNameOf(g.capId)} · {chapterLabelById(g.capId)}
+                        {g.colectie !== '' && <> · {g.colectie}</>}
                       </div>
 
                       {deSters === g.id ? (
