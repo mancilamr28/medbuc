@@ -24,6 +24,14 @@ export interface AuthValue {
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<AuthResult>;
   updatePassword: (parolaNoua: string) => Promise<AuthResult>;
+  /**
+   * Schimbarea parolei din cont, cu parola actuală cerută înainte.
+   *
+   * Separată de `updatePassword`, care servește resetarea prin email: acolo
+   * dovada e linkul primit în inbox, aici e parola veche. Fără ea, oricine
+   * prinde un laptop descuiat poate lua contul cu totul.
+   */
+  changePassword: (parolaCurenta: string, parolaNoua: string) => Promise<AuthResult>;
   updateNume: (numeComplet: string) => Promise<AuthResult>;
   updateEmail: (email: string) => Promise<AuthResult>;
   stergeContul: () => Promise<AuthResult>;

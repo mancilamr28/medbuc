@@ -96,6 +96,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!error) setRecovery(false);
         return { error: error ? mesajEroare(error) : null };
       },
+      async changePassword(parolaCurenta, parolaNoua) {
+        const email = user?.email;
+        if (!email) return { error: 'Nu ești autentificat.' };
+
+        // Supabase schimbă parola oricui are sesiunea deschisă, fără să ceară
+        // parola veche. O cerem noi, verificând-o cu o reautentificare pe
+        // aceeași adresă — sesiunea rămâne deschisă, doar se reîmprospătează.
+        const { error: verificare } = await supabase.auth.signInWithPassword({
+          email,
+          password: parolaCurenta,
+        });
+        if (verificare) {
+          const mesaj = mesajEroare(verificare);
+          return { error: mesaj === 'Email sau parolă greșită.' ? 'Parola actuală nu e corectă.' : mesaj };
+        }
+
+        const { error } = await supabase.auth.updateUser({ password: parolaNoua });
+        return { error: error ? mesajEroare(error) : null };
+      },
       async updateNume(numeComplet) {
         if (!user) return { error: 'Nu ești autentificat.' };
         const nume = numeComplet.trim();

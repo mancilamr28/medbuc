@@ -5,6 +5,7 @@ import { EXAMEN_ROWS } from '../data/profile';
 import { adunaDatele, descarca, numeFisier } from '../lib/exportDate';
 import { initialeDin } from '../lib/text';
 import { SANS, SERIF, pageLead, pageTitle } from '../lib/ui';
+import { SchimbaParola } from './SchimbaParola';
 import { useApp } from '../state/appContextValue';
 import { useAuth } from '../state/authState';
 import { useToast } from '../state/toastState';
@@ -238,6 +239,7 @@ export function Setari() {
             </button>
           </div>
           <Rows rows={contRows} />
+          <SchimbaParola />
         </div>
 
         <div className="card" style={{ padding: 22 }}>
