@@ -50,13 +50,15 @@ const SUPABASE_STUB = `
 
   grant usage on schema public to anon, authenticated;
   alter default privileges in schema public
-    grant select, insert, update, delete on tables to authenticated;
+    grant select, insert, update, delete on tables to anon, authenticated;
 `;
 
 export interface Baza {
   db: PGlite;
   /** Rulează ca un elev autentificat, cu RLS activ. */
   caUtilizator: <T>(userId: string, fn: () => Promise<T>) => Promise<T>;
+  /** Rulează ca un vizitator fără cont — rolul `anon`, fără `auth.uid()`. */
+  caVizitator: <T>(fn: () => Promise<T>) => Promise<T>;
   creeazaUtilizator: (email: string) => Promise<string>;
   faAdmin: (userId: string) => Promise<void>;
   inchide: () => Promise<void>;
@@ -90,6 +92,20 @@ export async function bazaDeTest(options: { cuSeed?: boolean } = {}): Promise<Ba
     }
   };
 
+  /**
+   * Fără `request.jwt.claim.sub`: un vizitator n-are `auth.uid()`, iar orice
+   * politică scrisă pe el trebuie să cadă, nu să citească rândul altcuiva.
+   */
+  const caVizitator = async <T>(fn: () => Promise<T>): Promise<T> => {
+    await db.query('select set_config($1, $2, false)', ['request.jwt.claim.sub', '']);
+    await db.exec('set role anon;');
+    try {
+      return await fn();
+    } finally {
+      await db.exec('reset role;');
+    }
+  };
+
   const creeazaUtilizator = async (email: string): Promise<string> => {
     const r = await db.query<{ id: string }>(
       'insert into auth.users (email) values ($1) returning id',
@@ -102,5 +118,5 @@ export async function bazaDeTest(options: { cuSeed?: boolean } = {}): Promise<Ba
     await db.query("update profiles set role = 'admin' where id = $1", [userId]);
   };
 
-  return { db, caUtilizator, creeazaUtilizator, faAdmin, inchide: () => db.close() };
+  return { db, caUtilizator, caVizitator, creeazaUtilizator, faAdmin, inchide: () => db.close() };
 }

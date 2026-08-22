@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { QUESTIONS } from '../data/questions';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
 import { AppProvider } from '../state/AppState';
 import { Grile } from './Grile';
 
@@ -11,7 +12,7 @@ vi.mock('../state/progressState', () => ({
   useProgressOptional: () => undefined,
 }));
 
-const deschide = () => render(<AppProvider questions={QUESTIONS}><Grile /></AppProvider>);
+const deschide = () => render(<AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED}><Grile /></AppProvider>);
 
 const buton = (name: RegExp | string) => screen.getByRole('button', { name });
 

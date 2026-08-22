@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Grile } from './Grile';
 import { QUESTIONS } from '../data/questions';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
 import type { AttemptRow } from '../lib/progres';
 import { AppProvider } from '../state/AppState';
 import { useApp } from '../state/appContextValue';
@@ -58,7 +59,7 @@ function PornesteCapitolGol() {
 
 const deschide = () =>
   render(
-    <AppProvider questions={QUESTIONS}>
+    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED}>
       <Grile />
       <PornesteBiblioteca />
       <PornesteCapitolGol />
@@ -71,7 +72,7 @@ const deschide = () =>
  */
 const reincarca = (banca = QUESTIONS) =>
   render(
-    <AppProvider questions={banca}>
+    <AppProvider questions={banca} taxonomie={TAXONOMIE_SEED}>
       <Grile />
     </AppProvider>,
   );

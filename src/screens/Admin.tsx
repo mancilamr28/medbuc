@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { Segmented } from '../components/Segmented';
-import { MATERII, chapterLabel, chapterLabelById, materieNameOf, type ChapterId } from '../data/chapters';
+import { chapterLabel, type ChapterId } from '../data/chapters';
 import { OPTION_KEYS, SURSE, tipLabel, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
@@ -72,7 +72,7 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
  */
 function AdminPanel() {
-  const { grile, loading, error, reload } = useContent();
+  const { grile, taxonomie, loading, error, reload } = useContent();
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
@@ -85,7 +85,7 @@ function AdminPanel() {
   const [deSters, setDeSters] = useState<string | null>(null);
   const [aratatProbleme, setAratatProbleme] = useState(false);
 
-  const probleme = valideaza(ciorna);
+  const probleme = valideaza(ciorna, taxonomie);
   const scrise = variantScrise(ciorna);
 
   const lista = useMemo(() => {
@@ -97,10 +97,10 @@ function AdminPanel() {
         g.id.toLowerCase().includes(q) ||
         g.text.toLowerCase().includes(q) ||
         g.colectie.toLowerCase().includes(q) ||
-        chapterLabelById(g.capId).toLowerCase().includes(q)
+        taxonomie.eticheta(g.capId).toLowerCase().includes(q)
       );
     });
-  }, [cautare, filtru, grile]);
+  }, [cautare, filtru, grile, taxonomie]);
 
   const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) =>
     setCiorna((prev) => ({ ...prev, [key]: value }));
@@ -204,7 +204,7 @@ function AdminPanel() {
 
       <div style={twoCol(isDesktop)}>
         {mod === 'import' ? (
-          <ImportGrile grile={grile} reload={reload} />
+          <ImportGrile grile={grile} taxonomie={taxonomie} reload={reload} />
         ) : (
         <div className="card" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
@@ -235,7 +235,7 @@ function AdminPanel() {
                 onChange={(e) => camp('capId', e.target.value as ChapterId)}
                 style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
               >
-                {Object.values(MATERII).map((m) => (
+                {taxonomie.materii.map((m) => (
                   <optgroup key={m.id} label={m.name}>
                     {m.list.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -621,7 +621,7 @@ function AdminPanel() {
                         {g.text.length > 110 ? `${g.text.slice(0, 110)}…` : g.text}
                       </div>
                       <div style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
-                        {materieNameOf(g.capId)} · {chapterLabelById(g.capId)}
+                        {taxonomie.numeMaterie(g.capId)} · {taxonomie.eticheta(g.capId)}
                         {g.colectie !== '' && <> · {g.colectie}</>}
                       </div>
 

@@ -1,4 +1,4 @@
-import { MATERII } from '../../../data/chapters';
+import type { Taxonomie } from '../../../lib/taxonomie';
 import { EXAM_DATE } from '../../../data/profile';
 import { QUESTIONS } from '../../../data/questions';
 import { daysUntil } from '../../../lib/time';
@@ -7,8 +7,8 @@ import { useContorAnimat, useInView } from '../motion';
 /**
  * Banda de cifre de sub erou.
  *
- * Toate patru se calculează din `src/data/` — zilele din `EXAM_DATE`, capitolele
- * numărate din `MATERII`, grilele numărate din `QUESTIONS`. Regula proiectului e
+ * Toate patru se calculează — zilele din `EXAM_DATE`, capitolele numărate din
+ * taxonomia citită din bază, grilele numărate din `QUESTIONS`. Regula proiectului e
  * că nicio cifră afișată nu se scrie de mână, iar o pagină de prezentare e exact
  * locul unde tentația de a inventa „1000+ grile" sau „5000 de elevi" e cea mai
  * mare. Numărul grilelor e cel din fixtura folosită fără sesiune — nu creștere
@@ -18,7 +18,6 @@ import { useContorAnimat, useInView } from '../motion';
  * oferită de `Simulari.tsx`, nu o măsurătoare.
  */
 
-const capitole = MATERII.bio.list.length + MATERII.chim.list.length;
 const grile = QUESTIONS.length;
 
 interface Cifra {
@@ -28,9 +27,10 @@ interface Cifra {
   nota: string;
 }
 
-export function Cifre() {
+export function Cifre({ taxonomie }: { taxonomie: Taxonomie }) {
   const [ref, vazut] = useInView<HTMLDivElement>({ prag: 0.3 });
   const zile = daysUntil(EXAM_DATE);
+  const capitole = taxonomie.capitole.length;
 
   const cifre: Cifra[] = [
     { valoare: zile, eticheta: 'Zile până la examen', nota: 'Sesiunea din 25 iulie 2027' },

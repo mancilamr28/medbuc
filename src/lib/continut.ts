@@ -1,5 +1,13 @@
 import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
-import { chapterById, type ChapterId, type MaterieId } from '../data/chapters';
+import type { ChapterId, MaterieId } from '../data/chapters';
+import {
+  TAXONOMIE_GOALA,
+  construiesteTaxonomie,
+  type RandCapitol,
+  type RandMaterie,
+  type Taxonomie,
+} from './taxonomie';
+import { citesteTot } from './paginare';
 
 /**
  * Biblioteca de grile, citită din Supabase.
@@ -98,9 +106,15 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
  */
 export async function incarcaGrile(): Promise<GrilaCuStare[]> {
   const { supabase } = await import('./supabase');
-  const { data, error } = await supabase.from('questions').select(CAMPURI).order('id');
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as RandGrila[]).map(mapeazaGrila);
+  const randuri = await citesteTot<RandGrila>(async (de, la) => {
+    const r = await supabase
+      .from('questions')
+      .select(CAMPURI, { count: 'exact' })
+      .order('id')
+      .range(de, la);
+    return { data: r.data as unknown as RandGrila[] | null, error: r.error, count: r.count };
+  });
+  return randuri.map(mapeazaGrila);
 }
 
 /**
@@ -111,7 +125,10 @@ export async function incarcaGrile(): Promise<GrilaCuStare[]> {
  * mai poate fi construită o dată, la import. Materia se citește din capitol —
  * `Chapter` o poartă explicit — nu din prefixul id-ului.
  */
-export function numaraGrile(questions: Question[]): {
+export function numaraGrile(
+  questions: Question[],
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
+): {
   peCapitol: ReadonlyMap<ChapterId, number>;
   peMaterie: ReadonlyMap<MaterieId, number>;
 } {
@@ -120,7 +137,7 @@ export function numaraGrile(questions: Question[]): {
 
   for (const q of questions) {
     peCapitol.set(q.capId, (peCapitol.get(q.capId) ?? 0) + 1);
-    const materie = chapterById(q.capId)?.materie;
+    const materie = taxonomie.capitol(q.capId)?.materie;
     if (materie) peMaterie.set(materie, (peMaterie.get(materie) ?? 0) + 1);
   }
 
@@ -161,4 +178,41 @@ export async function stergeGrila(id: string): Promise<void> {
   const { supabase } = await import('./supabase');
   const { error } = await supabase.rpc('sterge_grila', { grila_id: id });
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Materiile și capitolele, din bază.
+ *
+ * Stă aici, lângă `incarcaGrile`, nu în `lib/taxonomie.ts`: modulul acela e pur
+ * și e importat de generatorul de seed prin esbuild cu `platform: 'neutral'`,
+ * unde un `import('./supabase')` — chiar dinamic — trage tot clientul în bundle
+ * și oprește `npm run seed`.
+ *
+ * Merge și fără sesiune: politicile `materii_publice` și `chapters_publice`
+ * (migrarea 0009) dau vizitatorului taxonomia publicată, ca pagina de prezentare
+ * să poată număra capitole fără să mintă.
+ */
+export async function incarcaTaxonomie(): Promise<Taxonomie> {
+  const { supabase } = await import('./supabase');
+
+  const [materii, capitole] = await Promise.all([
+    citesteTot<RandMaterie>(async (de, la) => {
+      const r = await supabase
+        .from('materii')
+        .select('id,name,position', { count: 'exact' })
+        .order('position')
+        .range(de, la);
+      return { data: r.data as RandMaterie[] | null, error: r.error, count: r.count };
+    }),
+    citesteTot<RandCapitol>(async (de, la) => {
+      const r = await supabase
+        .from('chapters')
+        .select('id,materie_id,nr,name,position', { count: 'exact' })
+        .order('position')
+        .range(de, la);
+      return { data: r.data as RandCapitol[] | null, error: r.error, count: r.count };
+    }),
+  ]);
+
+  return construiesteTaxonomie(materii, capitole);
 }

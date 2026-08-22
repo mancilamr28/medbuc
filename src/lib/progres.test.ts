@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { QUESTIONS } from '../data/questions';
 import { calculeazaProgres, type AttemptRow } from './progres';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
 
 const attempt = (partial: Partial<AttemptRow> & Pick<AttemptRow, 'question_id' | 'is_correct'>): AttemptRow => ({
   source: 'sesiune',
@@ -16,6 +17,7 @@ describe('calculeazaProgres', () => {
     const rezultat = calculeazaProgres(
       [attempt({ question_id: q.id, is_correct: false }), attempt({ question_id: q.id, is_correct: true })],
       QUESTIONS,
+      TAXONOMIE_SEED,
     );
 
     expect(rezultat).toMatchObject({ raspunsuri: 2, corecte: 1, pct: 50 });
@@ -39,6 +41,7 @@ describe('calculeazaProgres', () => {
         attempt({ question_id: q5!.id, is_correct: true, session_id: 'g', answered_at: '2026-08-16T10:00:00Z' }),
       ],
       QUESTIONS,
+      TAXONOMIE_SEED,
     );
 
     expect(rezultat.evolutie.map((p) => [p.id, p.pct, p.grile])).toEqual([
@@ -52,7 +55,7 @@ describe('calculeazaProgres', () => {
       attempt({ question_id: q.id, is_correct: true, answered_at: `2026-08-1${index + 1}T10:00:00Z` }),
     );
 
-    expect(calculeazaProgres(attempts, QUESTIONS).evolutie).toEqual([]);
+    expect(calculeazaProgres(attempts, QUESTIONS, TAXONOMIE_SEED).evolutie).toEqual([]);
   });
 
   it('ignoră în evoluție datele invalide și grilele care nu mai sunt în bibliotecă', () => {
@@ -64,6 +67,7 @@ describe('calculeazaProgres', () => {
         attempt({ question_id: 'grila-retrasa', is_correct: true }),
       ],
       QUESTIONS,
+      TAXONOMIE_SEED,
     );
 
     expect(rezultat.evolutie).toHaveLength(1);
@@ -71,7 +75,7 @@ describe('calculeazaProgres', () => {
   });
 
   it('nu atribuie unui capitol o grilă care lipsește din bibliotecă', () => {
-    const rezultat = calculeazaProgres([attempt({ question_id: 'grila-retrasa', is_correct: true })], QUESTIONS);
+    const rezultat = calculeazaProgres([attempt({ question_id: 'grila-retrasa', is_correct: true })], QUESTIONS, TAXONOMIE_SEED);
     expect(rezultat).toMatchObject({ raspunsuri: 1, corecte: 1, pct: 100, capitole: [] });
   });
 });

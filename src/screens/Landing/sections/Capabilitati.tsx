@@ -1,4 +1,4 @@
-import { MATERII } from '../../../data/chapters';
+import type { Taxonomie } from '../../../lib/taxonomie';
 import { Marcaj } from '../parts/Marcaj';
 import { Panou } from '../parts/Panou';
 import { Reveal } from '../parts/Reveal';
@@ -24,7 +24,7 @@ const DESPRE_GRILE = [
   'Notiță proprie pe fiecare capitol, salvată pe dispozitiv.',
 ];
 
-export function Capabilitati() {
+export function Capabilitati({ taxonomie }: { taxonomie: Taxonomie }) {
   return (
     <section className="lp-sectiune lp-wrap" id="ce-poti-face">
       <Reveal fel="rand">
@@ -72,19 +72,20 @@ export function Capabilitati() {
               Alegi exact de unde exersezi
             </h3>
 
-            {/* Cifrele scoase din text: se citesc dintr-o privire. Amândouă se
-                numără din `MATERII`. */}
-            <div className="lp-mini">
-              {[
-                { n: MATERII.bio.list.length, e: 'capitole Biologie' },
-                { n: MATERII.chim.list.length, e: 'capitole Chimie' },
-              ].map((m) => (
-                <div key={m.e}>
-                  <span className="lp-mini__n">{m.n}</span>
-                  <span className="lp-mini__e">{m.e}</span>
-                </div>
-              ))}
-            </div>
+            {/* Cifrele scoase din text: se citesc dintr-o privire. Se numără din
+                taxonomia citită din bază, deci o materie nouă apare de la sine.
+                Cât timp încă se încarcă nu se afișează nimic — un „0 capitole"
+                ar fi o cifră falsă, iar aici tocmai asta e regula. */}
+            {taxonomie.materii.length > 0 && (
+              <div className="lp-mini">
+                {taxonomie.materii.map((m) => (
+                  <div key={m.id}>
+                    <span className="lp-mini__n">{m.list.length}</span>
+                    <span className="lp-mini__e">capitole {m.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <p className="lp-corp" style={{ marginTop: 18 }}>
               Materie, apoi scop — toată programa, capitole anume sau punctele tale slabe — apoi sursa grilelor.

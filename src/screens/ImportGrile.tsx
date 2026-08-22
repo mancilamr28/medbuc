@@ -7,6 +7,7 @@ import { MONO, SANS, autoGrid, label } from '../lib/ui';
 import { useToast } from '../state/toastState';
 import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } from './importLot';
 import { SURSE, type QuestionSursa } from '../data/questions';
+import type { Taxonomie } from '../lib/taxonomie';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -35,7 +36,15 @@ const cifra = (n: number, culoare: string) => (
  * stă în `importLot.ts`, pură și testată; aici rămâne doar interfața — același
  * tipar ca `Admin.tsx` cu `adminCiorna.ts`, din care vine și separarea numelor.
  */
-export function ImportGrile({ grile, reload }: { grile: GrilaCuStare[]; reload: () => Promise<void> }) {
+export function ImportGrile({
+  grile,
+  taxonomie,
+  reload,
+}: {
+  grile: GrilaCuStare[];
+  taxonomie: Taxonomie;
+  reload: () => Promise<void>;
+}) {
   const { notify } = useToast();
 
   const [brut, setBrut] = useState('');
@@ -47,8 +56,8 @@ export function ImportGrile({ grile, reload }: { grile: GrilaCuStare[]; reload: 
   const [bilant, setBilant] = useState<BilantImport | null>(null);
 
   const citire = useMemo(
-    () => citesteImport(brut, { status: implicit, sursa, colectie }, grile),
-    [brut, implicit, sursa, colectie, grile],
+    () => citesteImport(brut, { status: implicit, sursa, colectie }, grile, taxonomie),
+    [brut, implicit, sursa, colectie, grile, taxonomie],
   );
 
   const valide = citire.randuri.filter((r) => r.grila !== null);

@@ -1,5 +1,6 @@
-import { chapterById, chapterLabelById, MATERII, type ChapterId, type Materie } from '../data/chapters';
+import type { ChapterId, Materie } from '../data/chapters';
 import { numar } from '../lib/text';
+import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 
 /**
  * Frazele ecranului de grile care se acordă cu un număr.
@@ -35,23 +36,26 @@ export interface DescriereScop {
 }
 
 /** Materia din care vin toate capitolele, sau `null` dacă sunt din mai multe. */
-const materieComuna = (capitole: readonly ChapterId[]): Materie | null => {
-  const materii = new Set(capitole.map((id) => chapterById(id)?.materie));
+const materieComuna = (capitole: readonly ChapterId[], taxonomie: Taxonomie): Materie | null => {
+  const materii = new Set(capitole.map((id) => taxonomie.capitol(id)?.materie));
   if (materii.size !== 1) return null;
   const [materie] = [...materii];
-  return materie ? MATERII[materie] : null;
+  return materie ? (taxonomie.materie(materie) ?? null) : null;
 };
 
-export function descriereScop(capitole: readonly ChapterId[]): DescriereScop {
+export function descriereScop(
+  capitole: readonly ChapterId[],
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
+): DescriereScop {
   if (capitole.length === 0) {
     return { titlu: 'Sesiune rapidă', detaliu: 'Toate capitolele' };
   }
 
-  const materie = materieComuna(capitole);
+  const materie = materieComuna(capitole, taxonomie);
   const cu = (rest: string) => (materie ? `${materie.name} · ${rest}` : rest);
 
   if (capitole.length === 1) {
-    return { titlu: 'Sesiune pe capitol', detaliu: cu(chapterLabelById(capitole[0]!)) };
+    return { titlu: 'Sesiune pe capitol', detaliu: cu(taxonomie.eticheta(capitole[0]!)) };
   }
 
   // Materia întreagă se numește ca atare. „12 capitole" ar fi adevărat, dar

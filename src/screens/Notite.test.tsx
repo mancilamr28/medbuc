@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS } from '../data/questions';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
 import { NOTE_PREFIX } from '../lib/migrations';
 import { AppProvider } from '../state/AppState';
 import { Notite } from './Notite';
@@ -39,7 +40,7 @@ const CAPITOL = '03. Sistemul nervos';
  */
 const monteaza = () =>
   render(
-    <AppProvider questions={QUESTIONS}>
+    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED}>
       <Notite />
     </AppProvider>,
   );
