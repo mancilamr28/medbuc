@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
 import { Progress } from '../components/Progress';
-import { Segmented } from '../components/Segmented';
-import { EmptyState } from '../components/EmptyState';
 import { PasulUrmator } from '../components/PasulUrmator';
+import { RecitireGrile, type GrilaRecitita } from '../components/RecitireGrile';
 import { PoartaContinut } from '../components/PoartaContinut';
-import { questionCap, questionMaterie, tipLabel } from '../data/questions';
+import { rezumaLucrari } from '../lib/istoricSimulari';
+import { useProgressOptional } from '../state/progressState';
+import { LucrareRedeschisa, PanouIstoric } from './IstoricSimulari';
+import { tipLabel } from '../data/questions';
 import { useIsDesktop } from '../lib/hooks';
 import { navWindow } from '../lib/navWindow';
 import { numar } from '../lib/text';
@@ -19,7 +21,6 @@ import {
   pageLead,
   pageTitle,
   sideStack,
-  statusChip,
   twoCol,
 } from '../lib/ui';
 import { SIM_FIELDS } from '../state/useSimulare';
@@ -28,11 +29,44 @@ import { frazaCorecte } from './grileText';
 
 export function Simulari() {
   const { sim } = useApp();
+  // Lucrarea deschisă din istoric e o stare a ecranului, nu a simulării: n-are
+  // rută proprie și nu trebuie să supraviețuiască unei reîncărcări, dar o
+  // simulare pornită între timp o închide de la sine, prin `phase`.
+  const [deschisa, setDeschisa] = useState<string | null>(null);
+  const inchide = useCallback(() => setDeschisa(null), []);
+
   return (
     <PoartaContinut>
-      {sim.phase === 'rezultat' ? <SimRezultat /> : sim.phase === 'config' ? <SimConfig /> : <SimRun />}
+      {sim.phase === 'rezultat' ? (
+        <SimRezultat />
+      ) : sim.phase !== 'config' ? (
+        <SimRun />
+      ) : deschisa !== null ? (
+        <DinIstoric id={deschisa} onInchide={inchide} />
+      ) : (
+        <SimConfig onDeschideLucrare={setDeschisa} />
+      )}
     </PoartaContinut>
   );
+}
+
+/**
+ * Caută lucrarea cerută în ce s-a încărcat deja.
+ *
+ * Dacă a dispărut între timp — alt cont, o reîncărcare a progresului — ecranul
+ * se întoarce la configurare în loc să rămână gol.
+ */
+function DinIstoric({ id, onInchide }: { id: string; onInchide: () => void }) {
+  const progres = useProgressOptional();
+  const run = progres?.simRuns.find((r) => r.id === id) ?? null;
+  const lucrare = rezumaLucrari(run ? [run] : [], progres?.attempts ?? [])[0] ?? null;
+
+  useEffect(() => {
+    if (!run || !lucrare) onInchide();
+  }, [lucrare, onInchide, run]);
+
+  if (!run || !lucrare) return null;
+  return <LucrareRedeschisa run={run} lucrare={lucrare} onInchide={onInchide} />;
 }
 
 /** Prima regulă urmează durata aleasă, nu o valoare fixă. */
@@ -43,7 +77,7 @@ const reguliPentru = (durata: string): string[] => [
   'Poți marca grile și reveni la ele cât timp mai ai minute.',
 ];
 
-function SimConfig() {
+function SimConfig({ onDeschideLucrare }: { onDeschideLucrare: (id: string) => void }) {
   const { sim } = useApp();
   const isDesktop = useIsDesktop();
 
@@ -112,16 +146,7 @@ function SimConfig() {
         </div>
 
         <div style={sideStack}>
-          {/* Istoricul era o listă fixă de trei lucrări care nu fuseseră date
-              niciodată. Se completează când `finish()` chiar salvează rezultate. */}
-          <div className="card-flat" style={{ padding: 20 }}>
-            <div style={eyebrow(undefined, 11)}>Simulările tale</div>
-            <EmptyState
-              title="Nicio simulare dată încă"
-              hint="Lucrările predate apar aici, cu punctajul și timpul în care le-ai terminat."
-              padding="22px 4px 6px"
-            />
-          </div>
+          <PanouIstoric onDeschide={onDeschideLucrare} />
         </div>
       </div>
     </div>
@@ -445,13 +470,10 @@ function SimRun() {
   );
 }
 
-type FiltruRecitire = 'toate' | 'gresite';
-
 /** Ecranul de după predare: scorul lucrării și recitirea grilelor, cu explicații. */
 function SimRezultat() {
   const { sim } = useApp();
   const isDesktop = useIsDesktop();
-  const [filtru, setFiltru] = useState<FiltruRecitire>('gresite');
   const run = sim.run;
 
   const { corecte, gresite, neraspunse, total, pct, durataMs } = sim.score;
@@ -461,12 +483,15 @@ function SimRezultat() {
   // încărcată și pe lucrare, deci lista se recalculează exact când se schimbă
   // una dintre ele, nu la fiecare bătaie de ceas a simulării.
   const questionAt = sim.questionAt;
-  const pozitii = useMemo(() => {
-    if (!run) return [];
-    return run.order
-      .map((_, i) => i)
-      .filter((i) => filtru === 'toate' || run.answers[i] !== questionAt(i)?.correct);
-  }, [filtru, questionAt, run]);
+  const grile = useMemo<GrilaRecitita[]>(
+    () =>
+      run?.order.map((_, pozitie) => ({
+        pozitie,
+        question: questionAt(pozitie) ?? null,
+        ales: run.answers[pozitie] ?? null,
+      })) ?? [],
+    [questionAt, run],
+  );
 
   if (!run) return null;
 
@@ -540,90 +565,7 @@ function SimRezultat() {
 
           <PasulUrmator gresite={gresite} />
 
-          <div className="card" style={{ padding: 26, marginTop: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 140 }}>
-                <div style={eyebrow()}>Recitește grilele</div>
-              </div>
-              <Segmented
-                items={[
-                  { id: 'gresite' as FiltruRecitire, label: 'Ce am ratat' },
-                  { id: 'toate' as FiltruRecitire, label: 'Toate' },
-                ]}
-                value={filtru}
-                onChange={setFiltru}
-                ariaLabel="Ce grile să apară în recitire"
-              />
-            </div>
-
-            {pozitii.length === 0 ? (
-              <p style={{ margin: '18px 0 0', font: `400 14px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
-                Nimic de recitit: ai răspuns corect la toate grilele.
-              </p>
-            ) : (
-              <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {pozitii.map((i) => {
-                  const q = sim.questionAt(i);
-                  const ales = run.answers[i];
-
-                  // Grilă retrasă din bibliotecă după ce lucrarea a fost dată.
-                  // Se arată locul ei, nu se sare: altfel numerotarea din
-                  // recitire n-ar mai corespunde cu cea din timpul examenului.
-                  if (!q) {
-                    return (
-                      <div key={i} className="card-flat" style={{ padding: 18 }}>
-                        <span className="tabular" style={{ font: `500 12px ${SANS}`, color: 'var(--fg3)' }}>
-                          Grila {i + 1}
-                        </span>
-                        <p style={{ margin: '10px 0 0', font: `400 13.5px/1.6 ${SANS}`, color: 'var(--fg3)' }}>
-                          Grila asta nu mai e în bibliotecă, deci nu poate fi recitită. Punctajul
-                          lucrării a rămas cel de la predare.
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  const stare: [string, string, string] =
-                    ales === undefined
-                      ? ['Fără răspuns', 'var(--surf3)', 'var(--fg3)']
-                      : ales === q.correct
-                        ? ['Corect', 'var(--okS)', 'var(--ok)']
-                        : ['Greșit', 'var(--badS)', 'var(--bad)'];
-
-                  return (
-                    <div key={i} className="card-flat" style={{ padding: 18 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                        <span className="tabular" style={{ font: `500 12px ${SANS}`, color: 'var(--fg3)' }}>
-                          Grila {i + 1}
-                        </span>
-                        <span style={{ ...statusChip(stare[1], stare[2]) }}>{stare[0]}</span>
-                        <span style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-                          {questionMaterie(q)} · {questionCap(q)}
-                        </span>
-                      </div>
-
-                      <p style={{ margin: '12px 0 0', font: `400 16px/1.45 ${SERIF}`, textWrap: 'pretty' }}>
-                        {q.text}
-                      </p>
-
-                      <AnswerOptions question={q} answer={ales} revealed onPick={() => {}} />
-
-                      <p
-                        style={{
-                          margin: '14px 0 0',
-                          font: `400 13.5px/1.6 ${SANS}`,
-                          color: 'var(--fg2)',
-                          textWrap: 'pretty',
-                        }}
-                      >
-                        {q.expl}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <RecitireGrile grile={grile} />
         </div>
 
         <div style={sideStack}>
