@@ -380,6 +380,9 @@ function RezultatRecapitulare() {
           </p>
           <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <button type="button" className="btn-ghost tinta-tactila" onClick={() => go('acasa')} style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}>Înapoi acasă</button>
+            {/* Recapitularea își spune singură ce se întâmplă cu greșelile, deci
+                aici lipsea doar cealaltă jumătate a buclei: unde se vede mișcarea. */}
+            <button type="button" className="btn-ghost tinta-tactila" onClick={() => go('statistici')} style={{ padding: '11px 15px', font: `500 13.5px ${SANS}` }}>Vezi progresul →</button>
             <button type="button" className="btn-primary tinta-tactila" onClick={recapitulare.reset} style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}>Vezi coada actualizată →</button>
           </div>
         </div>

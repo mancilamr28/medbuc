@@ -90,6 +90,44 @@ describe('predarea lucrării', () => {
     expect(screen.getByText(/Lucrare predată|Rezultatul/i)).toBeInTheDocument();
   });
 
+  /**
+   * Panoul de rezultat al simulării se termina cu „Simulare nouă": singurul
+   * drum înainte era încă un examen. Greșelile din lucrare ajung acum în coada
+   * de recapitulare (PR #49), deci rezultatul poate în sfârșit să trimită acolo.
+   */
+  it('duce de la lucrarea predată la recapitulare și la progres', async () => {
+    deschide();
+    await userEvent.click(screen.getByRole('button', { name: /Începe simularea/ }));
+
+    // Grila de pe ecran e aleasă de bancă, nu de test: îi găsim varianta
+    // greșită după textul afișat, ca lucrarea să aibă exact o greșeală.
+    const q = QUESTIONS.find((intrebare) => screen.queryByText(intrebare.text) !== null)!;
+    const gresita = q.opts.find(([k]) => k !== q.correct)![1];
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(gresita.slice(0, 24), 'i') }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Predă lucrarea' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Da, predau' }));
+
+    expect(screen.getByText('1 grilă greșită intră în coada de recapitulare.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Revezi greșelile/ }));
+    expect(window.location.hash).toBe('#/recapitulare');
+
+    await userEvent.click(screen.getByRole('button', { name: /Vezi progresul/ }));
+    expect(window.location.hash).toBe('#/statistici');
+  });
+
+  it('nu trimite la recapitulare o lucrare fără nicio greșeală', async () => {
+    deschide();
+    await userEvent.click(screen.getByRole('button', { name: /Începe simularea/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Predă lucrarea' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Da, predau' }));
+
+    // Toate grilele au rămas fără răspuns: nu există greșeli în jurnal, deci
+    // nici ce recapitula.
+    expect(screen.queryByRole('button', { name: /Revezi greșelile/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Vezi progresul/ })).toBeInTheDocument();
+  });
+
   it('rezultatul supraviețuiește reîncărcării paginii', async () => {
     const { unmount } = deschide();
     await userEvent.click(screen.getByRole('button', { name: /Începe simularea/ }));

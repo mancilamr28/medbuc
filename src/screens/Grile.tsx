@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { AnswerOptions } from '../components/AnswerOptions';
 import { EmptyState } from '../components/EmptyState';
+import { PasulUrmator } from '../components/PasulUrmator';
 import { PoartaContinut } from '../components/PoartaContinut';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
@@ -518,6 +519,8 @@ function GrileRezultat() {
             </button>
           </div>
         </div>
+
+        <PasulUrmator gresite={gresite} />
       </div>
     </div>
   );
