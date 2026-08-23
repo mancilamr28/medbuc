@@ -283,6 +283,7 @@ describe('funcțiile', () => {
       'are_acces',
       'completeaza_materia',
       'handle_new_user',
+      'ingheata_instantaneul',
       'is_admin',
       'propaga_materia',
       'protect_role',
@@ -1195,5 +1196,181 @@ describe('favoritele', () => {
 
     const r = await baza.caVizitator(() => baza.db.query('select question_id from favorite'));
     expect(r.rows).toEqual([]);
+  });
+});
+
+/**
+ * Lucrările — masa de lucru comună a tuturor felurilor de test.
+ *
+ * Două lucruri se apără aici, și niciunul nu dă eroare când e greșit: că
+ * lucrarea unui elev nu e vizibilă altuia, și că instantaneul ei nu se mai
+ * poate schimba după ce a fost generat. A doua e regula pe care se sprijină
+ * tot restul — răspunsurile se cheie pe poziție, deci o poziție mutată nu
+ * strică lucrarea, ci o rescrie.
+ */
+describe('lucrările', () => {
+  const faLucrare = async (userId: string, nr = 2) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ id: string }>(
+        `insert into test_runs (user_id, mod, nr_cerut) values ($1, 'exersare', $2) returning id`,
+        [userId, nr],
+      ),
+    );
+    const id = r.rows[0]!.id;
+    await baza.caUtilizator(userId, () =>
+      baza.db.query(
+        `insert into test_run_items (run_id, position, question_id)
+         values ($1, 0, 'bio-nervos-01'), ($1, 1, 'bio-celula-01')`,
+        [id],
+      ),
+    );
+    return id;
+  };
+
+  it('nu se văd între elevi, nici lucrarea, nici grilele ei', async () => {
+    await faLucrare(ana);
+
+    const lucrari = await baza.caUtilizator(bogdan, () => baza.db.query('select * from test_runs'));
+    expect(lucrari.rows).toEqual([]);
+
+    const grile = await baza.caUtilizator(bogdan, () => baza.db.query('select * from test_run_items'));
+    expect(grile.rows).toEqual([]);
+  });
+
+  it('nu pot primi grile de la altcineva', async () => {
+    const alAnei = await faLucrare(ana);
+
+    await expect(
+      baza.caUtilizator(bogdan, () =>
+        baza.db.query(
+          `insert into test_run_items (run_id, position, question_id) values ($1, 9, 'bio-celula-01')`,
+          [alAnei],
+        ),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  /**
+   * Miezul. O grilă mutată pe altă poziție dezlipește tot ce s-a răspuns după
+   * ea, fiindcă `attempts.client_key` e `'<lucrare>:<poziție>'`. Un `with check`
+   * n-ar putea prinde asta — vede doar rândul nou — deci regula e declanșator.
+   */
+  it('nu-și mai schimbă instantaneul după generare', async () => {
+    const id = await faLucrare(ana);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("update test_run_items set question_id = 'bio-celula-01' where run_id = $1 and position = 0", [id]),
+      ),
+    ).rejects.toThrow(/nu se mai schimbă/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query('update test_run_items set position = 5 where run_id = $1 and position = 0', [id]),
+      ),
+    ).rejects.toThrow(/nu se mai schimbă/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(
+          `update test_run_items set option_order = array['B','A','C','D','E']::option_key[]
+           where run_id = $1 and position = 0`,
+          [id],
+        ),
+      ),
+    ).rejects.toThrow(/nu se mai schimbă/i);
+  });
+
+  it('lasă răspunsul să se schimbe cât timp lucrarea e în lucru', async () => {
+    const id = await faLucrare(ana);
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("update test_run_items set chosen = 'B', answered_at = now() where run_id = $1 and position = 0", [id]),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("update test_run_items set chosen = 'C' where run_id = $1 and position = 0", [id]),
+    );
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ chosen: string }>('select chosen from test_run_items where run_id = $1 and position = 0', [id]),
+    );
+    expect(r.rows[0]!.chosen).toBe('C');
+  });
+
+  /** După predare, lucrarea e ce a fost la predare — altfel scorul e o părere. */
+  it('nu mai lasă răspunsurile să se schimbe după predare', async () => {
+    const id = await faLucrare(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("update test_run_items set chosen = 'B' where run_id = $1 and position = 0", [id]),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('update test_runs set finished_at = now() where id = $1', [id]),
+    );
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("update test_run_items set chosen = 'A' where run_id = $1 and position = 0", [id]),
+      ),
+    ).rejects.toThrow(/predată/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query('update test_run_items set marked = true where run_id = $1 and position = 0', [id]),
+      ),
+    ).rejects.toThrow(/predată/i);
+  });
+
+  /**
+   * O lucrare se aruncă întreagă, nu rând cu rând: scoaterea unei poziții din
+   * mijloc renumerotează tot ce urmează. De aceea `test_run_items` n-are
+   * politică de ștergere, dar cascada de la lucrare curăță corect.
+   */
+  it('nu se pot scoate grile una câte una, dar lucrarea se aruncă întreagă', async () => {
+    const id = await faLucrare(ana);
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('delete from test_run_items where run_id = $1 and position = 1', [id]),
+    );
+    const ramase = await baza.caUtilizator(ana, () =>
+      baza.db.query('select position from test_run_items where run_id = $1', [id]),
+    );
+    expect(ramase.rows).toHaveLength(2);
+
+    await baza.caUtilizator(ana, () => baza.db.query('delete from test_runs where id = $1', [id]));
+    const dupa = await baza.db.query('select * from test_run_items where run_id = $1', [id]);
+    expect(dupa.rows).toEqual([]);
+  });
+
+  /**
+   * Grila poate dispărea din bibliotecă; lucrarea rămâne. Fără cheie externă pe
+   * `question_id`, o retragere de conținut nu poate strica o lucrare dată, iar
+   * pozițiile nu se mișcă.
+   */
+  it('supraviețuiește ștergerii unei grile din bibliotecă', async () => {
+    const id = await faLucrare(ana);
+
+    // Variantele cad în cascadă; șterse întâi, ar rupe cheia amânată
+    // `questions_correct_exists`, care cere ca varianta corectă să existe.
+    await baza.db.query("delete from questions where id = 'bio-nervos-01'");
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ position: number; question_id: string }>(
+        'select position, question_id from test_run_items where run_id = $1 order by position',
+        [id],
+      ),
+    );
+    expect(r.rows.map((x) => x.question_id)).toEqual(['bio-nervos-01', 'bio-celula-01']);
+  });
+
+  it('refuză o lucrare cu limita de timp înaintea începutului', async () => {
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(
+          `insert into test_runs (user_id, mod, nr_cerut, ends_at)
+           values ($1, 'simulare', 10, now() - interval '1 hour')`,
+          [ana],
+        ),
+      ),
+    ).rejects.toThrow(/test_runs_ends_after_start/i);
   });
 });
