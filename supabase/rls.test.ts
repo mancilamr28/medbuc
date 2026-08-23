@@ -27,6 +27,47 @@ afterEach(async () => {
   await baza.inchide();
 });
 
+/**
+ * Plasa de sub toate celelalte teste de aici.
+ *
+ * Fiecare test de mai jos verifică o politică anume, ceea ce înseamnă că
+ * verifică un tabel la care cineva s-a gândit. Tabelul la care nu s-a gândit
+ * nimeni e tocmai cel periculos: Supabase acordă implicit `select/insert/
+ * update/delete` lui `anon` și `authenticated` pe orice tabel nou din `public`,
+ * deci un `enable row level security` uitat nu dă nicio eroare — publică
+ * tabelul întreg, pentru oricine are cheia publicabilă.
+ *
+ * Testul ăsta nu întreabă ce politici există, ci dacă mai există vreun tabel
+ * fără RLS. E singurul de aici care apără și tabelele care încă nu s-au scris.
+ */
+describe('fiecare tabel din public', () => {
+  it('are RLS pornit', async () => {
+    const r = await baza.db.query<{ relname: string }>(`
+      select c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+      order by c.relname
+    `);
+    expect(r.rows.map((x) => x.relname)).toEqual([]);
+  });
+
+  /**
+   * RLS pornit fără nicio politică refuză tot, ceea ce e sigur dar arată ca un
+   * tabel stricat. Perechea celuilalt test: unul prinde tabelul deschis, ăsta
+   * prinde tabelul mut.
+   */
+  it('are cel puțin o politică', async () => {
+    const r = await baza.db.query<{ relname: string }>(`
+      select c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r'
+        and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+      order by c.relname
+    `);
+    expect(r.rows.map((x) => x.relname)).toEqual([]);
+  });
+});
+
 describe('notițele', () => {
   it('nu se văd între elevi', async () => {
     await baza.caUtilizator(ana, async () => {
@@ -222,14 +263,31 @@ describe('funcțiile', () => {
     expect(r.rows[0]!.poate).toBe(false);
   });
 
+  /**
+   * Fără `search_path` fix, cine poate crea obiecte într-o schemă din calea de
+   * căutare poate pune în fața unei funcții de sistem una a lui, iar corpul
+   * `security definer` o execută cu drepturi de proprietar.
+   *
+   * Lista e numită, nu numărată: un simplu `toHaveLength` trece dacă adaugi o
+   * funcție și ștergi alta, și oricum nu spune care lipsește când pică.
+   */
   it('au toate un search_path fix', async () => {
     const r = await baza.db.query<{ proname: string; proconfig: string[] | null }>(`
       select p.proname, p.proconfig
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'private'
+      order by p.proname
     `);
 
-    expect(r.rows).toHaveLength(4);
+    expect(r.rows.map((x) => x.proname)).toEqual([
+      'are_acces',
+      'completeaza_materia',
+      'handle_new_user',
+      'is_admin',
+      'propaga_materia',
+      'protect_role',
+      'touch_updated_at',
+    ]);
     for (const f of r.rows) {
       expect(f.proconfig?.some((c) => c.startsWith('search_path='))).toBe(true);
     }
@@ -1095,5 +1153,47 @@ describe('scrierea taxonomiei', () => {
       sursa_bibliografica: 'Corint, ed. 2024',
       position: inainte.rows[0]!.position,
     });
+  });
+});
+
+/**
+ * Favoritele — un tabel nou, deci exact clasa de scăpare pe care o prinde
+ * „fiecare tabel din public": Supabase acordă implicit drepturi lui `anon` și
+ * `authenticated` pe orice tabel proaspăt, iar un `enable row level security`
+ * uitat nu dă nicio eroare, doar publică tot.
+ */
+describe('favoritele', () => {
+  it('nu se văd între elevi', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-nervos-01']),
+    );
+
+    const aleLuiBogdan = await baza.caUtilizator(bogdan, () =>
+      baza.db.query<{ question_id: string }>('select question_id from favorite'),
+    );
+    expect(aleLuiBogdan.rows).toEqual([]);
+
+    const aleAnei = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ question_id: string }>('select question_id from favorite'),
+    );
+    expect(aleAnei.rows.map((x) => x.question_id)).toEqual(['bio-nervos-01']);
+  });
+
+  it('nu pot fi puse pe contul altcuiva', async () => {
+    await expect(
+      baza.caUtilizator(bogdan, () =>
+        baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-nervos-01']),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  /** Un vizitator fără sesiune n-are ce căuta în tabel, în niciun fel. */
+  it('nu sunt citibile de un vizitator', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-nervos-01']),
+    );
+
+    const r = await baza.caVizitator(() => baza.db.query('select question_id from favorite'));
+    expect(r.rows).toEqual([]);
   });
 });

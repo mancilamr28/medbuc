@@ -311,6 +311,13 @@ This is live — the app reads and writes it. The schema was written first, in S
 
 Note the harness detail that already bit once: it uses session-level `set role`, not `set local role`. Outside a transaction `set local` is silently ignored, queries keep running as the table owner, RLS is bypassed, and every isolation test passes while proving nothing.
 
+**Two tests in `rls.test.ts` cover the tables nobody has written yet:** every table in `public` must have RLS enabled, and must have at least one policy. Supabase grants `anon`/`authenticated` `select/insert/update/delete` on every new table in `public` by default, so a forgotten `enable row level security` publishes the whole table with no error anywhere — the per-table tests below them only protect tables someone remembered. The second test catches the opposite slip: RLS on with no policy refuses everything, which is safe but looks like a broken table.
+
+### Two derived columns that are not state
+
+- **`questions.materie_id` is denormalised from `chapter_id`** and kept there by two triggers (`private.completeaza_materia` on questions, `private.propaga_materia` on chapters). It exists because quota selection partitions by subject and the wizard counts per subject constantly — through a join, no index can cover that access path. It is derived at write time, so a client cannot claim a subject its chapter does not have, and `schema.test.ts` asserts it never diverges. This is not a violation of "derive, never store": the rule is about *displayed figures* that can drift from the journal, and this one is structurally pinned to its source.
+- **`nivel_acces` / `questions.acces` / `colectii.acces` / `profiles.abonament_pana` are the entitlement seam, and nothing is gated.** Everything defaults to `liber` and `private.are_acces()` returns true for everybody. The point is that turning it on later is a data change plus one predicate in a `where`, not a rewrite of the generation engine. When it does get used, the predicate belongs in the candidate query's `where` — an ineligible question must not be a row, not a hidden row.
+
 ## TypeScript constraints that bite
 
 `tsconfig.json` is aggressive; these cause build failures that may be surprising:
