@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Admin } from './Admin';
 import { QUESTIONS } from '../data/questions';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
+import { TIPURI_SEED } from '../data/tipuriSeed';
+import { construiesteColectii } from '../lib/colectii';
 import type { FiltreGrile, GrilaCuStare, GrilaDeSalvat } from '../lib/continut';
 import { AppProvider } from '../state/AppState';
 import { AuthProvider } from '../state/AuthContext';
@@ -23,6 +26,8 @@ const GRILE: GrilaCuStare[] = [
 
 let rol = 'admin';
 const salveaza = vi.fn<(g: GrilaDeSalvat) => Promise<void>>(async () => {});
+const schimbaStarea = vi.fn<(ids: readonly string[], s: string) => Promise<number>>(async (ids) => ids.length);
+const atribuie = vi.fn<(ids: readonly string[], c: string | null) => Promise<number>>(async (ids) => ids.length);
 const sterge = vi.fn<(id: string) => Promise<void>>(async () => {});
 
 /**
@@ -43,6 +48,22 @@ const filtreaza = (f: FiltreGrile) => {
 vi.mock('../lib/continut', async (original) => ({
   ...(await original<typeof import('../lib/continut')>()),
   incarcaGrile: async () => GRILE,
+  // Taxonomia, tipurile și colecțiile vin din bază de la faza 1 încoace; falsul
+  // le dă pe cele reale, ca selectoarele ecranului să aibă ce afișa.
+  incarcaTaxonomie: async () => TAXONOMIE_SEED,
+  incarcaTipuri: async () => TIPURI_SEED,
+  incarcaColectii: async () =>
+    construiesteColectii([
+      {
+        id: 'umfcd-2026-mg',
+        centru_id: 'umfcd',
+        nume: 'Admitere UMFCD 2026',
+        tip: 'subiect_oficial',
+        an: 2026,
+        sursa_bibliografica: '',
+        position: 0,
+      },
+    ]),
   cautaGrile: async (f: FiltreGrile, decalaj: number, limita: number) => {
     const toate = filtreaza(f);
     return { randuri: toate.slice(decalaj, decalaj + limita), total: toate.length };
@@ -52,6 +73,8 @@ vi.mock('../lib/continut', async (original) => ({
     publicata: filtreaza({ ...f, status: 'publicata' }).length,
     retrasa: filtreaza({ ...f, status: 'retrasa' }).length,
   }),
+  schimbaStareaGrilelor: (ids: readonly string[], s: string) => schimbaStarea(ids, s),
+  atribuieColectia: (ids: readonly string[], c: string | null) => atribuie(ids, c),
   salveazaGrila: (g: GrilaDeSalvat) => salveaza(g),
   stergeGrila: (id: string) => sterge(id),
 }));
@@ -90,6 +113,9 @@ const gata = () => screen.findByLabelText('Enunțul grilei');
 const GRILE_INITIALE = [...GRILE];
 
 beforeEach(() => {
+  // Secțiunea vine din hash, nu din state: fără reset, un test care a intrat în
+  // import lasă ecranul acolo pentru toate cele care urmează.
+  window.location.hash = '#/admin';
   GRILE.length = 0;
   GRILE.push(...GRILE_INITIALE);
   vi.clearAllMocks();
@@ -327,6 +353,43 @@ describe('Administrare · import în masă', () => {
    * randării, ci fiindcă fiecare deschidere a ecranului ar transfera zeci de
    * megaocteți, cu toate variantele și explicațiile lor.
    */
+
+  /**
+   * După un import de o sută de grile, publicarea lor una câte una înseamnă o
+   * sută de dus-întorsuri. Cifra din mesaj vine de la bază — câte rânduri a
+   * atins chiar update-ul — nu câte s-au trimis.
+   */
+  it('publică în masă doar grilele bifate', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await user.click(await screen.findByLabelText('Alege bio-nervos-ciorna'));
+    expect(screen.getByText('1 grilă aleasă')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Publică' }));
+
+    await waitFor(() => expect(schimbaStarea).toHaveBeenCalledWith(['bio-nervos-ciorna'], 'publicata'));
+    // Selecția se golește după operație: altfel al doilea clic ar reface-o tăcut.
+    await waitFor(() => expect(screen.queryByText('1 grilă aleasă')).not.toBeInTheDocument());
+  });
+
+  it('atribuie o colecție lotului bifat', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+
+    await user.click(await screen.findByLabelText('Alege bio-nervos-ciorna'));
+    await user.selectOptions(
+      screen.getByLabelText('Atribuie o colecție grilelor alese'),
+      'umfcd-2026-mg',
+    );
+
+    await waitFor(() =>
+      expect(atribuie).toHaveBeenCalledWith(['bio-nervos-ciorna'], 'umfcd-2026-mg'),
+    );
+  });
+
   it('aduce o singură pagină, nu toată biblioteca', async () => {
     GRILE.push(
       ...Array.from({ length: 60 }, (_, i) => ({
