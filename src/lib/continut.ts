@@ -255,3 +255,152 @@ export async function incarcaColectii(): Promise<Colectii> {
 
   return construiesteColectii(randuri);
 }
+
+// ---------------------------------------------------------------------------
+// Căutarea din Administrare.
+//
+// Lista din Administrare citea `useContent().grile` — adică biblioteca întreagă,
+// deja adusă în memorie — și filtra cu `Array.filter`. Merge la 181 de grile și
+// nu mai merge deloc la douăzeci de mii: nu doar din cauza randării, ci fiindcă
+// fiecare deschidere a ecranului ar transfera zeci de megaocteți, cu toate
+// variantele și explicațiile lor.
+//
+// Filtrarea se mută pe server. Nu e nevoie de un RPC nou: PostgREST știe să
+// filtreze, să numere și să pagineze, iar `questions_citire` face deja diferența
+// dintre elev și administrator — o funcție `security definer` ar fi trebuit să
+// reimplementeze regula aia pe cont propriu.
+//
+// Materia nu e o coloană pe `questions`, ci pe capitol. Nu se rezolvă cu un join
+// aici: clientul are deja taxonomia și transformă „materia bio" în lista de
+// capitole ale ei, deci filtrul rămâne o singură condiție `in`.
+// ---------------------------------------------------------------------------
+
+export interface FiltreGrile {
+  /** Caută în id și în enunț. Gol înseamnă fără restricție. */
+  cautare: string;
+  status: QuestionStatus | 'toate';
+  /** Capitolele cerute; gol înseamnă toate — aceeași convenție ca peste tot. */
+  capitole: ChapterId[];
+  colectieId: string;
+  tipId: string;
+  sursa: QuestionSursa | '';
+}
+
+export const FILTRE_GOALE: FiltreGrile = {
+  cautare: '',
+  status: 'toate',
+  capitole: [],
+  colectieId: '',
+  tipId: '',
+  sursa: '',
+};
+
+export interface PaginaGrile {
+  randuri: GrilaCuStare[];
+  /** Câte grile trec de filtru, nu câte s-au adus în pagina asta. */
+  total: number;
+}
+
+/** `%` și `_` sunt metacaractere în `ilike`; fără scăpare, o căutare cu `%` ar da tot. */
+/**
+ * Tiparul de căutare, gata de pus într-un `or=(...)` PostgREST.
+ *
+ * Două scăpări suprapuse, în ordinea asta:
+ *
+ * 1. `%` și `_` sunt metacaractere `ilike` — fără scăpare, o căutare cu `%` ar
+ *    întoarce toată biblioteca: un rezultat greșit care arată ca unul corect.
+ * 2. Virgula și parantezele despart termenii într-un `or=(...)`, deci valoarea
+ *    se pune între ghilimele. Fara ele, o căutare după textul variantelor unui
+ *    complement grupat — care chiar conține virgule — primește 400.
+ *
+ * Verificat pe serverul real: nescăpată dă `PGRST100 failed to parse logic
+ * tree`, scăpată dă 200.
+ */
+export const pentruIlike = (q: string): string => {
+  const ilike = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+  const citat = ilike.replace(/[\\"]/g, (m) => `\\${m}`);
+  return `"%${citat}%"`;
+};
+
+export async function cautaGrile(
+  filtre: FiltreGrile,
+  decalaj: number,
+  limita: number,
+): Promise<PaginaGrile> {
+  const { supabase } = await import('./supabase');
+
+  let q = supabase.from('questions').select(CAMPURI, { count: 'exact' });
+
+  const cautare = filtre.cautare.trim();
+  if (cautare !== '') {
+    const tipar = pentruIlike(cautare);
+    q = q.or(`id.ilike.${tipar},text.ilike.${tipar}`);
+  }
+  if (filtre.status !== 'toate') q = q.eq('status', filtre.status);
+  if (filtre.capitole.length > 0) q = q.in('chapter_id', filtre.capitole);
+  if (filtre.colectieId !== '') q = q.eq('colectie_id', filtre.colectieId);
+  if (filtre.tipId !== '') q = q.eq('tip_id', filtre.tipId);
+  if (filtre.sursa !== '') q = q.eq('sursa', filtre.sursa);
+
+  const r = await q.order('id').range(decalaj, decalaj + limita - 1);
+  if (r.error) throw new Error(r.error.message);
+
+  return {
+    randuri: ((r.data ?? []) as unknown as RandGrila[]).map(mapeazaGrila),
+    total: r.count ?? 0,
+  };
+}
+
+/**
+ * Câte grile are fiecare stare, pentru filtrul curent.
+ *
+ * Trei numărători, nu o listă adusă și grupată în client: `head: true` cere
+ * numai antetul cu totalul, deci nu se transferă niciun rând.
+ */
+export async function numaraPeStare(
+  filtre: FiltreGrile,
+): Promise<Record<QuestionStatus, number>> {
+  const { supabase } = await import('./supabase');
+  const stari: QuestionStatus[] = ['ciorna', 'publicata', 'retrasa'];
+
+  const perechi = await Promise.all(
+    stari.map(async (stare) => {
+      let q = supabase.from('questions').select('id', { count: 'exact', head: true }).eq('status', stare);
+
+      const cautare = filtre.cautare.trim();
+      if (cautare !== '') {
+        const tipar = pentruIlike(cautare);
+        q = q.or(`id.ilike.${tipar},text.ilike.${tipar}`);
+      }
+      if (filtre.capitole.length > 0) q = q.in('chapter_id', filtre.capitole);
+      if (filtre.colectieId !== '') q = q.eq('colectie_id', filtre.colectieId);
+      if (filtre.tipId !== '') q = q.eq('tip_id', filtre.tipId);
+      if (filtre.sursa !== '') q = q.eq('sursa', filtre.sursa);
+
+      const r = await q;
+      if (r.error) throw new Error(r.error.message);
+      return [stare, r.count ?? 0] as const;
+    }),
+  );
+
+  return Object.fromEntries(perechi) as Record<QuestionStatus, number>;
+}
+
+/**
+ * Id-urile deja existente dintre cele date. Pentru importul în masă, care
+ * trebuie să spună câte rânduri rescriu o grilă — fără să aducă biblioteca.
+ */
+export async function idExistente(ids: readonly string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { supabase } = await import('./supabase');
+
+  const gasite = new Set<string>();
+  // PostgREST pune lista în URL, deci un lot de două mii de id-uri ar depăși
+  // lungimea maximă a cererii. Se întreabă în tranșe.
+  for (let i = 0; i < ids.length; i += 200) {
+    const r = await supabase.from('questions').select('id').in('id', ids.slice(i, i + 200));
+    if (r.error) throw new Error(r.error.message);
+    for (const rand of (r.data ?? []) as { id: string }[]) gasite.add(rand.id);
+  }
+  return gasite;
+}

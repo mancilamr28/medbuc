@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { PUBLIC_ROUTES, SCREENS, publicViewFor, screenFor } from './router';
+import {
+  PUBLIC_ROUTES,
+  SCREENS,
+  SECTIUNI_ADMIN,
+  publicViewFor,
+  screenFor,
+  sectiuneAdminPentru,
+} from './router';
 
 /**
  * Rutarea publică.
@@ -60,5 +67,51 @@ describe('screenFor', () => {
     // Rutele publice nu sunt ecrane, deci după autentificare cad singure pe
     // `acasa` — de asta nu există logică de redirect după login.
     expect(screenFor('inregistrare')).toBe('acasa');
+  });
+});
+
+/**
+ * Al doilea segment, folosit doar de Administrare.
+ *
+ * Secțiunile nu sunt ecrane: nu apar în `SCREENS`, deci nici în `Sidebar`, nici
+ * în `MobileNav`, iar `go()` n-are ce face cu ele. Testele de aici țin cele două
+ * spații separate — dacă o secțiune ar ajunge `Screen`, `go('colectii')` ar
+ * deveni apelabil de oriunde din aplicație.
+ */
+describe('secțiunile de administrare', () => {
+  it('cad pe „grile" pentru orice nu recunosc, inclusiv gol', () => {
+    expect(sectiuneAdminPentru('')).toBe('grile');
+    expect(sectiuneAdminPentru('inventat')).toBe('grile');
+    expect(sectiuneAdminPentru('colectii')).toBe('colectii');
+  });
+
+  it('nu se suprapun cu ecranele aplicației', () => {
+    const ecrane = new Set<string>(SCREENS);
+    for (const s of SECTIUNI_ADMIN) {
+      // `grile` există în ambele spații, dar înseamnă lucruri diferite și e citit
+      // din segmente diferite; restul n-au voie să se atingă.
+      if (s === 'grile') continue;
+      expect(ecrane.has(s), `secțiunea ${s} nu are voie să fie și ecran`).toBe(false);
+    }
+  });
+});
+
+/**
+ * Ecranul se citește din **primul** segment.
+ *
+ * Înainte se citea tot hash-ul ca un singur nume, ceea ce mergea cât timp
+ * fiecare ecran era o frunză. Cu `#/admin/colectii`, `admin/colectii` nu e
+ * niciun `Screen` și cădea pe `acasa` — altă pagină decât cea cerută, tăcut.
+ */
+describe('rutarea pe două segmente', () => {
+  it('recunoaște ecranul chiar când hash-ul are un al doilea segment', () => {
+    expect(screenFor('admin')).toBe('admin');
+    expect(screenFor('admin/colectii')).toBe('acasa');
+  });
+
+  it('trimite spre autentificare un link adânc deschis fără sesiune', () => {
+    expect(publicViewFor('admin')).toBe('autentificare');
+    expect(publicViewFor('inregistrare')).toBe('inregistrare');
+    expect(publicViewFor('altceva')).toBe('landing');
   });
 });

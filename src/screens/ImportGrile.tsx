@@ -44,12 +44,15 @@ export function ImportGrile({
   tipuri,
   colectii,
   reload,
+  dupaImport,
 }: {
   grile: GrilaCuStare[];
   taxonomie: Taxonomie;
   tipuri: TipuriGrile;
   colectii: Colectii;
   reload: () => Promise<void>;
+  /** Lista din Administrare e o interogare separată; are nevoie de un semnal. */
+  dupaImport?: () => void;
 }) {
   const { notify } = useToast();
 
@@ -81,6 +84,7 @@ export function ImportGrile({
     setProgres(null);
     setBilant(rezultat);
     await reload();
+    dupaImport?.();
 
     if (rezultat.esecuri.length === 0) {
       notify('succes', `${numar(rezultat.reusite, 'grilă importată', 'grile importate')}.`);

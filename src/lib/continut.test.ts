@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapeazaGrila, type RandGrila } from './continut';
+import { mapeazaGrila, pentruIlike, type RandGrila } from './continut';
 
 const rand = (peste: Partial<RandGrila> = {}): RandGrila => ({
   id: 'bio-nervos-01',
@@ -89,5 +89,35 @@ describe('mapeazaGrila', () => {
       rand({ question_options: [{ key: 'Z', text: 'intrusă', why: null }] }),
     );
     expect(g.opts).toEqual([]);
+  });
+});
+
+/**
+ * Căutarea din Administrare merge prin `ilike`, unde `%` și `_` sunt
+ * metacaractere. Fără scăpare, un autor care caută „50%" ar primi toată
+ * biblioteca — un rezultat greșit care arată exact ca unul corect.
+ */
+describe('pentruIlike', () => {
+  it('scapă metacaracterele ilike, ca o căutare cu procent să nu dea tot', () => {
+    // Două scăpări: `\%` pentru ilike, apoi backslash-ul dublat pentru
+    // ghilimelele PostgREST, ca serverul să-i predea lui ilike chiar `\%`.
+    expect(pentruIlike('50%')).toBe('"%50\\\\%%"');
+    expect(pentruIlike('a_b')).toBe('"%a\\\\_b%"');
+  });
+
+  /**
+   * Virgula desparte termenii într-un `or=(...)`, iar textul variantelor unui
+   * complement grupat chiar conține virgule. Nescăpată, căutarea primea 400 de
+   * la PostgREST — verificat pe serverul real.
+   */
+  it('pune tiparul între ghilimele, ca o virgulă să nu rupă filtrul', () => {
+    expect(pentruIlike('1, 2, 3')).toBe('"%1, 2, 3%"');
+    // Ghilimeaua dinăuntru trebuie scăpată, altfel închide valoarea mai devreme.
+    // Ea trece doar prin a doua scăpare — nu e metacaracter `ilike`.
+    expect(pentruIlike('zi "buna"')).toBe('"%zi \\"buna\\"%"');
+  });
+
+  it('lasă textul obișnuit între ghilimele, altfel neatins', () => {
+    expect(pentruIlike('sistemul nervos')).toBe('"%sistemul nervos%"');
   });
 });
