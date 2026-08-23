@@ -221,11 +221,17 @@ Admin has two modes over the same library, both reaching the database through th
 
 **The import validates through `valideaza()` — the form's own function — not a parallel rule set.** This is the point of the file, not an implementation detail: a second copy of the rules would drift the first time a rule is added to one side, and the import would start accepting what the form rejects. Only the checks that *cannot* exist in a form live in `importLot.ts`: broken JSON, a `tip` outside the two, an option letter past E, an id repeated inside the same batch. Everything about content itself belongs in `valideaza()`, and the database stays the real gate either way.
 
+**Colecția e entitate, nu text liber.** Migrarea 0008 a pus `questions.colectie` ca text — răspunsul corect atunci, fiindcă nu se știa ce forme ia. Text liber nu se poate însă filtra, nu se poate renumi fără un `update` peste tot, și n-are unde să-și țină anul sau cartea. Migrarea 0011 l-a mutat la `colectii` (`colectie_id` pe grilă), cât timp erau zero grile care îl foloseau.
+
+**Lucrările de admitere s-au mutat aici din capitole.** Baza avea materia `ant` („Subiecte anterioare") cu 8 „capitole" care erau de fapt lucrări (`ant-2026-mg`, `ant-2026-simulare`), cu `nr` ținând anul. Modelul contrazicea decizia scrisă chiar în `data/questions.ts`: o grilă dintr-un subiect oficial ține în continuare de un capitol **real** de conținut, ca să poată fi filtrată și pe materie, și pe proveniență. O lucrare nu e un capitol, e o colecție. Conversia s-a făcut cât era gratis — zero grile, zero notițe, zero sesiuni care să le pomenească.
+
+`salveaza_grila` refuză acum o colecție care nu există: pe text liber, o greșeală de tipar crea tăcut un lot fantomă, invizibil în orice filtru.
+
 **Trei câmpuri spun de unde vine o grilă, și nu sunt interschimbabile.** `sursa` e
 felul materialului — o listă închisă (`materie`, `subiect_oficial`, `culegere`)
 verificată și de `salveaza_grila`, cu etichetele în `SURSE` din `data/questions.ts`,
-una singură fiindcă o citesc formularul, importul și validarea lotului. `colectie`
-e lotul, text liber: „Simulare 2026 UMFCD", „Corint – Sistemul nervos". `src` e
+una singură fiindcă o citesc formularul, importul și validarea lotului. `colectie_id`
+e lotul, o cheie către `colectii`. `src` e
 citarea de pagină („Celula, p. 11") și era deja acolo — cele 181 de grile scrise îl
 folosesc așa, una per câteva grile, deci nu putea fi refolosit ca proveniență fără
 să le piardă. Colecția e nivelul după care se grupează un import întreg.

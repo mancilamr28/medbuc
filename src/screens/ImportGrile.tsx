@@ -9,6 +9,7 @@ import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } 
 import { SURSE, type QuestionSursa } from '../data/questions';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
+import type { Colectii } from '../lib/colectii';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -41,11 +42,13 @@ export function ImportGrile({
   grile,
   taxonomie,
   tipuri,
+  colectii,
   reload,
 }: {
   grile: GrilaCuStare[];
   taxonomie: Taxonomie;
   tipuri: TipuriGrile;
+  colectii: Colectii;
   reload: () => Promise<void>;
 }) {
   const { notify } = useToast();
@@ -198,20 +201,26 @@ export function ImportGrile({
 
           <label style={{ display: 'block' }}>
             <span style={label}>Colecția</span>
-            <input
+            <select
               className="field"
               value={colectie}
               onChange={(e) => setColectie(e.target.value)}
-              placeholder="ex. Simulare 2026 UMFCD"
-              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
-            />
+              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
+            >
+              <option value="">— fără colecție —</option>
+              {colectii.lista.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nume}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
         <div style={{ font: `400 11.5px/1.6 ${SANS}`, color: 'var(--fg3)' }}>
           Se aplică tuturor grilelor din lot. O grilă care își scrie propria{' '}
-          <code>sursa</code> sau <code>colectie</code> și-o păstrează, deci un export al bibliotecii
-          se poate relipi întreg fără să fie uniformizat de câmpurile de aici.
+          <code>sursa</code> sau <code>colectie</code> (id-ul colecției) și-o păstrează, deci un export
+          al bibliotecii se poate relipi întreg fără să fie uniformizat de câmpurile de aici.
         </div>
       </div>
 

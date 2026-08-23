@@ -8,6 +8,7 @@ import {
   type Taxonomie,
 } from './taxonomie';
 import { construiesteTipuri, type RandTip, type TipuriGrile } from './tipuriGrile';
+import { construiesteColectii, type Colectii, type RandColectie } from './colectii';
 import { citesteTot } from './paginare';
 
 /**
@@ -47,7 +48,7 @@ export interface RandGrila {
   src: string;
   sursa: string;
   an: number | null;
-  colectie: string;
+  colectie_id: string | null;
   question_options: { key: string; text: string; why: string | null }[] | null;
 }
 
@@ -64,7 +65,7 @@ export interface RandGrila {
  */
 export const FK_VARIANTE = 'question_options_question_id_fkey';
 
-const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie, tip_id, question_options!${FK_VARIANTE}(key, text, why)`;
+const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie_id, tip_id, question_options!${FK_VARIANTE}(key, text, why)`;
 
 /**
  * Pură peste rândul primit, ca să poată fi testată fără rețea.
@@ -95,7 +96,7 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
     why,
     src: rand.src,
     sursa: rand.sursa as QuestionSursa,
-    colectie: rand.colectie,
+    colectieId: rand.colectie_id ?? '',
     ...(rand.an !== null ? { an: rand.an } : {}),
     status: rand.status as QuestionStatus,
   };
@@ -159,6 +160,7 @@ export interface GrilaDeSalvat {
   src: string;
   sursa: QuestionSursa;
   an?: number;
+  /** Id-ul colecției, sau gol. Cheia se numește `colectie` și în payload-ul RPC. */
   colectie: string;
   opts: { key: OptionKey; text: string; why?: string }[];
 }
@@ -236,4 +238,20 @@ export async function incarcaTipuri(): Promise<TipuriGrile> {
   });
 
   return construiesteTipuri(randuri);
+}
+
+/** Colecțiile, din bază. Aici, nu în `colectii.ts`, din același motiv ca taxonomia. */
+export async function incarcaColectii(): Promise<Colectii> {
+  const { supabase } = await import('./supabase');
+
+  const randuri = await citesteTot<RandColectie>(async (de, la) => {
+    const r = await supabase
+      .from('colectii')
+      .select('id,centru_id,nume,tip,an,sursa_bibliografica,position', { count: 'exact' })
+      .order('position')
+      .range(de, la);
+    return { data: r.data as RandColectie[] | null, error: r.error, count: r.count };
+  });
+
+  return construiesteColectii(randuri);
 }

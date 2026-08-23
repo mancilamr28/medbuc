@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { incarcaGrile, incarcaTaxonomie, incarcaTipuri, type GrilaCuStare } from '../lib/continut';
+import { incarcaColectii, incarcaGrile, incarcaTaxonomie, incarcaTipuri, type GrilaCuStare } from '../lib/continut';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
+import { COLECTII_GOALE, type Colectii } from '../lib/colectii';
 import { useAuth } from './authState';
 import { ContentContext, type ContentValue } from './contentState';
 
@@ -32,6 +33,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   const [grile, setGrile] = useState<GrilaCuStare[]>([]);
   const [taxonomie, setTaxonomie] = useState<Taxonomie>(TAXONOMIE_GOALA);
   const [tipuri, setTipuri] = useState<TipuriGrile>(TIPURI_GOALE);
+  const [colectii, setColectii] = useState<Colectii>(COLECTII_GOALE);
   const [seIncarca, setSeIncarca] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +77,25 @@ export function ContentProvider({ children }: { children: ReactNode }) {
    * oprește nimic: fiecare funcție din `Taxonomie` cade înapoi pe id-ul brut,
    * deci ecranul arată id-uri în loc de titluri — vizibil, nu stricat.
    */
+  // Colecțiile sunt vizibile doar cu sesiune: politica lor e dată lui
+  // `authenticated`, spre deosebire de taxonomie, pe care o citește și pagina
+  // publică. Se cer odată cu biblioteca.
+  useEffect(() => {
+    if (!user) {
+      setColectii(COLECTII_GOALE);
+      return;
+    }
+    let anulat = false;
+    void incarcaColectii()
+      .then((c) => {
+        if (!anulat) setColectii(c);
+      })
+      .catch((e: unknown) => console.warn('[medbuc] Încărcarea colecțiilor a eșuat.', e));
+    return () => {
+      anulat = true;
+    };
+  }, [user]);
+
   useEffect(() => {
     let anulat = false;
     void incarcaTipuri()
@@ -111,11 +132,12 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       questions: grile.filter((g) => g.status === 'publicata'),
       taxonomie,
       tipuri,
+      colectii,
       loading,
       error,
       reload: incarca,
     }),
-    [grile, taxonomie, tipuri, loading, error, incarca],
+    [grile, taxonomie, tipuri, colectii, loading, error, incarca],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

@@ -14,7 +14,7 @@ const rand = (peste: Partial<RandGrila> = {}): RandGrila => ({
   src: 'Manual',
   sursa: 'materie',
   an: null,
-  colectie: '',
+  colectie_id: null,
   question_options: [
     { key: 'B', text: 'a doua', why: 'de ce ține' },
     { key: 'A', text: 'prima', why: null },

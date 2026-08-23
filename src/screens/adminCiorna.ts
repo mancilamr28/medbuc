@@ -27,7 +27,7 @@ export interface Ciorna {
   expl: string;
   src: string;
   sursa: QuestionSursa;
-  /** Lotul din care vine grila, ex. „Simulare 2026 UMFCD". Liber, poate fi gol. */
+  /** Id-ul colecției din care vine grila, sau gol. */
   colectie: string;
   /** Anul subiectului, ca text în formular; gol dacă nu se aplică. */
   an: string;
@@ -68,7 +68,7 @@ export function dinGrila(g: GrilaCuStare): Ciorna {
     expl: g.expl,
     src: g.src,
     sursa: g.sursa,
-    colectie: g.colectie,
+    colectie: g.colectieId,
     an: g.an === undefined ? '' : String(g.an),
   };
 }
