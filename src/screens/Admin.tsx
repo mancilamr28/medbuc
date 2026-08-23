@@ -5,6 +5,8 @@ import { chapterLabel, type ChapterId } from '../data/chapters';
 import { OPTION_KEYS, SURSE, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import {
   FILTRE_GOALE,
+  atribuieColectia,
+  schimbaStareaGrilelor,
   salveazaGrila,
   stergeGrila,
   type FiltreGrile,
@@ -12,7 +14,10 @@ import {
   type QuestionStatus,
 } from '../lib/continut';
 import { PE_PAGINA, useBibliotecaAdmin } from './adminBiblioteca';
+import { AcoperireCapitole } from './AcoperireCapitole';
+import { useSectiuneAdmin } from '../lib/router';
 import { useIsDesktop } from '../lib/hooks';
+import { reportError } from '../lib/sentry';
 import { numar } from '../lib/text';
 import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip, twoCol } from '../lib/ui';
 import { useAuth } from '../state/authState';
@@ -84,7 +89,7 @@ function AdminPanel() {
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
-  const [mod, setMod] = useState<'formular' | 'import'>('formular');
+  const [sectiune, mergiLa] = useSectiuneAdmin();
   const [ciorna, setCiorna] = useState<Ciorna>(() => ciornaGoala());
   const [editez, setEditez] = useState<string | null>(null);
   const [filtre, setFiltre] = useState<FiltreGrile>(FILTRE_GOALE);
@@ -94,6 +99,8 @@ function AdminPanel() {
   const areFiltru = JSON.stringify(filtre) !== JSON.stringify(FILTRE_GOALE);
   const [seSalveaza, setSeSalveaza] = useState(false);
   const [deSters, setDeSters] = useState<string | null>(null);
+  const [alese, setAlese] = useState<Set<string>>(() => new Set());
+  const [inLucru, setInLucru] = useState(false);
   const [aratatProbleme, setAratatProbleme] = useState(false);
 
   const probleme = valideaza(ciorna, taxonomie, tipuri);
@@ -113,11 +120,42 @@ function AdminPanel() {
 
   // Lista rămâne vizibilă și în modul de import, deci „Editează" trebuie să
   // aducă înapoi formularul — altfel deschide o ciornă pe care n-o vede nimeni.
+  const comutaAlegerea = (id: string) =>
+    setAlese((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  /**
+   * Operațiile în masă, pe ce e bifat.
+   *
+   * Cifra întoarsă e câte rânduri a atins chiar baza, nu câte s-au trimis: dacă
+   * o grilă a fost ștearsă între timp, mesajul trebuie să spună adevărul.
+   */
+  const inMasa = async (ce: () => Promise<number>, frazaReusita: (n: number) => string) => {
+    if (inLucru || alese.size === 0) return;
+    setInLucru(true);
+    try {
+      const atinse = await ce();
+      await reload();
+      biblioteca.reincarca();
+      setAlese(new Set());
+      notify('succes', frazaReusita(atinse));
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Operația nu a reușit.');
+      reportError(e, 'Administrare: operație în masă');
+    } finally {
+      setInLucru(false);
+    }
+  };
+
   const incarcaPentruEditare = (g: GrilaCuStare) => {
     setCiorna(dinGrila(g));
     setEditez(g.id);
     setAratatProbleme(false);
-    setMod('formular');
+    mergiLa('grile');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -193,17 +231,23 @@ function AdminPanel() {
         </div>
         <Segmented
           items={[
-            { id: 'formular' as const, label: 'O grilă' },
+            { id: 'grile' as const, label: 'O grilă' },
             { id: 'import' as const, label: 'Import în masă' },
+            { id: 'acoperire' as const, label: 'Acoperire' },
           ]}
-          value={mod}
-          onChange={setMod}
-          ariaLabel="Felul în care scrii grile"
+          value={sectiune === 'taxonomie' || sectiune === 'colectii' ? 'grile' : sectiune}
+          onChange={mergiLa}
+          ariaLabel="Ce faci în administrare"
         />
       </div>
 
+      {/* Acoperirea e un ecran întreg, nu o coloană: e o hartă a programei, iar
+          lângă ea lista de grile n-ar avea ce adăuga. */}
+      {sectiune === 'acoperire' ? (
+        <AcoperireCapitole taxonomie={taxonomie} />
+      ) : (
       <div style={twoCol(isDesktop)}>
-        {mod === 'import' ? (
+        {sectiune === 'import' ? (
           <ImportGrile
               grile={grile}
               taxonomie={taxonomie}
@@ -651,6 +695,83 @@ function AdminPanel() {
               </div>
             </div>
 
+            {alese.size > 0 && (
+              <div
+                style={{
+                  padding: '10px 18px',
+                  borderBottom: '1px solid var(--line)',
+                  background: 'var(--brandS)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ font: `500 12px ${SANS}` }}>
+                  {numar(alese.size, 'grilă aleasă', 'grile alese')}
+                </span>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={inLucru}
+                  onClick={() =>
+                    void inMasa(
+                      () => schimbaStareaGrilelor([...alese], 'publicata'),
+                      (n) => `${numar(n, 'grilă publicată', 'grile publicate')}.`,
+                    )
+                  }
+                  style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
+                >
+                  Publică
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={inLucru}
+                  onClick={() =>
+                    void inMasa(
+                      () => schimbaStareaGrilelor([...alese], 'retrasa'),
+                      (n) => `${numar(n, 'grilă retrasă', 'grile retrase')}.`,
+                    )
+                  }
+                  style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
+                >
+                  Retrage
+                </button>
+                <select
+                  className="field"
+                  value=""
+                  disabled={inLucru}
+                  onChange={(e) => {
+                    const ales = e.target.value;
+                    if (ales === '') return;
+                    void inMasa(
+                      () => atribuieColectia([...alese], ales === 'fara' ? null : ales),
+                      (n) => `${numar(n, 'grilă mutată', 'grile mutate')}.`,
+                    );
+                  }}
+                  aria-label="Atribuie o colecție grilelor alese"
+                  style={{ padding: '6px 9px', font: `400 12px ${SANS}`, cursor: 'pointer' }}
+                >
+                  <option value="">Atribuie o colecție…</option>
+                  <option value="fara">— scoate colecția —</option>
+                  {colectii.lista.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nume}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-quiet"
+                  onClick={() => setAlese(new Set())}
+                  style={{ marginLeft: 'auto', font: `500 12px ${SANS}` }}
+                >
+                  Deselectează
+                </button>
+              </div>
+            )}
+
             {biblioteca.eroare ? (
               <EmptyState
                 title={biblioteca.eroare}
@@ -689,6 +810,13 @@ function AdminPanel() {
                       style={{ padding: '12px 18px', borderBottom: '1px solid var(--line)', display: 'grid', gap: 7 }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <input
+                          type="checkbox"
+                          checked={alese.has(g.id)}
+                          onChange={() => comutaAlegerea(g.id)}
+                          aria-label={`Alege ${g.id}`}
+                          style={{ width: 15, height: 15, accentColor: 'var(--brand)', cursor: 'pointer' }}
+                        />
                         <span style={statusChip(stare.culoare[0], stare.culoare[1])}>{stare.eticheta}</span>
                         <span className="tabular" style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
                           {g.id}
@@ -817,6 +945,7 @@ function AdminPanel() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

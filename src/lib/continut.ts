@@ -404,3 +404,54 @@ export async function idExistente(ids: readonly string[]): Promise<Set<string>> 
   }
   return gasite;
 }
+
+/** O linie de acoperire: câte grile are un capitol, pe stări. */
+export interface AcoperireCapitol {
+  capId: ChapterId;
+  ciorna: number;
+  publicata: number;
+  retrasa: number;
+}
+
+/**
+ * Câte grile are fiecare capitol, pe stări.
+ *
+ * Agregare în SQL, nu în client: adusă și grupată cu `Array.reduce`, ar fi exact
+ * interogarea nemărginită pe care lista tocmai a scăpat de ea. RPC-ul e
+ * `security invoker`, deci RLS decide ce se numără — un elev n-ar vedea ciornele
+ * nici ca cifră.
+ */
+export async function citesteAcoperirea(): Promise<AcoperireCapitol[]> {
+  const { supabase } = await import('./supabase');
+  const { data, error } = await supabase.rpc('acoperire_capitole');
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as { chapter_id: string; ciorna: number; publicata: number; retrasa: number }[]).map(
+    (r) => ({ capId: r.chapter_id, ciorna: r.ciorna, publicata: r.publicata, retrasa: r.retrasa }),
+  );
+}
+
+/** Schimbă starea mai multor grile deodată. Întoarce câte au fost atinse. */
+export async function schimbaStareaGrilelor(
+  ids: readonly string[],
+  stare: QuestionStatus,
+): Promise<number> {
+  const { supabase } = await import('./supabase');
+  const { data, error } = await supabase.rpc('schimba_starea_grilelor', { ids, stare });
+  if (error) throw new Error(error.message);
+  return (data as number | null) ?? 0;
+}
+
+/** Atribuie o colecție unui lot. `null` o scoate. Întoarce câte au fost atinse. */
+export async function atribuieColectia(
+  ids: readonly string[],
+  colectieId: string | null,
+): Promise<number> {
+  const { supabase } = await import('./supabase');
+  const { data, error } = await supabase.rpc('atribuie_colectia', {
+    ids,
+    colectie_noua: colectieId,
+  });
+  if (error) throw new Error(error.message);
+  return (data as number | null) ?? 0;
+}

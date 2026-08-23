@@ -176,7 +176,13 @@ describe('funcțiile', () => {
    * sunt cele scrise anume ca să fie chemate din client. Orice altceva ajuns
    * acolo din neatenție pică testul, care e tot rostul lui.
    */
-  const RPC_INTENTIONAT = ['salveaza_grila', 'sterge_contul', 'sterge_grila'];
+  const RPC_INTENTIONAT = [
+    'atribuie_colectia',
+    'salveaza_grila',
+    'schimba_starea_grilelor',
+    'sterge_contul',
+    'sterge_grila',
+  ];
 
   it('nu stau în schema pe care o publică PostgREST', async () => {
     const r = await baza.db.query<{ proname: string }>(`
@@ -816,5 +822,98 @@ describe('colecțiile', () => {
     );
 
     expect(r.rows[0]!.n).toBe(0);
+  });
+});
+
+/**
+ * Acoperirea și operațiile în masă.
+ *
+ * Acoperirea e `security invoker` intenționat: rulează cu drepturile celui care
+ * o cheamă, deci RLS decide ce se numără. Un elev n-are ce căuta în ciornele
+ * nepublicate nici măcar ca cifră — iar o funcție `security definer` ar fi
+ * trebuit să reimplementeze `questions_citire` pe cont propriu.
+ */
+describe('acoperirea capitolelor', () => {
+  it('numără pe stări, iar elevul nu vede ciornele nici ca cifră', async () => {
+    await baza.db.query("update questions set status = 'ciorna' where id = 'bio-nervos-01'");
+
+    const alElevului = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ chapter_id: string; ciorna: number; publicata: number }>(
+        "select * from public.acoperire_capitole() where chapter_id = 'bio-nervos'",
+      ),
+    );
+    await baza.faAdmin(ana);
+    const alAdminului = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ chapter_id: string; ciorna: number; publicata: number }>(
+        "select * from public.acoperire_capitole() where chapter_id = 'bio-nervos'",
+      ),
+    );
+
+    // Singura grilă din capitol e acum ciornă: elevul nu vede niciun rând.
+    expect(alElevului.rows).toHaveLength(0);
+    expect(alAdminului.rows[0]).toMatchObject({ ciorna: 1, publicata: 0 });
+  });
+});
+
+describe('operațiile în masă', () => {
+  it('publică mai multe grile deodată și spune câte a atins', async () => {
+    await baza.faAdmin(ana);
+    await baza.db.query("update questions set status = 'ciorna'");
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ schimba_starea_grilelor: number }>(
+        "select public.schimba_starea_grilelor(array['bio-nervos-01', 'bio-sange-01'], 'publicata')",
+      ),
+    );
+
+    expect(r.rows[0]!.schimba_starea_grilelor).toBe(2);
+    const publicate = await baza.db.query<{ n: number }>(
+      "select count(*)::int as n from questions where status = 'publicata'",
+    );
+    expect(publicate.rows[0]!.n).toBe(2);
+  });
+
+  it('nu se lasă chemate de un elev', async () => {
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("select public.schimba_starea_grilelor(array['bio-nervos-01'], 'publicata')"),
+      ),
+    ).rejects.toThrow(/administrator/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("select public.atribuie_colectia(array['bio-nervos-01'], null)"),
+      ),
+    ).rejects.toThrow(/administrator/i);
+  });
+
+  it('refuză o stare necunoscută în loc s-o scrie', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("select public.schimba_starea_grilelor(array['bio-nervos-01'], 'arhivata')"),
+      ),
+    ).rejects.toThrow(/Stare necunoscută/i);
+  });
+
+  /** Aceeași regulă ca la salvare: o colecție inventată n-are voie să intre. */
+  it('atribuie o colecție unui lot și refuză una inexistentă', async () => {
+    await baza.faAdmin(ana);
+    await baza.db.query(
+      "insert into colectii (id, centru_id, nume, tip) values ('umfcd-2026-mg', 'umfcd', 'Admitere 2026', 'subiect_oficial')",
+    );
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ atribuie_colectia: number }>(
+        "select public.atribuie_colectia(array['bio-nervos-01', 'bio-sange-01'], 'umfcd-2026-mg')",
+      ),
+    );
+    expect(r.rows[0]!.atribuie_colectia).toBe(2);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("select public.atribuie_colectia(array['bio-nervos-01'], 'lot-inventat')"),
+      ),
+    ).rejects.toThrow(/Colecția nu există/i);
   });
 });
