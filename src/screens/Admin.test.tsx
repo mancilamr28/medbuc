@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Admin } from './Admin';
 import { QUESTIONS } from '../data/questions';
-import type { GrilaCuStare, GrilaDeSalvat } from '../lib/continut';
+import type { FiltreGrile, GrilaCuStare, GrilaDeSalvat } from '../lib/continut';
 import { AppProvider } from '../state/AppState';
 import { AuthProvider } from '../state/AuthContext';
 import { ContentProvider } from '../state/ContentContext';
@@ -25,9 +25,33 @@ let rol = 'admin';
 const salveaza = vi.fn<(g: GrilaDeSalvat) => Promise<void>>(async () => {});
 const sterge = vi.fn<(id: string) => Promise<void>>(async () => {});
 
+/**
+ * Lista din Administrare interoghează serverul, nu mai filtrează un array adus
+ * în memorie. Falsul face aici exact filtrarea pe care o face PostgREST, ca
+ * testele să rămână despre ecran — ce se vede, ce se poate apăsa — nu despre
+ * felul în care se compune o interogare.
+ */
+const filtreaza = (f: FiltreGrile) => {
+  const q = f.cautare.trim().toLowerCase();
+  return GRILE.filter(
+    (g) =>
+      (f.status === 'toate' || g.status === f.status) &&
+      (q === '' || g.id.toLowerCase().includes(q) || g.text.toLowerCase().includes(q)),
+  );
+};
+
 vi.mock('../lib/continut', async (original) => ({
   ...(await original<typeof import('../lib/continut')>()),
   incarcaGrile: async () => GRILE,
+  cautaGrile: async (f: FiltreGrile, decalaj: number, limita: number) => {
+    const toate = filtreaza(f);
+    return { randuri: toate.slice(decalaj, decalaj + limita), total: toate.length };
+  },
+  numaraPeStare: async (f: FiltreGrile) => ({
+    ciorna: filtreaza({ ...f, status: 'ciorna' }).length,
+    publicata: filtreaza({ ...f, status: 'publicata' }).length,
+    retrasa: filtreaza({ ...f, status: 'retrasa' }).length,
+  }),
   salveazaGrila: (g: GrilaDeSalvat) => salveaza(g),
   stergeGrila: (id: string) => sterge(id),
 }));
@@ -63,7 +87,11 @@ function monteaza() {
 /** Formularul apare abia după ce rolul a fost citit din `profiles`. */
 const gata = () => screen.findByLabelText('Enunțul grilei');
 
+const GRILE_INITIALE = [...GRILE];
+
 beforeEach(() => {
+  GRILE.length = 0;
+  GRILE.push(...GRILE_INITIALE);
   vi.clearAllMocks();
   rol = 'admin';
 });
@@ -291,5 +319,47 @@ describe('Administrare · import în masă', () => {
     await user.click((await screen.findAllByRole('button', { name: 'Editează' }))[0]!);
 
     expect(await screen.findByLabelText('Enunțul grilei')).toHaveValue(GRILE[0]!.text);
+  });
+
+  /**
+   * Lista aducea biblioteca întreagă în memorie și o filtra cu `Array.filter`.
+   * Merge la 181 de grile și nu mai merge la douăzeci de mii — nu din cauza
+   * randării, ci fiindcă fiecare deschidere a ecranului ar transfera zeci de
+   * megaocteți, cu toate variantele și explicațiile lor.
+   */
+  it('aduce o singură pagină, nu toată biblioteca', async () => {
+    GRILE.push(
+      ...Array.from({ length: 60 }, (_, i) => ({
+        ...QUESTIONS[0]!,
+        id: `bio-umplutura-${String(i).padStart(2, '0')}`,
+        status: 'publicata' as const,
+      })),
+    );
+
+    monteaza();
+
+    await waitFor(() => expect(screen.getByText(/din 62 de grile/)).toBeInTheDocument());
+    // 25 pe pagină: rândurile randate sunt mult sub cele 62 care trec de filtru.
+    expect(screen.getAllByRole('button', { name: 'Editează' })).toHaveLength(25);
+    expect(screen.getByRole('button', { name: /Înapoi/ })).toBeDisabled();
+  });
+
+  it('trece la pagina următoare fără să reia totul', async () => {
+    const user = userEvent.setup();
+    GRILE.push(
+      ...Array.from({ length: 60 }, (_, i) => ({
+        ...QUESTIONS[0]!,
+        id: `bio-umplutura-${String(i).padStart(2, '0')}`,
+        status: 'publicata' as const,
+      })),
+    );
+
+    monteaza();
+    await waitFor(() => expect(screen.getByText(/1–25 din/)).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Înainte/ }));
+
+    await waitFor(() => expect(screen.getByText(/26–50 din/)).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Înapoi/ })).toBeEnabled();
   });
 });

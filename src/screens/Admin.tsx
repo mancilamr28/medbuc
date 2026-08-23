@@ -1,9 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { Segmented } from '../components/Segmented';
 import { chapterLabel, type ChapterId } from '../data/chapters';
 import { OPTION_KEYS, SURSE, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
-import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
+import {
+  FILTRE_GOALE,
+  salveazaGrila,
+  stergeGrila,
+  type FiltreGrile,
+  type GrilaCuStare,
+  type QuestionStatus,
+} from '../lib/continut';
+import { PE_PAGINA, useBibliotecaAdmin } from './adminBiblioteca';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
 import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip, twoCol } from '../lib/ui';
@@ -72,35 +80,24 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
  */
 function AdminPanel() {
-  const { grile, taxonomie, tipuri, colectii, loading, error, reload } = useContent();
+  const { grile, taxonomie, tipuri, colectii, reload } = useContent();
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
   const [mod, setMod] = useState<'formular' | 'import'>('formular');
   const [ciorna, setCiorna] = useState<Ciorna>(() => ciornaGoala());
   const [editez, setEditez] = useState<string | null>(null);
-  const [cautare, setCautare] = useState('');
-  const [filtru, setFiltru] = useState<'toate' | QuestionStatus>('toate');
+  const [filtre, setFiltre] = useState<FiltreGrile>(FILTRE_GOALE);
+  const biblioteca = useBibliotecaAdmin(filtre);
+  const filtruCamp = <K extends keyof FiltreGrile>(key: K, value: FiltreGrile[K]) =>
+    setFiltre((prev) => ({ ...prev, [key]: value }));
+  const areFiltru = JSON.stringify(filtre) !== JSON.stringify(FILTRE_GOALE);
   const [seSalveaza, setSeSalveaza] = useState(false);
   const [deSters, setDeSters] = useState<string | null>(null);
   const [aratatProbleme, setAratatProbleme] = useState(false);
 
   const probleme = valideaza(ciorna, taxonomie, tipuri);
   const scrise = variantScrise(ciorna);
-
-  const lista = useMemo(() => {
-    const q = cautare.trim().toLowerCase();
-    return grile.filter((g) => {
-      if (filtru !== 'toate' && g.status !== filtru) return false;
-      if (q === '') return true;
-      return (
-        g.id.toLowerCase().includes(q) ||
-        g.text.toLowerCase().includes(q) ||
-        colectii.eticheta(g.colectieId).toLowerCase().includes(q) ||
-        taxonomie.eticheta(g.capId).toLowerCase().includes(q)
-      );
-    });
-  }, [cautare, colectii, filtru, grile, taxonomie]);
 
   const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) =>
     setCiorna((prev) => ({ ...prev, [key]: value }));
@@ -136,6 +133,7 @@ function AdminPanel() {
     try {
       await salveazaGrila(catreSalvare(ciorna, status, tipuri));
       await reload();
+      biblioteca.reincarca();
       notify('succes', status === 'publicata' ? 'Grila e publicată.' : 'Ciorna a fost salvată.');
       reseteaza();
     } catch (e: unknown) {
@@ -156,6 +154,7 @@ function AdminPanel() {
     try {
       await salveazaGrila(catreSalvare(dinGrila(g), status, tipuri));
       await reload();
+      biblioteca.reincarca();
       notify('info', status === 'retrasa' ? 'Grila a fost retrasă din fața elevilor.' : 'Grila e publicată.');
     } catch (e: unknown) {
       notify('eroare', e instanceof Error ? e.message : 'Nu am putut schimba starea grilei.');
@@ -166,6 +165,7 @@ function AdminPanel() {
     try {
       await stergeGrila(id);
       await reload();
+      biblioteca.reincarca();
       notify('succes', 'Grila a fost ștearsă.');
       if (editez === id) reseteaza();
     } catch (e: unknown) {
@@ -204,7 +204,14 @@ function AdminPanel() {
 
       <div style={twoCol(isDesktop)}>
         {mod === 'import' ? (
-          <ImportGrile grile={grile} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} />
+          <ImportGrile
+              grile={grile}
+              taxonomie={taxonomie}
+              tipuri={tipuri}
+              colectii={colectii}
+              reload={reload}
+              dupaImport={biblioteca.reincarca}
+            />
         ) : (
         <div className="card" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
@@ -534,7 +541,7 @@ function AdminPanel() {
               {STARI.map((s) => (
                 <div key={s.id}>
                   <div style={{ font: `500 22px/1 ${SERIF}` }}>
-                    {loading ? '—' : grile.filter((g) => g.status === s.id).length}
+                    {biblioteca.contoare ? biblioteca.contoare[s.id] : '—'}
                   </div>
                   <div style={{ marginTop: 5, font: `400 11.5px/1.4 ${SANS}`, color: 'var(--fg3)' }}>
                     {s.eticheta.toLowerCase()}
@@ -548,20 +555,74 @@ function AdminPanel() {
             <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--line)', display: 'grid', gap: 10 }}>
               <input
                 className="field"
-                value={cautare}
-                onChange={(e) => setCautare(e.target.value)}
-                placeholder="Caută după enunț, capitol sau id…"
+                value={filtre.cautare}
+                onChange={(e) => filtruCamp('cautare', e.target.value)}
+                placeholder="Caută după enunț sau id…"
                 aria-label="Caută în bibliotecă"
                 style={{ padding: '10px 12px', font: `400 13px ${SANS}` }}
               />
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {/* Filtrele fine: capitol, colecție, tip. Se trimit toate în aceeași
+                  interogare, deci nu costă un drum în plus. Materia n-are filtru
+                  propriu — capitolele sunt deja grupate pe materie în listă. */}
+              <div style={autoGrid(150, 8)}>
+                <select
+                  className="field"
+                  value={filtre.capitole[0] ?? ''}
+                  onChange={(e) => filtruCamp('capitole', e.target.value === '' ? [] : [e.target.value])}
+                  aria-label="Filtrează după capitol"
+                  style={{ padding: '8px 10px', font: `400 12px ${SANS}`, cursor: 'pointer' }}
+                >
+                  <option value="">Toate capitolele</option>
+                  {taxonomie.materii.map((m) => (
+                    <optgroup key={m.id} label={m.name}>
+                      {m.list.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {chapterLabel(c)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+
+                <select
+                  className="field"
+                  value={filtre.colectieId}
+                  onChange={(e) => filtruCamp('colectieId', e.target.value)}
+                  aria-label="Filtrează după colecție"
+                  style={{ padding: '8px 10px', font: `400 12px ${SANS}`, cursor: 'pointer' }}
+                >
+                  <option value="">Toate colecțiile</option>
+                  {colectii.lista.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nume}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="field"
+                  value={filtre.tipId}
+                  onChange={(e) => filtruCamp('tipId', e.target.value)}
+                  aria-label="Filtrează după tip"
+                  style={{ padding: '8px 10px', font: `400 12px ${SANS}`, cursor: 'pointer' }}
+                >
+                  <option value="">Toate tipurile</option>
+                  {tipuri.lista.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nume}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 {(['toate', ...STARI.map((s) => s.id)] as const).map((f) => {
-                  const activ = filtru === f;
+                  const activ = filtre.status === f;
                   return (
                     <button
                       key={f}
                       type="button"
-                      onClick={() => setFiltru(f)}
+                      onClick={() => filtruCamp('status', f)}
                       aria-pressed={activ}
                       style={{
                         padding: '6px 11px',
@@ -577,39 +638,49 @@ function AdminPanel() {
                     </button>
                   );
                 })}
+                {areFiltru && (
+                  <button
+                    type="button"
+                    className="btn-quiet"
+                    onClick={() => setFiltre(FILTRE_GOALE)}
+                    style={{ marginLeft: 'auto', font: `500 12px ${SANS}` }}
+                  >
+                    Șterge filtrele
+                  </button>
+                )}
               </div>
             </div>
 
-            {error ? (
+            {biblioteca.eroare ? (
               <EmptyState
-                title={error}
+                title={biblioteca.eroare}
                 action={
                   <button
                     type="button"
                     className="btn-ghost"
-                    onClick={() => void reload()}
+                    onClick={biblioteca.reincarca}
                     style={{ padding: '9px 14px', font: `500 12.5px ${SANS}` }}
                   >
                     Încearcă din nou
                   </button>
                 }
               />
-            ) : loading ? (
+            ) : biblioteca.seIncarca && biblioteca.randuri.length === 0 ? (
               <div style={{ padding: 22, font: `400 13px ${SANS}`, color: 'var(--fg3)' }}>
-                Se încarcă biblioteca…
+                Se caută în bibliotecă…
               </div>
-            ) : lista.length === 0 ? (
+            ) : biblioteca.total === 0 ? (
               <EmptyState
-                title={grile.length === 0 ? 'Biblioteca e goală' : 'Nimic pe filtrul ăsta'}
+                title={areFiltru ? 'Nimic pe filtrul ăsta' : 'Biblioteca e goală'}
                 hint={
-                  grile.length === 0
-                    ? 'Prima grilă scrisă din formularul de alături apare aici.'
-                    : 'Schimbă filtrul sau șterge căutarea.'
+                  areFiltru
+                    ? 'Schimbă filtrul sau șterge căutarea.'
+                    : 'Prima grilă scrisă din formularul de alături apare aici.'
                 }
               />
             ) : (
-              <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-                {lista.map((g) => {
+              <div style={{ opacity: biblioteca.seIncarca ? 0.55 : 1, transition: 'opacity .12s' }}>
+                {biblioteca.randuri.map((g) => {
                   const stare = stareaLui(g.status);
                   return (
                     <div
@@ -698,6 +769,49 @@ function AdminPanel() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {biblioteca.total > PE_PAGINA && (
+              <div
+                style={{
+                  padding: '12px 18px',
+                  borderTop: '1px solid var(--line)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span className="tabular" style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
+                  {biblioteca.pagina * PE_PAGINA + 1}–
+                  {Math.min((biblioteca.pagina + 1) * PE_PAGINA, biblioteca.total)} din{' '}
+                  {numar(biblioteca.total, 'grilă', 'grile')}
+                </span>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => biblioteca.mergiLaPagina(biblioteca.pagina - 1)}
+                    disabled={biblioteca.pagina === 0}
+                    style={{ padding: '6px 11px', font: `500 12px ${SANS}`, opacity: biblioteca.pagina === 0 ? 0.45 : 1 }}
+                  >
+                    ← Înapoi
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => biblioteca.mergiLaPagina(biblioteca.pagina + 1)}
+                    disabled={biblioteca.pagina >= biblioteca.pagini - 1}
+                    style={{
+                      padding: '6px 11px',
+                      font: `500 12px ${SANS}`,
+                      opacity: biblioteca.pagina >= biblioteca.pagini - 1 ? 0.45 : 1,
+                    }}
+                  >
+                    Înainte →
+                  </button>
+                </div>
               </div>
             )}
           </div>

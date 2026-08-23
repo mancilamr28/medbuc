@@ -41,11 +41,61 @@ const isScreen = (value: string): value is Screen => (SCREENS as readonly string
 /** Hash-ul curățat de `#/` și de eventualul query, o singură dată, pentru ambele rutări. */
 const rawHash = (): string => window.location.hash.replace(/^#\/?/, '').split('?')[0] ?? '';
 
+/**
+ * Segmentele hash-ului, fără prefix și fără query.
+ *
+ * Erau citite ca un singur nume, ceea ce mergea cât timp fiecare ecran era o
+ * frunză. Administrarea are nevoie de un al doilea nivel (`#/admin/colectii`),
+ * iar cu citirea veche `admin/colectii` nu era niciun `Screen` și cădea pe
+ * `acasa` — adică pe altă pagină decât cea cerută.
+ */
+const segmente = (): string[] => (rawHash() === '' ? [] : rawHash().split('/').filter(Boolean));
+
 /** Pură, ca să poată fi testată fără DOM. */
 export const screenFor = (raw: string): Screen => (isScreen(raw) ? raw : 'acasa');
 
-const readHash = (): Screen => screenFor(rawHash());
+const readHash = (): Screen => screenFor(segmente()[0] ?? '');
 
+// ---------------------------------------------------------------------------
+// Al doilea segment, folosit doar de Administrare.
+//
+// Nu intră în `SCREENS`. Secțiunile de administrare nu sunt ecrane ale
+// aplicației: nu apar în `Sidebar`, nici în `MobileNav`, nici în `BUILT_SCREENS`,
+// iar `go()` n-are ce face cu ele. Ținute separat, restul aplicației rămâne
+// neschimbat, iar cele patru fișiere care știu despre navigare continuă să
+// cunoască un singur nivel.
+// ---------------------------------------------------------------------------
+
+export const SECTIUNI_ADMIN = ['grile', 'import', 'taxonomie', 'colectii'] as const;
+
+export type SectiuneAdmin = (typeof SECTIUNI_ADMIN)[number];
+
+const esteSectiuneAdmin = (v: string): v is SectiuneAdmin =>
+  (SECTIUNI_ADMIN as readonly string[]).includes(v);
+
+/** Secțiunea cerută de hash; `grile` pentru orice altceva, inclusiv `#/admin`. */
+export const sectiuneAdminPentru = (raw: string): SectiuneAdmin =>
+  esteSectiuneAdmin(raw) ? raw : 'grile';
+
+export const goAdmin = (sectiune: SectiuneAdmin): void => {
+  window.location.hash = `/admin/${sectiune}`;
+  window.scrollTo(0, 0);
+};
+
+/** Secțiunea curentă de administrare, urmărind `hashchange` ca și `useHashRoute`. */
+export function useSectiuneAdmin(): [SectiuneAdmin, (s: SectiuneAdmin) => void] {
+  const [sectiune, setSectiune] = useState<SectiuneAdmin>(() =>
+    sectiuneAdminPentru(segmente()[1] ?? ''),
+  );
+
+  useEffect(() => {
+    const laSchimbare = () => setSectiune(sectiuneAdminPentru(segmente()[1] ?? ''));
+    window.addEventListener('hashchange', laSchimbare);
+    return () => window.removeEventListener('hashchange', laSchimbare);
+  }, []);
+
+  return [sectiune, goAdmin];
+}
 /**
  * Rutare pe hash: ecranele au adrese proprii, butonul „înapoi” funcționează și
  * un link către #/materii deschide direct materiile — fără dependințe externe.
@@ -89,10 +139,10 @@ const isPublicRoute = (value: string): value is PublicRoute =>
   (PUBLIC_ROUTES as readonly string[]).includes(value);
 
 /** Spune dacă bara de adrese arată chiar o rută publică, nu un ecran care cere autentificare. */
-export const isPublicRouteHash = (): boolean => isPublicRoute(rawHash());
+export const isPublicRouteHash = (): boolean => isPublicRoute(segmente()[0] ?? '');
 
 /**
- * Pură, ca `screenFor`. `raw` e hash-ul deja curățat de `#/`.
+ * Pură, ca `screenFor`. `raw` e **primul segment** al hash-ului.
  *
  * Un link direct într-o pagină a aplicației cere autentificare, nu prezentare —
  * iar hash-ul rămâne neatins, deci după login `readHash()` regăsește exact
@@ -106,10 +156,10 @@ export const publicViewFor = (raw: string): PublicView => {
 
 /** Perechea publică a lui `useHashRoute`. Nu atinge `Screen`. */
 export function usePublicView(): PublicView {
-  const [view, setView] = useState<PublicView>(() => publicViewFor(rawHash()));
+  const [view, setView] = useState<PublicView>(() => publicViewFor(segmente()[0] ?? ''));
 
   useEffect(() => {
-    const onHashChange = () => setView(publicViewFor(rawHash()));
+    const onHashChange = () => setView(publicViewFor(segmente()[0] ?? ''));
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
