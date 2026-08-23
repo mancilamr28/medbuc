@@ -194,25 +194,25 @@ describe('citesteImport, proveniența lotului', () => {
     const r = citesteImport(JSON.stringify([valida()]), {
       status: 'ciorna',
       sursa: 'subiect_oficial',
-      colectie: 'Simulare 2026 UMFCD',
+      colectie: 'umfcd-2026-simulare',
     }, [], TAXONOMIE_SEED);
 
     expect(r.randuri[0]!.grila).toMatchObject({
       sursa: 'subiect_oficial',
-      colectie: 'Simulare 2026 UMFCD',
+      colectie: 'umfcd-2026-simulare',
     });
   });
 
   it('lasă rândul să-și păstreze propria sursă și propria colecție', () => {
     const r = citesteImport(
-      JSON.stringify([valida({ sursa: 'culegere', colectie: 'Corint – Sistemul nervos' })]),
-      { status: 'ciorna', sursa: 'subiect_oficial', colectie: 'Simulare 2026 UMFCD' },
+      JSON.stringify([valida({ sursa: 'culegere', colectie: 'corint-nervos' })]),
+      { status: 'ciorna', sursa: 'subiect_oficial', colectie: 'umfcd-2026-simulare' },
       [],
     );
 
     expect(r.randuri[0]!.grila).toMatchObject({
       sursa: 'culegere',
-      colectie: 'Corint – Sistemul nervos',
+      colectie: 'corint-nervos',
     });
   });
 
@@ -222,13 +222,13 @@ describe('citesteImport, proveniența lotului', () => {
     expect(r.randuri[0]!.grila!.sursa).toBe('materie');
   });
 
-  it('curăță spațiile din colecția lotului, ca două loturi să nu iasă etichete diferite', () => {
+  it('curăță spațiile din colecția lotului, ca id-ul să se potrivească', () => {
     const r = citesteImport(JSON.stringify([valida()]), {
       status: 'ciorna',
-      colectie: '  Simulare 2026 UMFCD  ',
+      colectie: '  umfcd-2026-simulare  ',
     }, [], TAXONOMIE_SEED);
 
-    expect(r.randuri[0]!.grila!.colectie).toBe('Simulare 2026 UMFCD');
+    expect(r.randuri[0]!.grila!.colectie).toBe('umfcd-2026-simulare');
   });
 });
 
@@ -328,7 +328,7 @@ describe('catreJson', () => {
     why: { A: 'Cade fiindcă…' },
     src: 'Manual, p. 1',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
     status: 'publicata',
   };
 
@@ -355,19 +355,19 @@ describe('catreJson', () => {
       ...dinBiblioteca,
       id: 'bio-nervos-04',
       sursa: 'subiect_oficial',
-      colectie: 'Simulare 2026 UMFCD',
+      colectieId: 'umfcd-2026-simulare',
     };
     // Lotul cere altceva: exportul are voie să reintre neatins.
     const { randuri } = citesteImport(catreJson([dintrUnLot]), {
       status: 'ciorna',
       sursa: 'culegere',
-      colectie: 'Corint – Sistemul nervos',
+      colectie: 'corint-nervos',
     }, [], TAXONOMIE_SEED);
 
     expect(randuri[0]!.probleme).toEqual([]);
     expect(randuri[0]!.grila).toMatchObject({
       sursa: 'subiect_oficial',
-      colectie: 'Simulare 2026 UMFCD',
+      colectie: 'umfcd-2026-simulare',
     });
   });
 

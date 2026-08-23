@@ -3,6 +3,7 @@ import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continu
 import { catreSalvare, ciornaGoala, opturiGoale, valideaza, type Ciorna } from './adminCiorna';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
+
 import type { ChapterId } from '../data/chapters';
 
 /**
@@ -312,7 +313,7 @@ export function catreJson(grile: readonly GrilaCuStare[]): string {
       expl: g.expl,
       src: g.src,
       sursa: g.sursa,
-      ...(g.colectie !== '' ? { colectie: g.colectie } : {}),
+      ...(g.colectieId !== '' ? { colectie: g.colectieId } : {}),
       ...(g.an !== undefined ? { an: g.an } : {}),
     })),
     null,

@@ -72,7 +72,7 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
  */
 function AdminPanel() {
-  const { grile, taxonomie, tipuri, loading, error, reload } = useContent();
+  const { grile, taxonomie, tipuri, colectii, loading, error, reload } = useContent();
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
@@ -96,11 +96,11 @@ function AdminPanel() {
       return (
         g.id.toLowerCase().includes(q) ||
         g.text.toLowerCase().includes(q) ||
-        g.colectie.toLowerCase().includes(q) ||
+        colectii.eticheta(g.colectieId).toLowerCase().includes(q) ||
         taxonomie.eticheta(g.capId).toLowerCase().includes(q)
       );
     });
-  }, [cautare, filtru, grile, taxonomie]);
+  }, [cautare, colectii, filtru, grile, taxonomie]);
 
   const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) =>
     setCiorna((prev) => ({ ...prev, [key]: value }));
@@ -204,7 +204,7 @@ function AdminPanel() {
 
       <div style={twoCol(isDesktop)}>
         {mod === 'import' ? (
-          <ImportGrile grile={grile} taxonomie={taxonomie} tipuri={tipuri} reload={reload} />
+          <ImportGrile grile={grile} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} />
         ) : (
         <div className="card" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
@@ -423,13 +423,19 @@ function AdminPanel() {
 
           <label style={{ display: 'block', marginTop: 14 }}>
             <span style={label}>Colecția</span>
-            <input
+            <select
               className="field"
               value={ciorna.colectie}
               onChange={(e) => camp('colectie', e.target.value)}
-              placeholder="ex. Simulare 2026 UMFCD, Corint – Sistemul nervos"
-              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
-            />
+              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
+            >
+              <option value="">— fără colecție —</option>
+              {colectii.lista.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nume}
+                </option>
+              ))}
+            </select>
             <span style={{ display: 'block', marginTop: 6, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
               Lotul din care vine grila. Referința de mai sus e pagina; asta e materialul întreg.
             </span>
@@ -622,7 +628,7 @@ function AdminPanel() {
                       </div>
                       <div style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
                         {taxonomie.numeMaterie(g.capId)} · {taxonomie.eticheta(g.capId)}
-                        {g.colectie !== '' && <> · {g.colectie}</>}
+                        {g.colectieId !== '' && <> · {colectii.eticheta(g.colectieId)}</>}
                       </div>
 
                       {deSters === g.id ? (

@@ -61,13 +61,14 @@ export interface Question {
   src: string;
   sursa: QuestionSursa;
   /**
-   * Lotul din care vine grila — „Simulare 2026 UMFCD", „Corint – Sistemul nervos".
+   * Colecția din care vine grila — **id**, nu nume: `umfcd-2026-mg`.
    *
-   * Deosebită de `src`, care e citarea de pagină („Celula, p. 11"), și de `sursa`,
-   * care e felul materialului. Colecția e nivelul după care se grupează un import
-   * întreg, deci și cel după care se filtrează. Gol înseamnă nespus.
+   * Era text liber („Simulare 2026 UMFCD"). Migrarea 0011 a mutat colecțiile la
+   * un tabel, ca să se poată filtra, renumi și să-și țină anul și cartea.
+   * Deosebită de `src`, care e citarea de pagină („Celula, p. 11"), și de
+   * `sursa`, care e felul materialului. Gol înseamnă nespus.
    */
-  colectie: string;
+  colectieId: string;
   /** Anul subiectului, doar la `subiect_oficial` — ex. 2026. */
   an?: number;
 }
@@ -111,7 +112,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Sistemul nervos',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
   },
   {
     tip: 'grupat',
@@ -142,7 +143,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Chimie organică, manual clasa a X-a · Alcooli',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
   },
   {
     tip: 'simplu',
@@ -167,7 +168,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Glandele endocrine',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
   },
   {
     tip: 'grupat',
@@ -198,7 +199,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Sângele',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
   },
   {
     tip: 'simplu',
@@ -223,7 +224,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Biologie, manual clasa a XI-a · Sistemul osos',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
   },
   {
     tip: 'simplu',
@@ -248,7 +249,7 @@ export const QUESTIONS: Question[] = [
     },
     src: 'Chimie organică, manual clasa a X-a · Arene',
     sursa: 'materie',
-    colectie: '',
+    colectieId: '',
   },
 ];
 

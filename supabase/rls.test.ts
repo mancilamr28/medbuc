@@ -364,35 +364,57 @@ describe('scrierea grilelor', () => {
    * interfața să pară că salvează, iar colecția s-ar pierde tăcut între ecran și
    * bază — invizibil până la primul import de cincizeci de grile.
    */
+  /** Două colecții de probă, ca grila să aibă spre ce arăta. */
+  const doualaColectii = async () => {
+    await baza.db.query(`
+      insert into colectii (id, centru_id, nume, tip, an) values
+        ('umfcd-2026-simulare', 'umfcd', 'Simulare 2026 UMFCD', 'simulare_oficiala', 2026),
+        ('corint-nervos', null, 'Corint – Sistemul nervos', 'culegere', null)
+    `);
+  };
+
   it('scrie colecția și sursa, și le rescrie la reimportare', async () => {
     await baza.faAdmin(ana);
+    await doualaColectii();
     await baza.caUtilizator(ana, () =>
-      salveaza(grila({ sursa: 'subiect_oficial', an: 2026, colectie: '  Simulare 2026 UMFCD  ' })),
+      salveaza(grila({ sursa: 'subiect_oficial', an: 2026, colectie: '  umfcd-2026-simulare  ' })),
     );
 
-    const dupaPrima = await baza.db.query<{ sursa: string; colectie: string; an: number }>(
-      "select sursa, colectie, an from questions where id = 'bio-nervos-99'",
+    const dupaPrima = await baza.db.query<{ sursa: string; colectie_id: string; an: number }>(
+      "select sursa, colectie_id, an from questions where id = 'bio-nervos-99'",
     );
     // Curățată de spații în bază, nu doar în formular: cererea poate veni de oriunde.
     expect(dupaPrima.rows[0]).toMatchObject({
       sursa: 'subiect_oficial',
-      colectie: 'Simulare 2026 UMFCD',
+      colectie_id: 'umfcd-2026-simulare',
       an: 2026,
     });
 
     // Upsert-ul pe id e felul în care se relipește un lot corectat: colecția
     // corectată trebuie s-o înlocuiască pe cea greșită, nu s-o păstreze.
     await baza.caUtilizator(ana, () =>
-      salveaza(grila({ sursa: 'culegere', colectie: 'Corint – Sistemul nervos' })),
+      salveaza(grila({ sursa: 'culegere', colectie: 'corint-nervos' })),
     );
 
-    const dupaAdoua = await baza.db.query<{ sursa: string; colectie: string }>(
-      "select sursa, colectie from questions where id = 'bio-nervos-99'",
+    const dupaAdoua = await baza.db.query<{ sursa: string; colectie_id: string }>(
+      "select sursa, colectie_id from questions where id = 'bio-nervos-99'",
     );
     expect(dupaAdoua.rows[0]).toMatchObject({
       sursa: 'culegere',
-      colectie: 'Corint – Sistemul nervos',
+      colectie_id: 'corint-nervos',
     });
+  });
+
+  /**
+   * Colecția era text liber până la migrarea 0011. O greșeală de tipar crea
+   * tăcut un lot fantomă: grila părea salvată, dar nu apărea în niciun filtru pe
+   * colecția pe care autorul credea că a scris-o.
+   */
+  it('refuză o colecție care nu există', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () => salveaza(grila({ colectie: 'lot-inventat' }))),
+    ).rejects.toThrow(/Colecția nu există/i);
   });
 
   /** Colecția lipsă e cazul obișnuit: 181 de grile existente n-au una. */
@@ -400,10 +422,10 @@ describe('scrierea grilelor', () => {
     await baza.faAdmin(ana);
     await baza.caUtilizator(ana, () => salveaza(grila()));
 
-    const q = await baza.db.query<{ colectie: string }>(
-      "select colectie from questions where id = 'bio-nervos-99'",
+    const q = await baza.db.query<{ colectie_id: string | null }>(
+      "select colectie_id from questions where id = 'bio-nervos-99'",
     );
-    expect(q.rows[0]!.colectie).toBe('');
+    expect(q.rows[0]!.colectie_id).toBeNull();
   });
 
   /** Exact constrângerea amânată care a impus RPC-ul; merită verificată prin rulare. */
@@ -743,5 +765,56 @@ describe('biblioteca', () => {
       "select src from questions where id = 'bio-nervos-01'",
     );
     expect(r.rows[0]!.src).toBe('sursă nouă');
+  });
+});
+
+/**
+ * Colecțiile — loturile din care vin grilele.
+ *
+ * Spre deosebire de taxonomie, nu se deschid către vizitatori: pagina publică
+ * n-are ce număra aici, iar lista de culegeri digitizate e chiar subiectul
+ * întrebării de drepturi. Politicile sunt cele obișnuite — publicat pentru elev,
+ * tot pentru administrator, scriere doar de administrator.
+ */
+describe('colecțiile', () => {
+  const doua = () =>
+    baza.db.query(`
+      insert into colectii (id, centru_id, nume, tip, an, publicat) values
+        ('umfcd-2026-mg', 'umfcd', 'Admitere UMFCD 2026', 'subiect_oficial', 2026, true),
+        ('corint-nervos', null, 'Corint – Sistemul nervos', 'culegere', null, false)
+    `);
+
+  it('arată elevului doar colecțiile publicate, iar administratorului pe toate', async () => {
+    await doua();
+
+    const aleElevului = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string }>('select id from colectii order by id'),
+    );
+    await baza.faAdmin(ana);
+    const aleAdminului = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from colectii'),
+    );
+
+    expect(aleElevului.rows.map((c) => c.id)).toEqual(['umfcd-2026-mg']);
+    expect(aleAdminului.rows[0]!.n).toBe(2);
+  });
+
+  it('nu se lasă scrisă de un elev', async () => {
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("insert into colectii (id, nume, tip) values ('a-mea', 'A mea', 'autor')"),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  /** Nu sunt publice: lista de culegeri digitizate nu se citește fără cont. */
+  it('nu se văd de un vizitator fără cont', async () => {
+    await doua();
+
+    const r = await baza.caVizitator(() =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from colectii'),
+    );
+
+    expect(r.rows[0]!.n).toBe(0);
   });
 });
