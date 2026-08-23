@@ -325,6 +325,19 @@ Three things there that are load-bearing:
 
 `test_run_items` has **no delete policy** — a paper is discarded whole (cascade from `test_runs`), never row by row, because removing a middle position renumbers everything after it. And there is no `scor` column, and there must not be: a stored score is a score that can disagree with the journal.
 
+### Generating a test — `numara_candidati` / `genereaza_test`
+
+Selection moved off the client. `buildOrder` receives the whole bank and cuts from it; at 181 questions that works, at 50k it means downloading the library to pick 100 rows — and downloading every correct answer before a simulation starts. **The move only half-fixes the second problem**: whatever the RPC withholds can still be asked for directly (`select id, correct from questions`), because RLS filters rows, not columns. The real close is a column-level `revoke`, which has strict deploy ordering (client that stops asking first, revoke second) and is a separate slice.
+
+- **Every mode goes through one candidate query** (`private.candidati`), with predicates that compose. Six parallel queries would diverge the first time a rule was added to only one — exactly what happened between the form's validation and the import's, until they were merged.
+- **Empty list means "no restriction on this axis"**, the same convention as `sessions.chapter_ids` and `filtreazaCapitole`.
+- **Errors are codes, not Romanian sentences** (`neautentificat`, `mod_necunoscut`, `fara_candidati`, `insuficient_strict`). The other RPCs speak Romanian because an admin reads them; these are read by the wizard, which has to branch — to a paywall, to a shortfall confirm, to an error — and you cannot branch on a translated sentence.
+- **Duplicates are impossible by construction** — selection is over `questions.id` with `row_number()`. This replaces `buildOrder`'s cyclic `pool[i % pool.length]`, which *deliberately* repeats the bank to fill the requested count.
+- **A short pool returns fewer questions and says so**; `nr_cerut` stays what was asked, because it is the score's denominator. `strict: true` raises instead, for a format that must be exactly 100.
+- **Shuffling is decided at generation, from the type**, never at render: `question_types.permite_amestecare` is false for `grupat`, whose option texts *are* the answer key ("1, 2, 3", "doar 4"). By the time the client renders, the order is already persisted. The resolved order is stored per item rather than a seed — Postgres does not guarantee `setseed` reproducibility across versions, so "store the seed and re-derive" is a latent bug.
+- **`greseli` means the most recent attempt is wrong**, not "was ever wrong" — otherwise a question you have since learned stays in the queue forever.
+- **No temp table.** `create temporary table` leaves session state and PostgREST reuses pooled sessions; two generations in one transaction would fail with "relation already exists", a fault that only shows up under load. The chosen ids live in a `text[]`.
+
 ### Two derived columns that are not state
 
 - **`questions.materie_id` is denormalised from `chapter_id`** and kept there by two triggers (`private.completeaza_materia` on questions, `private.propaga_materia` on chapters). It exists because quota selection partitions by subject and the wizard counts per subject constantly — through a join, no index can cover that access path. It is derived at write time, so a client cannot claim a subject its chapter does not have, and `schema.test.ts` asserts it never diverges. This is not a violation of "derive, never store": the rule is about *displayed figures* that can drift from the journal, and this one is structurally pinned to its source.
