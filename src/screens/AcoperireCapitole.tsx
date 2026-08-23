@@ -5,7 +5,7 @@ import { citesteAcoperirea, type AcoperireCapitol } from '../lib/continut';
 import { reportError } from '../lib/sentry';
 import type { Taxonomie } from '../lib/taxonomie';
 import { numar } from '../lib/text';
-import { SANS, SERIF, eyebrow, pctPill } from '../lib/ui';
+import { SANS, SERIF, eyebrow, type SX } from '../lib/ui';
 
 /**
  * Ce s-a scris și ce nu, capitol cu capitol.
@@ -21,6 +21,24 @@ import { SANS, SERIF, eyebrow, pctPill } from '../lib/ui';
  * Nicio cifră de aici nu e scrisă de mână — regula casei. Un capitol fără nicio
  * grilă arată „—", nu un zero care s-ar putea citi ca un procent.
  */
+/**
+ * Numărul de grile publicate dintr-un capitol.
+ *
+ * Pastila își strânge lățimea pe cifră, nu ține una fixă: cu lățime fixă și text
+ * la dreapta, fondul colorat rămas liber varia cu numărul de cifre, așa că „60"
+ * arăta ca o bară umplută mai mult decât „120" — exact pe dos. E o numărătoare,
+ * nu o măsură, deci nu are voie să semene cu o bară de progres.
+ */
+const pastila = (areGrile: boolean): SX => ({
+  font: `600 12.5px/1 ${SANS}`,
+  padding: '4px 9px',
+  borderRadius: 99,
+  flex: '0 0 auto',
+  fontVariantNumeric: 'tabular-nums',
+  color: areGrile ? 'var(--ok)' : 'var(--fg3)',
+  background: areGrile ? 'var(--okS)' : 'var(--surf2)',
+});
+
 export function AcoperireCapitole({ taxonomie }: { taxonomie: Taxonomie }) {
   const [randuri, setRanduri] = useState<AcoperireCapitol[] | null>(null);
   const [eroare, setEroare] = useState<string | null>(null);
@@ -127,7 +145,6 @@ export function AcoperireCapitole({ taxonomie }: { taxonomie: Taxonomie }) {
               </div>
               {m.list.map((c) => {
                 const a = peCapitol.get(c.id);
-                const scrise = (a?.ciorna ?? 0) + (a?.publicata ?? 0) + (a?.retrasa ?? 0);
                 return (
                   <div
                     key={c.id}
@@ -151,11 +168,9 @@ export function AcoperireCapitole({ taxonomie }: { taxonomie: Taxonomie }) {
                     <span
                       className="tabular"
                       style={{
-                        ...pctPill(scrise === 0 ? 0 : 100, 52),
+                        ...pastila((a?.publicata ?? 0) > 0),
                         // Culoarea spune „are conținut / n-are", nu un procent de
                         // corectitudine: aici se scrie, nu se rezolvă.
-                        color: (a?.publicata ?? 0) > 0 ? 'var(--ok)' : 'var(--fg3)',
-                        background: (a?.publicata ?? 0) > 0 ? 'var(--okS)' : 'var(--surf2)',
                       }}
                     >
                       {(a?.publicata ?? 0) > 0 ? a!.publicata : '—'}

@@ -468,32 +468,38 @@ export async function atribuieColectia(
 // fără să atingă nimic din ce s-a scris deja, exact ca retragerea unei grile.
 // ---------------------------------------------------------------------------
 
+// Câmpurile opționale de mai jos nu sunt o comoditate, sunt contractul:
+// `cheamaRpc` trimite obiectul ca JSON, deci un `undefined` dispare din payload
+// — iar o cheie absentă îi spune funcției din bază „las-o cum e". Exact ce vrea
+// să spună un formular de redenumire, care nu cunoaște poziția (n-o poartă nici
+// `Materie`, nici `Chapter`, nici `Colectie`) și n-are treabă cu publicarea. Un
+// `null` trimis explicit rămâne o ștergere de valoare.
 export interface MaterieDeSalvat {
   id: string;
   nume: string;
   centruId?: string;
-  position: number;
-  publicat: boolean;
+  position?: number;
+  publicat?: boolean;
 }
 
 export interface CapitolDeSalvat {
   id: string;
   materieId: string;
-  nr: string;
+  nr?: string;
   nume: string;
-  position: number;
-  publicat: boolean;
+  position?: number;
+  publicat?: boolean;
 }
 
 export interface ColectieDeSalvat {
   id: string;
   nume: string;
   tip: string;
-  centruId: string | null;
-  an: number | null;
-  sursaBibliografica: string;
-  position: number;
-  publicat: boolean;
+  centruId?: string | null;
+  an?: number | null;
+  sursaBibliografica?: string;
+  position?: number;
+  publicat?: boolean;
 }
 
 const cheamaRpc = async (nume: string, payload: unknown): Promise<void> => {

@@ -1018,4 +1018,82 @@ describe('scrierea taxonomiei', () => {
       ),
     ).rejects.toThrow(/Fel de colecție necunoscut/i);
   });
+
+  /**
+   * O redenumire nu e o reordonare.
+   *
+   * Formularul de redenumire nu are de unde ști poziția: `Chapter`, `Materie` și
+   * `Colectie` o consumă la sortare și n-o mai poartă pe obiect. Prima versiune
+   * trimitea `position: 0`, deci orice corectare de titlu muta rândul în capul
+   * listei — materiile, capitolele și colecțiile se citesc toate `order by
+   * position`. Regula stă acum în bază: **o cheie absentă înseamnă „las-o cum
+   * e"**, exact ce vrea să spună un formular de redenumire.
+   */
+  it('păstrează poziția și publicarea când doar se redenumește', async () => {
+    await baza.faAdmin(ana);
+
+    const inainte = await baza.db.query<{ position: number }>(
+      "select position from chapters where id = 'bio-nervos'",
+    );
+    expect(inainte.rows[0]!.position).toBeGreaterThan(0);
+
+    await baza.db.query("update chapters set publicat = false where id = 'bio-nervos'");
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_capitol('{"id":"bio-nervos","materieId":"bio","nr":"03","nume":"Sistemul nervos"}'::jsonb)`,
+      ),
+    );
+
+    const dupa = await baza.db.query<{ position: number; publicat: boolean }>(
+      "select position, publicat from chapters where id = 'bio-nervos'",
+    );
+    expect(dupa.rows[0]!.position).toBe(inainte.rows[0]!.position);
+    expect(dupa.rows[0]!.publicat).toBe(false);
+  });
+
+  /** Un rând nou se pune la coadă, nu peste poziția altuia. */
+  it('pune o materie nouă la coada listei, fără să i se spună poziția', async () => {
+    await baza.faAdmin(ana);
+    const max = await baza.db.query<{ m: number }>('select max(position) as m from materii');
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(`select public.salveaza_materie('{"id":"fiz","nume":"Fizică"}'::jsonb)`),
+    );
+
+    const r = await baza.db.query<{ position: number }>("select position from materii where id = 'fiz'");
+    expect(r.rows[0]!.position).toBe(max.rows[0]!.m + 1);
+  });
+
+  /** La fel pentru colecții: anul și cartea nu se pierd la o redenumire. */
+  it('păstrează anul, cartea și poziția colecției la redenumire', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint","tip":"culegere","an":2024,"sursaBibliografica":"Corint, ed. 2024"}'::jsonb)`,
+      ),
+    );
+    const inainte = await baza.db.query<{ position: number }>(
+      "select position from colectii where id = 'corint-nervos'",
+    );
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint · Biologie","tip":"culegere"}'::jsonb)`,
+      ),
+    );
+
+    const r = await baza.db.query<{
+      nume: string;
+      an: number | null;
+      sursa_bibliografica: string;
+      position: number;
+    }>("select nume, an, sursa_bibliografica, position from colectii where id = 'corint-nervos'");
+    expect(r.rows[0]).toMatchObject({
+      nume: 'Corint · Biologie',
+      an: 2024,
+      sursa_bibliografica: 'Corint, ed. 2024',
+      position: inainte.rows[0]!.position,
+    });
+  });
 });

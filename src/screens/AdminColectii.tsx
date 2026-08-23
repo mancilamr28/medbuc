@@ -60,7 +60,6 @@ export function AdminColectii({
 
       <FormularColectie
         inLucru={inLucru}
-        pozitieUrmatoare={colectii.lista.length}
         onSalveaza={(c) => void salveaza(c, 'Colecția a fost creată.')}
       />
 
@@ -86,11 +85,9 @@ export function AdminColectii({
 
 function FormularColectie({
   inLucru,
-  pozitieUrmatoare,
   onSalveaza,
 }: {
   inLucru: boolean;
-  pozitieUrmatoare: number;
   onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => void;
 }) {
   const gol = { id: '', nume: '', tip: 'subiect_oficial', an: '', sursa: '' };
@@ -181,8 +178,6 @@ function FormularColectie({
             centruId: eCulegere ? null : 'umfcd',
             an: c.an.trim() === '' ? null : Number(c.an.trim()),
             sursaBibliografica: c.sursa.trim(),
-            position: pozitieUrmatoare,
-            publicat: true,
           });
           setC(gol);
         }}
@@ -205,18 +200,6 @@ function RandColectie({
 }) {
   const [nume, setNume] = useState(colectie.nume);
   const [editez, setEditez] = useState(false);
-
-  const catreSalvare = (peste: Partial<Parameters<typeof salveazaColectie>[0]> = {}) => ({
-    id: colectie.id,
-    nume: nume.trim(),
-    tip: colectie.tip,
-    centruId: colectie.centruId,
-    an: colectie.an,
-    sursaBibliografica: colectie.sursaBibliografica,
-    position: 0,
-    publicat: true,
-    ...peste,
-  });
 
   return (
     <div
@@ -257,7 +240,9 @@ function RandColectie({
           className="btn-ghost"
           disabled={inLucru || nume.trim() === ''}
           onClick={() => {
-            onSalveaza(catreSalvare());
+            // Doar numele. Anul, cartea, centrul și poziția rămân ce erau —
+            // formularul ăsta nu le arată, deci n-are ce să spună despre ele.
+            onSalveaza({ id: colectie.id, nume: nume.trim(), tip: colectie.tip });
             setEditez(false);
           }}
           style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}

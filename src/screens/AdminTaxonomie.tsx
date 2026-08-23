@@ -52,7 +52,6 @@ export function AdminTaxonomie({
 
       <FormularMaterie
         inLucru={inLucru}
-        pozitieUrmatoare={taxonomie.materii.length}
         onSalveaza={(m) => cu(() => salveazaMaterie(m), 'Materia a fost salvată.')}
       />
 
@@ -78,12 +77,10 @@ export function AdminTaxonomie({
 /** Adăugarea unei materii noi. Id-ul se scrie o dată și nu se mai schimbă. */
 function FormularMaterie({
   inLucru,
-  pozitieUrmatoare,
   onSalveaza,
 }: {
   inLucru: boolean;
-  pozitieUrmatoare: number;
-  onSalveaza: (m: { id: string; nume: string; position: number; publicat: boolean }) => void;
+  onSalveaza: (m: { id: string; nume: string }) => void;
 }) {
   const [id, setId] = useState('');
   const [nume, setNume] = useState('');
@@ -123,7 +120,7 @@ function FormularMaterie({
         className="btn-primary"
         disabled={!poate || inLucru}
         onClick={() => {
-          onSalveaza({ id: id.trim(), nume: nume.trim(), position: pozitieUrmatoare, publicat: true });
+          onSalveaza({ id: id.trim(), nume: nume.trim() });
           setId('');
           setNume('');
         }}
@@ -143,15 +140,8 @@ function CardMaterie({
 }: {
   materie: Materie;
   inLucru: boolean;
-  onSalveazaMaterie: (m: { id: string; nume: string; position: number; publicat: boolean }) => void;
-  onSalveazaCapitol: (c: {
-    id: string;
-    materieId: string;
-    nr: string;
-    nume: string;
-    position: number;
-    publicat: boolean;
-  }) => void;
+  onSalveazaMaterie: (m: { id: string; nume: string }) => void;
+  onSalveazaCapitol: (c: { id: string; materieId: string; nr: string; nume: string }) => void;
 }) {
   const [nume, setNume] = useState(materie.name);
   const [capNou, setCapNou] = useState({ id: '', nr: '', nume: '' });
@@ -186,7 +176,7 @@ function CardMaterie({
           aria-label={`Salvează numele materiei ${materie.name}`}
           disabled={inLucru || nume.trim() === '' || nume === materie.name}
           onClick={() =>
-            onSalveazaMaterie({ id: materie.id, nume: nume.trim(), position: 0, publicat: true })
+            onSalveazaMaterie({ id: materie.id, nume: nume.trim() })
           }
           style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
         >
@@ -234,8 +224,6 @@ function CardMaterie({
               materieId: materie.id,
               nr: capNou.nr.trim(),
               nume: capNou.nume.trim(),
-              position: materie.list.length,
-              publicat: true,
             });
             setCapNou({ id: '', nr: '', nume: '' });
           }}
@@ -255,14 +243,7 @@ function RandCapitol({
 }: {
   capitol: Chapter;
   inLucru: boolean;
-  onSalveaza: (c: {
-    id: string;
-    materieId: string;
-    nr: string;
-    nume: string;
-    position: number;
-    publicat: boolean;
-  }) => void;
+  onSalveaza: (c: { id: string; materieId: string; nr: string; nume: string }) => void;
 }) {
   const [editez, setEditez] = useState(false);
   const [nume, setNume] = useState(capitol.name);
@@ -326,8 +307,6 @@ function RandCapitol({
             materieId: capitol.materie,
             nr: nr.trim(),
             nume: nume.trim(),
-            position: 0,
-            publicat: true,
           });
           setEditez(false);
         }}

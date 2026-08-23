@@ -227,6 +227,8 @@ Administrarea are acum secțiuni, citite din **al doilea segment de hash** (`#/a
 
 **Nu există ștergere de taxonomie sau colecții**, deliberat: depublicarea scoate din fața elevului fără să atingă nimic din ce s-a scris, exact ca retragerea unei grile față de ștergerea ei.
 
+**În `salveaza_materie`/`salveaza_capitol`/`salveaza_colectie`, o cheie absentă înseamnă „las-o cum e".** Prima versiune făcea `coalesce(payload ->> 'x', <implicit>)`, adică absent = pune implicitul — pe dos față de ce spune un formular de redenumire, care trimite doar ce a schimbat omul. `Materie`, `Chapter` și `Colectie` consumă `position` la sortare și n-o mai poartă pe obiect, deci formularul chiar **nu are** ce trimite: rezultatul era că orice corectare de titlu muta rândul în capul listei (toate trei se citesc `order by position`), iar redenumirea unei colecții îi ștergea anul și cartea. Poziția unui rând nou se calculează în bază (`max + 1`), nu se numără în client — `lista.length` greșește de îndată ce pozițiile au goluri. `an`, `centruId` și `sursaBibliografica` se citesc cu `jsonb_exists`, fiindcă pentru ele un `null` trimis explicit chiar înseamnă ceva, iar `coalesce` nu poate distinge asta de o cheie lipsă.
+
 `acoperire_capitole` e `security invoker` — RLS decide ce se numără, deci un elev n-ar vedea ciornele nici ca cifră. Operațiile în masă (`schimba_starea_grilelor`, `atribuie_colectia`) sunt `security definer` fiindcă poarta e rolul, deci intră în allowlist-ul din `rls.test.ts`.
 
 ### Writing content — the form and the batch
