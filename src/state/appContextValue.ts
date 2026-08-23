@@ -3,6 +3,7 @@ import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
 import type { Screen } from '../lib/router';
 import type { Taxonomie } from '../lib/taxonomie';
+import type { TipuriGrile } from '../lib/tipuriGrile';
 import type { Session } from './useSession';
 import type { Simulare } from './useSimulare';
 import type { Recapitulare } from './useRecapitulare';
@@ -20,6 +21,8 @@ export interface AppValue {
   questions: Question[];
   /** Materiile și capitolele, din bază. Etichetele de capitol vin de aici. */
   taxonomie: Taxonomie;
+  /** Formatele de grilă, din bază. */
+  tipuri: TipuriGrile;
   session: Session;
   recapitulare: Recapitulare;
   sim: Simulare;

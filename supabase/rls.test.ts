@@ -414,17 +414,49 @@ describe('scrierea grilelor', () => {
     ).rejects.toThrow(/dintre variantele scrise/i);
   });
 
-  it('refuză complementul grupat fără patru afirmații', async () => {
+  /** Cele cinci variante fixe ale complementului grupat, cerute de tipul lui. */
+  const VARIANTE_GRUPAT = [
+    { key: 'A', text: '1, 2, 3' },
+    { key: 'B', text: '1, 3' },
+    { key: 'C', text: '2, 4' },
+    { key: 'D', text: 'doar 4' },
+    { key: 'E', text: 'toate' },
+  ];
+
+  const grilaGrupata = (peste: Record<string, unknown> = {}) =>
+    grila({ tip: 'grupat', opts: VARIANTE_GRUPAT, correct: 'B', ...peste });
+
+  it('refuză complementul grupat fără cele patru afirmații', async () => {
     await baza.faAdmin(ana);
     await expect(
-      baza.caUtilizator(ana, () => salveaza(grila({ tip: 'grupat', enunturi: ['una', 'două'] }))),
-    ).rejects.toThrow(/patru afirmații/i);
+      baza.caUtilizator(ana, () => salveaza(grilaGrupata({ enunturi: ['una', 'două'] }))),
+    ).rejects.toThrow(/exact 4 afirmații/i);
+  });
+
+  /**
+   * La complementul grupat textele variantelor sunt cheia fixă a formatului, nu
+   * conținut: A = „1, 2, 3", B = „1, 3", și așa mai departe. Toate cele 110 grile
+   * grupate din bază le au identice. Verificarea stă în bază fiindcă un import
+   * poate veni de oriunde, nu doar din formularul care le completează singur.
+   */
+  it('refuză un complement grupat cu variante rescrise', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () =>
+        salveaza(
+          grilaGrupata({
+            enunturi: ['a', 'b', 'c', 'd'],
+            opts: [...VARIANTE_GRUPAT.slice(0, 4), { key: 'E', text: 'niciuna' }],
+          }),
+        ),
+      ),
+    ).rejects.toThrow(/variante fixe/i);
   });
 
   it('golește afirmațiile când grila nu mai e grupată', async () => {
     await baza.faAdmin(ana);
     await baza.caUtilizator(ana, () =>
-      salveaza(grila({ tip: 'grupat', enunturi: ['a', 'b', 'c', 'd'] })),
+      salveaza(grilaGrupata({ enunturi: ['a', 'b', 'c', 'd'] })),
     );
     await baza.caUtilizator(ana, () => salveaza(grila({ tip: 'simplu' })));
 
@@ -693,8 +725,8 @@ describe('biblioteca', () => {
     await expect(
       baza.caUtilizator(ana, () =>
         baza.db.query(
-          `insert into questions (id, chapter_id, tip, text, correct, expl, src)
-           values ('strecurata-01', 'bio-nervos', 'simplu', 'a mea', 'A', 'x', 'y')`,
+          `insert into questions (id, chapter_id, tip, tip_id, text, correct, expl, src)
+           values ('strecurata-01', 'bio-nervos', 'simplu', 'simplu', 'a mea', 'A', 'x', 'y')`,
         ),
       ),
     ).rejects.toThrow(/row-level security/i);

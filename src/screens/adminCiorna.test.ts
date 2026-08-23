@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { catreSalvare, ciornaGoala, dinGrila, idSugerat, valideaza, type Ciorna } from './adminCiorna';
 import { QUESTIONS } from '../data/questions';
+import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
+import { TIPURI_SEED } from '../data/tipuriSeed';
 import type { GrilaCuStare } from '../lib/continut';
 
 /** O ciornă completă și corectă; fiecare test strică exact un lucru. */
+/** `valideaza` cu fixturile de taxonomie și de tipuri — regulile vin de acolo. */
+const valideazaCu = (c: Ciorna) => valideaza(c, TAXONOMIE_SEED, TIPURI_SEED);
+const catreSalvareCu = (c: Ciorna, status: Parameters<typeof catreSalvare>[1]) =>
+  catreSalvare(c, status, TIPURI_SEED);
+
 const buna = (peste: Partial<Ciorna> = {}): Ciorna => ({
   ...ciornaGoala('bio-nervos'),
   id: 'bio-nervos-07',
@@ -23,27 +30,27 @@ const buna = (peste: Partial<Ciorna> = {}): Ciorna => ({
 
 describe('valideaza', () => {
   it('lasă o ciornă corectă să treacă', () => {
-    expect(valideaza(buna())).toEqual([]);
+    expect(valideazaCu(buna())).toEqual([]);
   });
 
   it('cere identificator', () => {
-    expect(valideaza(buna({ id: '  ' }))).toContain('Grila are nevoie de un identificator.');
+    expect(valideazaCu(buna({ id: '  ' }))).toContain('Grila are nevoie de un identificator.');
   });
 
   /** Id-ul ajunge în `attempts` și în lucrările salvate; un spațiu acolo doare mai târziu. */
   it('refuză un identificator cu spații sau majuscule', () => {
-    expect(valideaza(buna({ id: 'Bio Nervos 07' }))[0]).toMatch(/litere mici/);
+    expect(valideazaCu(buna({ id: 'Bio Nervos 07' }))[0]).toMatch(/litere mici/);
   });
 
   it('cere enunț și explicație', () => {
-    expect(valideaza(buna({ text: '' }))).toContain('Enunțul nu poate fi gol.');
-    expect(valideaza(buna({ expl: '   ' }))).toContain('Explicația generală nu poate fi goală.');
+    expect(valideazaCu(buna({ text: '' }))).toContain('Enunțul nu poate fi gol.');
+    expect(valideazaCu(buna({ expl: '   ' }))).toContain('Explicația generală nu poate fi goală.');
   });
 
   it('cere cel puțin două variante', () => {
     const c = buna();
     c.opts.B = { text: '', why: '' };
-    expect(valideaza(c)).toContain('Scrie cel puțin două variante.');
+    expect(valideazaCu(c)).toContain('Scrie cel puțin 2 variante.');
   });
 
   /**
@@ -51,70 +58,94 @@ describe('valideaza', () => {
    * formular, autorul ar afla abia din mesajul serverului, după ce apasă salvează.
    */
   it('cere ca răspunsul corect să fie printre variantele scrise', () => {
-    expect(valideaza(buna({ correct: 'E' }))).toContain(
+    expect(valideazaCu(buna({ correct: 'E' }))).toContain(
       'Răspunsul corect trebuie să fie una dintre variantele scrise.',
     );
   });
 
+  /**
+   * La complementul grupat toate cinci variantele sunt cerute, fiindcă textele
+   * lor sunt cheia fixă a formatului, nu conținut. Regula vine din tip, nu
+   * dintr-un `if` pe nume — un format nou o capătă fără să se atingă codul.
+   */
+  const grupata = (peste: Partial<Ciorna> = {}): Ciorna =>
+    buna({
+      tip: 'grupat',
+      opts: {
+        A: { text: '1, 2, 3', why: '' },
+        B: { text: '1, 3', why: '' },
+        C: { text: '2, 4', why: '' },
+        D: { text: 'doar 4', why: '' },
+        E: { text: 'toate', why: '' },
+      },
+      ...peste,
+    });
+
   it('cere exact patru afirmații la complementul grupat', () => {
-    expect(valideaza(buna({ tip: 'grupat', enunturi: ['a', 'b', '', ''] }))).toContain(
-      'Complementul grupat are nevoie de exact patru afirmații.',
+    expect(valideazaCu(grupata({ enunturi: ['a', 'b', '', ''] }))).toContain(
+      'Complement grupat are nevoie de exact 4 afirmații.',
     );
-    expect(valideaza(buna({ tip: 'grupat', enunturi: ['a', 'b', 'c', 'd'] }))).toEqual([]);
+    expect(valideazaCu(grupata({ enunturi: ['a', 'b', 'c', 'd'] }))).toEqual([]);
+  });
+
+  it('cere toate cele cinci variante ale complementului grupat', () => {
+    const faraE = grupata({ enunturi: ['a', 'b', 'c', 'd'] });
+    faraE.opts.E = { text: '', why: '' };
+    expect(valideazaCu(faraE)).toContain('Scrie cel puțin 5 variante.');
   });
 
   it('nu cere afirmații la complementul simplu', () => {
-    expect(valideaza(buna({ tip: 'simplu', enunturi: ['', '', '', ''] }))).toEqual([]);
+    expect(valideazaCu(buna({ tip: 'simplu', enunturi: ['', '', '', ''] }))).toEqual([]);
   });
 
   it('lasă anul gol să treacă, dar respinge unul absurd', () => {
-    expect(valideaza(buna({ an: '' }))).toEqual([]);
-    expect(valideaza(buna({ an: '1900' }))).toContain('Anul subiectului trebuie să fie un an valid.');
-    expect(valideaza(buna({ an: 'douămiișaișe' }))).toContain('Anul subiectului trebuie să fie un an valid.');
+    expect(valideazaCu(buna({ an: '' }))).toEqual([]);
+    expect(valideazaCu(buna({ an: '1900' }))).toContain('Anul subiectului trebuie să fie un an valid.');
+    expect(valideazaCu(buna({ an: 'douămiișaișe' }))).toContain('Anul subiectului trebuie să fie un an valid.');
   });
 });
 
 describe('catreSalvare', () => {
   it('nu trimite variantele lăsate goale', () => {
-    expect(catreSalvare(buna(), 'ciorna').opts.map((o) => o.key)).toEqual(['A', 'B']);
+    expect(catreSalvareCu(buna(), 'ciorna').opts.map((o) => o.key)).toEqual(['A', 'B']);
   });
 
   it('lasă deoparte explicația per variantă când lipsește', () => {
-    const opts = catreSalvare(buna(), 'ciorna').opts;
+    const opts = catreSalvareCu(buna(), 'ciorna').opts;
     expect(opts[0]).toHaveProperty('why', 'de ce cade');
     expect(opts[1]).not.toHaveProperty('why');
   });
 
   it('taie spațiile de la capete', () => {
-    const g = catreSalvare(buna({ id: '  bio-nervos-07  ', text: ' cu spații ' }), 'publicata');
+    const g = catreSalvareCu(buna({ id: '  bio-nervos-07  ', text: ' cu spații ' }), 'publicata');
     expect(g.id).toBe('bio-nervos-07');
     expect(g.text).toBe('cu spații');
   });
 
   /** La simplu, afirmațiile nu pleacă deloc — altfel ar rămâne de la o editare veche. */
   it('trimite afirmațiile doar la complementul grupat', () => {
-    expect(catreSalvare(buna({ tip: 'simplu' }), 'ciorna').enunturi).toBeUndefined();
+    expect(catreSalvareCu(buna({ tip: 'simplu' }), 'ciorna').enunturi).toBeUndefined();
     expect(
-      catreSalvare(buna({ tip: 'grupat', enunturi: ['a', 'b', 'c', 'd'] }), 'ciorna').enunturi,
+      catreSalvareCu(buna({ tip: 'grupat', enunturi: ['a', 'b', 'c', 'd'] }), 'ciorna').enunturi,
     ).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('duce starea cerută, nu una din ciornă', () => {
-    expect(catreSalvare(buna(), 'publicata').status).toBe('publicata');
-    expect(catreSalvare(buna(), 'ciorna').status).toBe('ciorna');
+    expect(catreSalvareCu(buna(), 'publicata').status).toBe('publicata');
+    expect(catreSalvareCu(buna(), 'ciorna').status).toBe('ciorna');
   });
 
   it('trimite colecția, curățată de spații', () => {
-    expect(catreSalvare(buna({ colectie: '  Simulare 2026 UMFCD  ' }), 'ciorna').colectie).toBe(
+    expect(catreSalvareCu(buna({ colectie: '  Simulare 2026 UMFCD  ' }), 'ciorna').colectie).toBe(
       'Simulare 2026 UMFCD',
     );
-    expect(catreSalvare(buna(), 'ciorna').colectie).toBe('');
+    expect(catreSalvareCu(buna(), 'ciorna').colectie).toBe('');
   });
 
   it('trimite sursa aleasă și anul doar când e completat', () => {
-    expect(catreSalvare(buna({ sursa: 'culegere' }), 'ciorna').sursa).toBe('culegere');
-    expect(catreSalvare(buna(), 'ciorna').an).toBeUndefined();
-    expect(catreSalvare(buna({ sursa: 'subiect_oficial', an: '2026' }), 'ciorna').an).toBe(2026);
+    expect(catreSalvareCu(buna({ sursa: 'culegere' }), 'ciorna').sursa).toBe('culegere');
+    expect(catreSalvareCu(buna(), 'ciorna').an).toBeUndefined();
+    expect(catreSalvareCu(buna({ sursa: 'subiect_oficial', an: '2026' }), 'ciorna').an).toBe(2026);
   });
 });
 

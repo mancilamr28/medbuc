@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { catreJson, citesteImport, frazaRescrieri, importa } from './importLot';
 import { TAXONOMIE_SEED } from '../data/taxonomieSeed';
+import { TIPURI_SEED } from '../data/tipuriSeed';
 import type { GrilaCuStare } from '../lib/continut';
 import type { GrilaDeSalvat } from '../lib/continut';
 
@@ -22,7 +23,7 @@ const valida = (peste: Record<string, unknown> = {}) => ({
 });
 
 const citeste = (v: unknown, existente: { id: string }[] = []) =>
-  citesteImport(JSON.stringify(v), { status: 'ciorna' }, existente, TAXONOMIE_SEED);
+  citesteImport(JSON.stringify(v), { status: 'ciorna' }, existente, TAXONOMIE_SEED, TIPURI_SEED);
 
 describe('citesteImport', () => {
   it('acceptă un lot valid și îl pregătește pentru salvare', () => {
@@ -80,7 +81,7 @@ describe('citesteImport folosește regulile formularului', () => {
 
   it('cere exact patru afirmații la complementul grupat', () => {
     const { randuri } = citeste([valida({ tip: 'grupat', enunturi: ['una', 'doua'] })]);
-    expect(randuri[0]!.probleme).toContain('Complementul grupat are nevoie de exact patru afirmații.');
+    expect(randuri[0]!.probleme).toContain('Complement grupat are nevoie de exact 4 afirmații.');
   });
 
   it('respinge un identificator cu majuscule sau spații', () => {
@@ -388,9 +389,20 @@ describe('catreJson', () => {
       ...dinBiblioteca,
       id: 'bio-nervos-02',
       tip: 'grupat',
+      // Variantele complementului grupat sunt cheia fixă a formatului, cerută de
+      // tip; o grilă grupată cu alte texte nu e o grilă grupată.
+      opts: [
+        ['A', '1, 2, 3'],
+        ['B', '1, 3'],
+        ['C', '2, 4'],
+        ['D', 'doar 4'],
+        ['E', 'toate'],
+      ],
+      why: {},
+      correct: 'B',
       enunturi: ['una', 'doua', 'trei', 'patru'],
     };
-    const { randuri } = citesteImport(catreJson([grupata]), { status: 'ciorna' }, [], TAXONOMIE_SEED);
+    const { randuri } = citesteImport(catreJson([grupata]), { status: 'ciorna' }, [], TAXONOMIE_SEED, TIPURI_SEED);
 
     expect(randuri[0]!.probleme).toEqual([]);
     expect(randuri[0]!.grila!.enunturi).toEqual(['una', 'doua', 'trei', 'patru']);

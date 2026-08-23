@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FK_VARIANTE } from '../src/lib/continut';
+import { TIPURI_SEED_RANDURI } from '../src/data/tipuriSeed';
 import { bazaDeTest, type Baza } from './harness';
 
 /**
@@ -61,8 +62,8 @@ describe('constrângerile de conținut', () => {
     await expect(
       baza.db.exec(`
         begin;
-        insert into questions (id, chapter_id, tip, text, correct, expl, src)
-        values ('test-01', 'bio-nervos', 'simplu', 'Întrebare', 'E', 'explicație', 'sursă');
+        insert into questions (id, chapter_id, tip, tip_id, text, correct, expl, src)
+        values ('test-01', 'bio-nervos', 'simplu', 'simplu', 'Întrebare', 'E', 'explicație', 'sursă');
         insert into question_options (question_id, key, text) values ('test-01', 'A', 'doar A');
         commit;
       `),
@@ -72,8 +73,8 @@ describe('constrângerile de conținut', () => {
   it('refuză o grilă grupată fără cele patru afirmații', async () => {
     await expect(
       baza.db.query(
-        `insert into questions (id, chapter_id, tip, text, correct, expl, src)
-         values ('test-02', 'bio-nervos', 'grupat', 'Întrebare', 'A', 'explicație', 'sursă')`,
+        `insert into questions (id, chapter_id, tip, tip_id, text, correct, expl, src)
+         values ('test-02', 'bio-nervos', 'grupat', 'grupat', 'Întrebare', 'A', 'explicație', 'sursă')`,
       ),
     ).rejects.toThrow(/grupat_are_enunturi/);
   });
@@ -81,8 +82,8 @@ describe('constrângerile de conținut', () => {
   it('refuză o grilă legată de un capitol inexistent', async () => {
     await expect(
       baza.db.query(
-        `insert into questions (id, chapter_id, tip, text, correct, expl, src)
-         values ('test-03', 'capitol-inventat', 'simplu', 'Întrebare', 'A', 'explicație', 'sursă')`,
+        `insert into questions (id, chapter_id, tip, tip_id, text, correct, expl, src)
+         values ('test-03', 'capitol-inventat', 'simplu', 'simplu', 'Întrebare', 'A', 'explicație', 'sursă')`,
       ),
     ).rejects.toThrow();
   });
@@ -168,5 +169,46 @@ describe('embed-ul folosit de aplicație', () => {
       FK_VARIANTE,
       'questions_correct_exists',
     ]);
+  });
+});
+
+/**
+ * Fixtura de tipuri față de ce a inserat migrarea.
+ *
+ * `src/data/tipuriSeed.ts` oglindește inserarea din `0010_tipuri_de_grile.sql`,
+ * iar două locuri pot diverge. Divergența n-ar da nicio eroare: testele pure ar
+ * valida după fixtură, baza ar valida după rândurile ei, iar diferența ar ieși la
+ * iveală abia într-un formular care refuză o grilă corectă. De aceea se compară
+ * aici, pe baza reală, după migrări.
+ */
+describe('tipurile de grilă', () => {
+  it('sunt în bază exact cum le descrie fixtura din aplicație', async () => {
+    const baza = await bazaDeTest({ cuSeed: false });
+    try {
+      const r = await baza.db.query<Record<string, unknown>>(
+        `select id, nume, descriere, sablon_optiuni, nr_optiuni_min, nr_optiuni_max,
+                permite_amestecare, cere_enunturi, nr_enunturi, hint_randare, position
+         from question_types order by position`,
+      );
+
+      expect(r.rows).toEqual(TIPURI_SEED_RANDURI);
+    } finally {
+      await baza.inchide();
+    }
+  });
+
+  /** Constrângerea care face din siguranța la amestecare o garanție, nu o convenție. */
+  it('nu lasă un tip cu variante fixe să fie și amestecabil', async () => {
+    const baza = await bazaDeTest({ cuSeed: false });
+    try {
+      await expect(
+        baza.db.query(
+          `insert into question_types (id, nume, sablon_optiuni, nr_optiuni_min, nr_optiuni_max, permite_amestecare)
+           values ('gresit', 'Greșit', array['a', 'b'], 2, 2, true)`,
+        ),
+      ).rejects.toThrow(/qt_sablon_fix/i);
+    } finally {
+      await baza.inchide();
+    }
   });
 });

@@ -7,6 +7,7 @@ import {
   type RandMaterie,
   type Taxonomie,
 } from './taxonomie';
+import { construiesteTipuri, type RandTip, type TipuriGrile } from './tipuriGrile';
 import { citesteTot } from './paginare';
 
 /**
@@ -36,7 +37,8 @@ export interface GrilaCuStare extends Question {
 export interface RandGrila {
   id: string;
   chapter_id: string;
-  tip: string;
+  tip: string | null;
+  tip_id: string;
   status: string;
   text: string;
   enunturi: string[] | null;
@@ -62,7 +64,7 @@ export interface RandGrila {
  */
 export const FK_VARIANTE = 'question_options_question_id_fkey';
 
-const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie, question_options!${FK_VARIANTE}(key, text, why)`;
+const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie, tip_id, question_options!${FK_VARIANTE}(key, text, why)`;
 
 /**
  * Pură peste rândul primit, ca să poată fi testată fără rețea.
@@ -83,7 +85,7 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
 
   return {
     id: rand.id,
-    tip: rand.tip as QuestionType,
+    tip: rand.tip_id,
     capId: rand.chapter_id as ChapterId,
     text: rand.text,
     ...(rand.enunturi ? { enunturi: rand.enunturi } : {}),
@@ -215,4 +217,23 @@ export async function incarcaTaxonomie(): Promise<Taxonomie> {
   ]);
 
   return construiesteTaxonomie(materii, capitole);
+}
+
+/** Tipurile de grilă, din bază. Aici, nu în `tipuriGrile.ts`, din același motiv ca taxonomia. */
+export async function incarcaTipuri(): Promise<TipuriGrile> {
+  const { supabase } = await import('./supabase');
+
+  const randuri = await citesteTot<RandTip>(async (de, la) => {
+    const r = await supabase
+      .from('question_types')
+      .select(
+        'id,nume,descriere,sablon_optiuni,nr_optiuni_min,nr_optiuni_max,permite_amestecare,cere_enunturi,nr_enunturi,hint_randare,position',
+        { count: 'exact' },
+      )
+      .order('position')
+      .range(de, la);
+    return { data: r.data as RandTip[] | null, error: r.error, count: r.count };
+  });
+
+  return construiesteTipuri(randuri);
 }

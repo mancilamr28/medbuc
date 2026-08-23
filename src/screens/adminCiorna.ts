@@ -1,5 +1,7 @@
 import type { ChapterId } from '../data/chapters';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
+import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
+import { numar } from '../lib/text';
 import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 
@@ -81,9 +83,14 @@ export const variantScrise = (c: Ciorna): OptionKey[] =>
  * Lista goală înseamnă că se poate salva. Mesajele sunt în aceeași ordine în care
  * apar câmpurile, ca ochiul să meargă de sus în jos.
  */
-export function valideaza(c: Ciorna, taxonomie: Taxonomie = TAXONOMIE_GOALA): string[] {
+export function valideaza(
+  c: Ciorna,
+  taxonomie: Taxonomie = TAXONOMIE_GOALA,
+  tipuri: TipuriGrile = TIPURI_GOALE,
+): string[] {
   const probleme: string[] = [];
   const scrise = variantScrise(c);
+  const tip = tipuri.tip(c.tip);
 
   if (c.id.trim() === '') probleme.push('Grila are nevoie de un identificator.');
   else if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.id.trim())) {
@@ -96,11 +103,22 @@ export function valideaza(c: Ciorna, taxonomie: Taxonomie = TAXONOMIE_GOALA): st
   }
   if (c.text.trim() === '') probleme.push('Enunțul nu poate fi gol.');
 
-  if (c.tip === 'grupat' && c.enunturi.filter((e) => e.trim() !== '').length !== 4) {
-    probleme.push('Complementul grupat are nevoie de exact patru afirmații.');
+  // Regulile de format vin din tip, nu dintr-un `if` pe „grupat": un format nou
+  // e un rând în `question_types`, iar validarea trebuie să-l urmeze de la sine.
+  if (tip?.cereEnunturi && tip.nrEnunturi !== null) {
+    const scrieri = c.enunturi.filter((e) => e.trim() !== '').length;
+    if (scrieri !== tip.nrEnunturi) {
+      probleme.push(`${tip.nume} are nevoie de exact ${numar(tip.nrEnunturi, 'afirmație', 'afirmații')}.`);
+    }
   }
 
-  if (scrise.length < 2) probleme.push('Scrie cel puțin două variante.');
+  const minim = tip?.nrOptiuniMin ?? 2;
+  if (scrise.length < minim) {
+    probleme.push(`Scrie cel puțin ${numar(minim, 'variantă', 'variante')}.`);
+  }
+  if (tip && scrise.length > tip.nrOptiuniMax) {
+    probleme.push(`${tip.nume} are cel mult ${numar(tip.nrOptiuniMax, 'variantă', 'variante')}.`);
+  }
   if (!scrise.includes(c.correct)) {
     probleme.push('Răspunsul corect trebuie să fie una dintre variantele scrise.');
   }
@@ -118,7 +136,12 @@ export function valideaza(c: Ciorna, taxonomie: Taxonomie = TAXONOMIE_GOALA): st
 }
 
 /** Ciorna, pregătită pentru `salveaza_grila`. Variantele goale nu pleacă spre bază. */
-export function catreSalvare(c: Ciorna, status: QuestionStatus): GrilaDeSalvat {
+export function catreSalvare(
+  c: Ciorna,
+  status: QuestionStatus,
+  tipuri: TipuriGrile = TIPURI_GOALE,
+): GrilaDeSalvat {
+  const cereEnunturi = tipuri.tip(c.tip)?.cereEnunturi ?? c.tip === 'grupat';
   const opts = variantScrise(c).map((k) => {
     const why = c.opts[k].why.trim();
     return { key: k, text: c.opts[k].text.trim(), ...(why ? { why } : {}) };
@@ -130,7 +153,7 @@ export function catreSalvare(c: Ciorna, status: QuestionStatus): GrilaDeSalvat {
     tip: c.tip,
     status,
     text: c.text.trim(),
-    ...(c.tip === 'grupat' ? { enunturi: c.enunturi.map((e) => e.trim()) } : {}),
+    ...(cereEnunturi ? { enunturi: c.enunturi.map((e) => e.trim()) } : {}),
     correct: c.correct,
     expl: c.expl.trim(),
     src: c.src.trim(),

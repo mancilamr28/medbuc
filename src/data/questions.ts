@@ -2,7 +2,15 @@ import type { ChapterId, MaterieId } from './chapters';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 
 export type OptionKey = 'A' | 'B' | 'C' | 'D' | 'E';
-export type QuestionType = 'simplu' | 'grupat';
+/**
+ * Formatul grilei — id-ul unui rând din `question_types`, nu o uniune.
+ *
+ * A fost `'simplu' | 'grupat'`. O uniune compilată peste o listă care trăiește
+ * în bază e exact tiparul care a produs divergența `MaterieId`; nu se
+ * reintroduce. Ce înseamnă tipul — câte variante, ce șablon, dacă se poate
+ * amesteca — se citește din `lib/tipuriGrile.ts`.
+ */
+export type QuestionType = string;
 /**
  * De unde vine grila: scrisă pe curriculum, dintr-un subiect oficial de admitere
  * din anii trecuți, sau dintr-o culegere. Independentă de `capId` — o grilă
@@ -65,9 +73,6 @@ export interface Question {
 }
 
 export const OPTION_KEYS: OptionKey[] = ['A', 'B', 'C', 'D', 'E'];
-
-export const tipLabel = (tip: QuestionType): string =>
-  tip === 'simplu' ? 'Complement simplu' : 'Complement grupat';
 
 /**
  * „Biologie” — pentru antetul grilei.

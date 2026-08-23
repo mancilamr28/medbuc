@@ -127,7 +127,7 @@ describe('Administrare', () => {
     // Apare de două ori, intenționat: în lista de probleme de sub formular și
     // în notificare, fiindcă butonul apăsat poate fi departe de câmpul vinovat.
     await waitFor(() =>
-      expect(screen.getAllByText(/Scrie cel puțin două variante/).length).toBeGreaterThan(0),
+      expect(screen.getAllByText(/Scrie cel puțin 2 variante/).length).toBeGreaterThan(0),
     );
   });
 

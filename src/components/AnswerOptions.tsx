@@ -1,5 +1,6 @@
 import { SANS } from '../lib/ui';
 import type { OptionKey, Question } from '../data/questions';
+import type { TipGrila } from '../lib/tipuriGrile';
 
 /**
  * Variantele de răspuns. La complementul grupat se afișează doar litera —
@@ -8,18 +9,25 @@ import type { OptionKey, Question } from '../data/questions';
  */
 export function AnswerOptions({
   question,
+  tip,
   answer,
   revealed,
   onPick,
   showIcons = true,
 }: {
   question: Question;
+  /** Formatul grilei. Lipsă (încă neîncărcat) înseamnă randare simplă. */
+  tip?: TipGrila | undefined;
   answer: OptionKey | undefined;
   revealed: boolean;
   onPick: (key: OptionKey) => void;
   showIcons?: boolean;
 }) {
-  const bare = question.tip === 'grupat';
+  // „Doar literele" e o proprietate a formatului, nu a grilei: la complementul
+  // grupat textele variantelor sunt cheia fixă (A = „1, 2, 3"), deci repetarea
+  // lor lângă fiecare buton e zgomot. Un tip necunoscut cade pe lista completă —
+  // sărac, nu gol.
+  const bare = tip?.hintRandare === 'enunturi_numerotate';
 
   return (
     <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 9 }} role="radiogroup" aria-label="Variante de răspuns">

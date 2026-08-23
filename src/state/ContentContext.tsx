@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { incarcaGrile, incarcaTaxonomie, type GrilaCuStare } from '../lib/continut';
+import { incarcaGrile, incarcaTaxonomie, incarcaTipuri, type GrilaCuStare } from '../lib/continut';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
+import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
 import { useAuth } from './authState';
 import { ContentContext, type ContentValue } from './contentState';
 
@@ -30,6 +31,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   const { user, loading: sesiuneaSeIncarca } = useAuth();
   const [grile, setGrile] = useState<GrilaCuStare[]>([]);
   const [taxonomie, setTaxonomie] = useState<Taxonomie>(TAXONOMIE_GOALA);
+  const [tipuri, setTipuri] = useState<TipuriGrile>(TIPURI_GOALE);
   const [seIncarca, setSeIncarca] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +77,18 @@ export function ContentProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     let anulat = false;
+    void incarcaTipuri()
+      .then((t) => {
+        if (!anulat) setTipuri(t);
+      })
+      .catch((e: unknown) => console.warn('[medbuc] Încărcarea tipurilor a eșuat.', e));
+    return () => {
+      anulat = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let anulat = false;
     void incarcaTaxonomie()
       .then((t) => {
         if (!anulat) setTaxonomie(t);
@@ -96,11 +110,12 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       // interogare: administratorul are nevoie și de ciorne, în aceeași încărcare.
       questions: grile.filter((g) => g.status === 'publicata'),
       taxonomie,
+      tipuri,
       loading,
       error,
       reload: incarca,
     }),
-    [grile, taxonomie, loading, error, incarca],
+    [grile, taxonomie, tipuri, loading, error, incarca],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

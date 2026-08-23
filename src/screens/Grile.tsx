@@ -6,7 +6,7 @@ import { PoartaContinut } from '../components/PoartaContinut';
 import { StareNotitaText } from '../components/StareNotita';
 import { Progress } from '../components/Progress';
 import { Segmented } from '../components/Segmented';
-import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
+import { OPTION_KEYS, questionCap, questionMaterie, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow, usePersistentState } from '../lib/hooks';
 import { useNotita } from '../state/useNotita';
 import { navWindow } from '../lib/navWindow';
@@ -75,7 +75,7 @@ function CapitolGol() {
 }
 
 function GrileRun() {
-  const { go, session } = useApp();
+  const { go, session, tipuri } = useApp();
   const isDesktop = useIsDesktop();
   const [layout, setLayout] = usePersistentState<Variant>('medbuc.solve', 'a');
   const now = useNow();
@@ -228,7 +228,7 @@ function GrileRun() {
                   padding: '6px 9px',
                 }}
               >
-                {tipLabel(question.tip)}
+                {tipuri.eticheta(question.tip)}
               </span>
               <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
                 {questionMaterie(question)} · {questionCap(question)}
@@ -280,6 +280,7 @@ function GrileRun() {
 
             <AnswerOptions
               question={question}
+              tip={tipuri.tip(question.tip)}
               answer={answer}
               revealed={isRevealed}
               onPick={session.pick}

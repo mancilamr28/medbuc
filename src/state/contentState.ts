@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { Question } from '../data/questions';
 import type { GrilaCuStare } from '../lib/continut';
 import type { Taxonomie } from '../lib/taxonomie';
+import type { TipuriGrile } from '../lib/tipuriGrile';
 
 export interface ContentValue {
   grile: GrilaCuStare[];
@@ -13,6 +14,8 @@ export interface ContentValue {
    * pagina de prezentare numără capitole înainte de orice cont.
    */
   taxonomie: Taxonomie;
+  /** Formatele de grilă, din bază: ce validează, ce randează, ce se poate amesteca. */
+  tipuri: TipuriGrile;
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;

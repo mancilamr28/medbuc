@@ -5,6 +5,7 @@ const rand = (peste: Partial<RandGrila> = {}): RandGrila => ({
   id: 'bio-nervos-01',
   chapter_id: 'bio-nervos',
   tip: 'simplu',
+  tip_id: 'simplu',
   status: 'publicata',
   text: 'Enunțul',
   enunturi: null,
@@ -43,9 +44,22 @@ describe('mapeazaGrila', () => {
   });
 
   it('păstrează cele patru afirmații la complementul grupat', () => {
-    const g = mapeazaGrila(rand({ tip: 'grupat', enunturi: ['a', 'b', 'c', 'd'] }));
+    const g = mapeazaGrila(rand({ tip_id: 'grupat', enunturi: ['a', 'b', 'c', 'd'] }));
     expect(g.tip).toBe('grupat');
     expect(g.enunturi).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  /**
+   * Formatul se citește din `tip_id`, nu din coloana `tip`.
+   *
+   * `tip` e enumul istoric, păstrat o vreme ca un client deja livrat să nu se
+   * strice între migrare și deploy. Un tip nou n-are ce valoare de enum să scrie
+   * acolo — scrie null — deci o mapare care încă citește `tip` ar randa grilele
+   * formatului nou fără niciun tip.
+   */
+  it('citește formatul din tip_id, nu din enumul istoric', () => {
+    const g = mapeazaGrila(rand({ tip: null, tip_id: 'flashcard' }));
+    expect(g.tip).toBe('flashcard');
   });
 
   it('duce starea mai departe, pentru Admin', () => {

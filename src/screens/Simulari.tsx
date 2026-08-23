@@ -7,7 +7,7 @@ import { PoartaContinut } from '../components/PoartaContinut';
 import { rezumaLucrari } from '../lib/istoricSimulari';
 import { useProgressOptional } from '../state/progressState';
 import { LucrareRedeschisa, PanouIstoric } from './IstoricSimulari';
-import { tipLabel } from '../data/questions';
+
 import { useIsDesktop } from '../lib/hooks';
 import { navWindow } from '../lib/navWindow';
 import { numar } from '../lib/text';
@@ -197,7 +197,7 @@ function GrilaLipsa() {
 }
 
 function SimRun() {
-  const { sim } = useApp();
+  const { sim, tipuri } = useApp();
   const isDesktop = useIsDesktop();
   const { start, end } = navWindow(sim.qi, sim.total);
   const run = sim.run;
@@ -315,7 +315,7 @@ function SimRun() {
                 padding: '6px 9px',
               }}
             >
-              {tipLabel(question.tip)}
+              {tipuri.eticheta(question.tip)}
             </span>
             <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
               Grila {sim.qi + 1} din {sim.total}
@@ -347,6 +347,7 @@ function SimRun() {
 
           <AnswerOptions
             question={question}
+            tip={tipuri.tip(question.tip)}
             answer={sim.answer}
             revealed={false}
             onPick={sim.pick}
@@ -472,7 +473,7 @@ function SimRun() {
 
 /** Ecranul de după predare: scorul lucrării și recitirea grilelor, cu explicații. */
 function SimRezultat() {
-  const { sim } = useApp();
+  const { sim, tipuri } = useApp();
   const isDesktop = useIsDesktop();
   const run = sim.run;
 
@@ -565,7 +566,7 @@ function SimRezultat() {
 
           <PasulUrmator gresite={gresite} />
 
-          <RecitireGrile grile={grile} />
+          <RecitireGrile grile={grile} tipuri={tipuri} />
         </div>
 
         <div style={sideStack}>

@@ -258,6 +258,17 @@ It is wired now — roughly twenty `notify()` calls across Admin, ImportGrile, A
 
 Separately, **`reportError` from `src/lib/sentry.ts` has exactly one caller** (`ErrorBoundary.componentDidCatch`), so Sentry sees render crashes and nothing else — every failed save, RLS rejection and dropped sync is invisible in production. It is documented as safe to call unconditionally, so adding it to a `catch` block costs one line.
 
+**Formatul unei grile e o linie în `question_types`, nu o valoare de enum.** `simplu` și `grupat` sunt rânduri; un format nou e un `insert`, nu un `alter type` plus patru ramuri de cod. Tipul poartă regulile: câte variante acceptă, câte afirmații cere, dacă variantele pot fi amestecate, și cum se randează (`hint_randare`, vocabular mic, cu `lista` drept cădere pentru un tip necunoscut — sărac, nu gol).
+
+`QuestionType` e acum `string`, deliberat: uniunea compilată e exact tiparul care a produs divergența `MaterieId`. Aceleași trei reguli ca la taxonomie — modulul `lib/tipuriGrile.ts` rămâne pur (citirea e în `continut.ts`, altfel `npm run seed` cade), `data/tipuriSeed.ts` e fixtură de test, iar valoarea circulă prin `ContentContext` → `AppProvider`.
+
+Două lucruri specifice tipurilor:
+
+- **`sablon_optiuni` înseamnă „textele variantelor sunt fixe și poziționale".** La complementul grupat A = „1, 2, 3", B = „1, 3", C = „2, 4", D = „doar 4", E = „toate" — toate cele 110 grile grupate le au identice. Nu sunt conținut, sunt cheia formatului, așa că `salveaza_grila` refuză o grilă grupată cu alte texte.
+- **`permite_amestecare` e fals implicit și stă pe tip, nu pe grilă.** Un CHECK (`qt_sablon_fix`) face imposibil un tip cu șablon fix *și* amestecare permisă: siguranța la amestecarea variantelor e constrângere, nu convenție. Un format pozițional adăugat de cineva care nu s-a gândit la asta e corect din oficiu.
+
+`tipuriSeed.ts` oglindește inserarea din migrarea 0010, deci pot diverge — `schema.test.ts` compară fixtura cu ce a intrat efectiv în bază, ca diferența să pice acolo, nu într-un formular care refuză o grilă corectă.
+
 **Questions have a stable `id`** (`QuestionId`, e.g. `bio-nervos-01`), and anything persisted or passed around must reference that id — never the array position. `QUESTION_BY_ID` / `questionById()` resolve it and `isQuestionId()` validates it. This is why `SimRun.order` stores ids: with positions, inserting one question into the middle of the bank silently rewrote the content of every saved paper. `QUESTION_BY_ID` is built at the bottom of the file, after `QUESTIONS` — building it earlier is a temporal-dead-zone crash at import time. Ids must be unique; a duplicate throws on module load rather than making a question unreachable.
 
 **Chapters have the same treatment** (`ChapterId`, e.g. `bio-nervos`), for two reasons `nr` could not cover: under "Subiecte anterioare" `nr` is a *year* and 2026 holds two sessions, so `nr` repeats; and the note key used to embed the chapter *label* (`medbuc.note.03. Sistemul nervos`), so fixing a typo in a title orphaned the student's note. `CHAPTER_BY_ID` / `chapterById()` / `isChapterId()` mirror the question helpers and are likewise built after `MATERII`. Every `Chapter` also carries its `materie`, so a chapter id alone resolves to both the label (`chapterLabelById`) and the subject name (`materieNameOf`).

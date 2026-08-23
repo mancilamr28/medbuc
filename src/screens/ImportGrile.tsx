@@ -8,6 +8,7 @@ import { useToast } from '../state/toastState';
 import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } from './importLot';
 import { SURSE, type QuestionSursa } from '../data/questions';
 import type { Taxonomie } from '../lib/taxonomie';
+import type { TipuriGrile } from '../lib/tipuriGrile';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -39,10 +40,12 @@ const cifra = (n: number, culoare: string) => (
 export function ImportGrile({
   grile,
   taxonomie,
+  tipuri,
   reload,
 }: {
   grile: GrilaCuStare[];
   taxonomie: Taxonomie;
+  tipuri: TipuriGrile;
   reload: () => Promise<void>;
 }) {
   const { notify } = useToast();
@@ -56,8 +59,8 @@ export function ImportGrile({
   const [bilant, setBilant] = useState<BilantImport | null>(null);
 
   const citire = useMemo(
-    () => citesteImport(brut, { status: implicit, sursa, colectie }, grile, taxonomie),
-    [brut, implicit, sursa, colectie, grile, taxonomie],
+    () => citesteImport(brut, { status: implicit, sursa, colectie }, grile, taxonomie, tipuri),
+    [brut, implicit, sursa, colectie, grile, taxonomie, tipuri],
   );
 
   const valide = citire.randuri.filter((r) => r.grila !== null);

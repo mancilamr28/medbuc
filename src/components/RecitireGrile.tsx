@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { AnswerOptions } from './AnswerOptions';
 import { Segmented } from './Segmented';
 import { questionCap, questionMaterie, type OptionKey, type Question } from '../data/questions';
+import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
 import { SANS, SERIF, eyebrow, statusChip } from '../lib/ui';
 
 /** O poziție dintr-o lucrare predată, gata de recitit. */
@@ -21,7 +22,13 @@ type Filtru = 'gresite' | 'toate';
  * redeschisă din istoric — două ecrane care arătau aceeași informație n-aveau
  * de ce s-o deseneze de două ori.
  */
-export function RecitireGrile({ grile }: { grile: readonly GrilaRecitita[] }) {
+export function RecitireGrile({
+  grile,
+  tipuri = TIPURI_GOALE,
+}: {
+  grile: readonly GrilaRecitita[];
+  tipuri?: TipuriGrile;
+}) {
   const [filtru, setFiltru] = useState<Filtru>('gresite');
 
   const vizibile = useMemo(
@@ -93,7 +100,7 @@ export function RecitireGrile({ grile }: { grile: readonly GrilaRecitita[] }) {
                   {question.text}
                 </p>
 
-                <AnswerOptions question={question} answer={ales ?? undefined} revealed onPick={() => {}} />
+                <AnswerOptions question={question} tip={tipuri.tip(question.tip)} answer={ales ?? undefined} revealed onPick={() => {}} />
 
                 <p
                   style={{
