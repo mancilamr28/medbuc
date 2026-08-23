@@ -28,6 +28,8 @@ let rol = 'admin';
 const salveaza = vi.fn<(g: GrilaDeSalvat) => Promise<void>>(async () => {});
 const schimbaStarea = vi.fn<(ids: readonly string[], s: string) => Promise<number>>(async (ids) => ids.length);
 const atribuie = vi.fn<(ids: readonly string[], c: string | null) => Promise<number>>(async (ids) => ids.length);
+const salveazaCap = vi.fn<(c: unknown) => Promise<void>>(async () => {});
+const salveazaCol = vi.fn<(c: unknown) => Promise<void>>(async () => {});
 const sterge = vi.fn<(id: string) => Promise<void>>(async () => {});
 
 /**
@@ -75,6 +77,8 @@ vi.mock('../lib/continut', async (original) => ({
   }),
   schimbaStareaGrilelor: (ids: readonly string[], s: string) => schimbaStarea(ids, s),
   atribuieColectia: (ids: readonly string[], c: string | null) => atribuie(ids, c),
+  salveazaCapitol: (c: unknown) => salveazaCap(c),
+  salveazaColectie: (c: unknown) => salveazaCol(c),
   salveazaGrila: (g: GrilaDeSalvat) => salveaza(g),
   stergeGrila: (id: string) => sterge(id),
 }));
@@ -424,5 +428,93 @@ describe('Administrare · import în masă', () => {
 
     await waitFor(() => expect(screen.getByText(/26–50 din/)).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Înapoi/ })).toBeEnabled();
+  });
+});
+
+/**
+ * Materiile și capitolele se adăugau prin migrare — adică din editorul SQL, de
+ * către cineva care știe SQL. E chiar bariera pe care faza 1 a scos-o din
+ * runtime: taxonomia trăiește în bază, deci trebuie și scrisă de acolo.
+ */
+describe('Administrare · materii și capitole', () => {
+  it('adaugă un capitol în materia lui, cu poziția următoare', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('tab', { name: 'Materii' }));
+
+    await user.type(await screen.findByLabelText('Identificatorul capitolului nou din Biologie'), 'bio-nou');
+    await user.type(screen.getByLabelText('Numele capitolului nou din Biologie'), 'Capitol nou');
+    await user.type(screen.getByLabelText('Numărul capitolului nou din Biologie'), '13');
+    await user.click(screen.getByRole('button', { name: 'Adaugă un capitol în Biologie' }));
+
+    await waitFor(() =>
+      expect(salveazaCap).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'bio-nou', materieId: 'bio', nr: '13', nume: 'Capitol nou' }),
+      ),
+    );
+  });
+
+  it('redenumește un capitol fără să-i schimbe materia', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('tab', { name: 'Materii' }));
+
+    await user.click(await screen.findByRole('button', { name: /Redenumește 01. Celula/ }));
+    const camp = screen.getByLabelText('Numele capitolului bio-celula');
+    await user.clear(camp);
+    await user.type(camp, 'Celula (revizuit)');
+    await user.click(screen.getByRole('button', { name: 'Salvează capitolul bio-celula' }));
+
+    await waitFor(() =>
+      expect(salveazaCap).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'bio-celula', materieId: 'bio', nume: 'Celula (revizuit)' }),
+      ),
+    );
+  });
+});
+
+describe('Administrare · colecții', () => {
+  /**
+   * O culegere nu ține de un centru de admitere; o lucrare, da. Diferența
+   * contează pentru întrebarea de drepturi, care vine înaintea oricărei plăți.
+   */
+  it('creează o culegere fără centru și cu sursa ei bibliografică', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('tab', { name: 'Colecții' }));
+
+    await user.type(await screen.findByLabelText('Identificator'), 'corint-nervos');
+    await user.type(screen.getByLabelText('Nume'), 'Corint – Sistemul nervos');
+    await user.selectOptions(screen.getByLabelText('Fel'), 'culegere');
+    await user.type(screen.getByLabelText('Sursa bibliografică'), 'Corint, ediția 2024');
+    await user.click(screen.getByRole('button', { name: 'Adaugă colecția' }));
+
+    await waitFor(() =>
+      expect(salveazaCol).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'corint-nervos',
+          tip: 'culegere',
+          centruId: null,
+          sursaBibliografica: 'Corint, ediția 2024',
+        }),
+      ),
+    );
+  });
+
+  it('leagă o lucrare de admitere de centru', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('tab', { name: 'Colecții' }));
+
+    await user.type(await screen.findByLabelText('Identificator'), 'umfcd-2027-mg');
+    await user.type(screen.getByLabelText('Nume'), 'Admitere 2027');
+    await user.type(screen.getByLabelText('Anul'), '2027');
+    await user.click(screen.getByRole('button', { name: 'Adaugă colecția' }));
+
+    await waitFor(() =>
+      expect(salveazaCol).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'umfcd-2027-mg', tip: 'subiect_oficial', centruId: 'umfcd', an: 2027 }),
+      ),
+    );
   });
 });
