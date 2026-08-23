@@ -66,8 +66,8 @@ insert into chapters (id, materie_id, nr, name, position) values ('chim-izomerie
 -- `questions_correct_exists` e o cheie externă amânată: grila se inserează
 -- înaintea variantelor ei, iar verificarea se face la commit.
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
-  'bio-nervos-01', 'bio-nervos', 'simplu', 'publicata',
+insert into questions (id, chapter_id, tip, tip_id, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
+  'bio-nervos-01', 'bio-nervos', 'simplu', 'simplu', 'publicata',
   'Substanța cenușie a medulei spinării este dispusă:',
   null,
   'B',
@@ -77,7 +77,7 @@ insert into questions (id, chapter_id, tip, status, text, enunturi, correct, exp
   null,
   ''
 ) on conflict (id) do update set
-  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
+  chapter_id = excluded.chapter_id, tip = excluded.tip, tip_id = excluded.tip_id, text = excluded.text,
   enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
   sursa = excluded.sursa, an = excluded.an, colectie = excluded.colectie;
 
@@ -92,8 +92,8 @@ insert into question_options (question_id, key, text, why) values ('bio-nervos-0
 insert into question_options (question_id, key, text, why) values ('bio-nervos-01', 'E', 'exclusiv în ganglionii spinali', 'Nu este dispusă în noduli; formațiunile nodulare sunt ganglionii spinali, situați în afara medulei.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
-  'chim-alcooli-01', 'chim-alcooli', 'grupat', 'publicata',
+insert into questions (id, chapter_id, tip, tip_id, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
+  'chim-alcooli-01', 'chim-alcooli', 'grupat', 'grupat', 'publicata',
   'Referitor la etanol sunt corecte afirmațiile:',
   array['are formula moleculară C₂H₆O', 'este un alcool secundar', 'se poate obține prin fermentația glucozei', 'este insolubil în apă']::text[],
   'B',
@@ -103,7 +103,7 @@ insert into questions (id, chapter_id, tip, status, text, enunturi, correct, exp
   null,
   ''
 ) on conflict (id) do update set
-  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
+  chapter_id = excluded.chapter_id, tip = excluded.tip, tip_id = excluded.tip_id, text = excluded.text,
   enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
   sursa = excluded.sursa, an = excluded.an, colectie = excluded.colectie;
 
@@ -118,8 +118,8 @@ insert into question_options (question_id, key, text, why) values ('chim-alcooli
 insert into question_options (question_id, key, text, why) values ('chim-alcooli-01', 'E', 'toate', 'Nu toate: 2 și 4 sunt false.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
-  'bio-endocrin-01', 'bio-endocrin', 'simplu', 'publicata',
+insert into questions (id, chapter_id, tip, tip_id, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
+  'bio-endocrin-01', 'bio-endocrin', 'simplu', 'simplu', 'publicata',
   'Insulina este secretată de:',
   null,
   'C',
@@ -129,7 +129,7 @@ insert into questions (id, chapter_id, tip, status, text, enunturi, correct, exp
   null,
   ''
 ) on conflict (id) do update set
-  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
+  chapter_id = excluded.chapter_id, tip = excluded.tip, tip_id = excluded.tip_id, text = excluded.text,
   enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
   sursa = excluded.sursa, an = excluded.an, colectie = excluded.colectie;
 
@@ -144,8 +144,8 @@ insert into question_options (question_id, key, text, why) values ('bio-endocrin
 insert into question_options (question_id, key, text, why) values ('bio-endocrin-01', 'E', 'adenohipofiză', 'Celulele delta secretă somatostatină, care inhibă atât insulina, cât și glucagonul.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
-  'bio-sange-01', 'bio-sange', 'grupat', 'publicata',
+insert into questions (id, chapter_id, tip, tip_id, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
+  'bio-sange-01', 'bio-sange', 'grupat', 'grupat', 'publicata',
   'Despre hematiile adultului sunt adevărate afirmațiile:',
   array['sunt celule anucleate', 'conțin hemoglobină', 'au o durată de viață de aproximativ 120 de zile', 'asigură apărarea specifică a organismului']::text[],
   'A',
@@ -155,7 +155,7 @@ insert into questions (id, chapter_id, tip, status, text, enunturi, correct, exp
   null,
   ''
 ) on conflict (id) do update set
-  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
+  chapter_id = excluded.chapter_id, tip = excluded.tip, tip_id = excluded.tip_id, text = excluded.text,
   enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
   sursa = excluded.sursa, an = excluded.an, colectie = excluded.colectie;
 
@@ -170,8 +170,8 @@ insert into question_options (question_id, key, text, why) values ('bio-sange-01
 insert into question_options (question_id, key, text, why) values ('bio-sange-01', 'E', 'toate', 'Nu toate: apărarea specifică revine limfocitelor.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
-  'bio-osos-01', 'bio-osos', 'simplu', 'publicata',
+insert into questions (id, chapter_id, tip, tip_id, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
+  'bio-osos-01', 'bio-osos', 'simplu', 'simplu', 'publicata',
   'Numărul vertebrelor din regiunea toracală a coloanei vertebrale este:',
   null,
   'B',
@@ -181,7 +181,7 @@ insert into questions (id, chapter_id, tip, status, text, enunturi, correct, exp
   null,
   ''
 ) on conflict (id) do update set
-  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
+  chapter_id = excluded.chapter_id, tip = excluded.tip, tip_id = excluded.tip_id, text = excluded.text,
   enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
   sursa = excluded.sursa, an = excluded.an, colectie = excluded.colectie;
 
@@ -196,8 +196,8 @@ insert into question_options (question_id, key, text, why) values ('bio-osos-01'
 insert into question_options (question_id, key, text, why) values ('bio-osos-01', 'E', '33–34', '33–34 este numărul total al vertebrelor din întreaga coloană.')
   on conflict (question_id, key) do update set text = excluded.text, why = excluded.why;
 
-insert into questions (id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
-  'chim-arene-01', 'chim-arene', 'simplu', 'publicata',
+insert into questions (id, chapter_id, tip, tip_id, status, text, enunturi, correct, expl, src, sursa, an, colectie) values (
+  'chim-arene-01', 'chim-arene', 'simplu', 'simplu', 'publicata',
   'Formula moleculară a benzenului este:',
   null,
   'C',
@@ -207,7 +207,7 @@ insert into questions (id, chapter_id, tip, status, text, enunturi, correct, exp
   null,
   ''
 ) on conflict (id) do update set
-  chapter_id = excluded.chapter_id, tip = excluded.tip, text = excluded.text,
+  chapter_id = excluded.chapter_id, tip = excluded.tip, tip_id = excluded.tip_id, text = excluded.text,
   enunturi = excluded.enunturi, correct = excluded.correct, expl = excluded.expl, src = excluded.src,
   sursa = excluded.sursa, an = excluded.an, colectie = excluded.colectie;
 

@@ -3,6 +3,7 @@ import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
 import type { AttemptRow } from '../lib/progres';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
+import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
 import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute } from '../lib/router';
 import { AppContext, type AppValue, type Theme } from './appContextValue';
@@ -27,11 +28,13 @@ export function AppProvider({
   questions,
   attempts = [],
   taxonomie = TAXONOMIE_GOALA,
+  tipuri = TIPURI_GOALE,
   children,
 }: {
   questions: Question[];
   attempts?: readonly AttemptRow[];
   taxonomie?: Taxonomie;
+  tipuri?: TipuriGrile;
   children: ReactNode;
 }) {
   const [screen, go] = useHashRoute();
@@ -66,11 +69,12 @@ export function AppProvider({
       setMaterie,
       questions,
       taxonomie,
+      tipuri,
       session,
       recapitulare,
       sim,
     }),
-    [go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, toggleTheme],
+    [go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, tipuri, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

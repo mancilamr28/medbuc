@@ -1,7 +1,8 @@
-import { OPTION_KEYS, esteSursa, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, esteSursa, type OptionKey, type QuestionSursa } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 import { catreSalvare, ciornaGoala, opturiGoale, valideaza, type Ciorna } from './adminCiorna';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
+import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
 import type { ChapterId } from '../data/chapters';
 
 /**
@@ -114,6 +115,7 @@ function citesteVariante(brut: unknown): { triple: [string, string, string][]; p
 function catreCiorna(
   brut: Record<string, unknown>,
   implicite: LotImplicit,
+  tipuri: TipuriGrile,
 ): { ciorna: Ciorna; probleme: string[] } {
   const probleme: string[] = [];
   const ciorna = ciornaGoala(sir(brut['capId']) as ChapterId);
@@ -135,10 +137,16 @@ function catreCiorna(
   }
   ciorna.an = typeof brut['an'] === 'number' ? String(brut['an']) : sir(brut['an']);
 
+  // Tipurile se citesc din bază, deci lista lor nu mai poate fi scrisă aici.
   const tip = sir(brut['tip']);
-  if (tip === '') probleme.push('Grila nu spune ce tip e („simplu" sau „grupat").');
-  else if (tip !== 'simplu' && tip !== 'grupat') probleme.push(`Tip necunoscut: ${tip}.`);
-  else ciorna.tip = tip as QuestionType;
+  const cunoscute = tipuri.lista.map((t) => t.id);
+  if (tip === '') {
+    probleme.push(`Grila nu spune ce tip e (${cunoscute.map((t) => `„${t}"`).join(' sau ') || 'niciun tip încărcat'}).`);
+  } else if (cunoscute.length > 0 && !cunoscute.includes(tip)) {
+    probleme.push(`Tip necunoscut: ${tip}.`);
+  } else {
+    ciorna.tip = tip;
+  }
 
   const enunturi = brut['enunturi'];
   if (Array.isArray(enunturi)) ciorna.enunturi = [0, 1, 2, 3].map((i) => sir(enunturi[i]));
@@ -185,6 +193,7 @@ export function citesteImport(
   implicite: LotImplicit,
   existente: readonly { id: string }[],
   taxonomie: Taxonomie = TAXONOMIE_GOALA,
+  tipuri: TipuriGrile = TIPURI_GOALE,
 ): RezultatCitire {
   if (brut.trim() === '') return { eroare: null, randuri: [] };
 
@@ -209,14 +218,14 @@ export function citesteImport(
       return { pozitie, id: '', grila: null, probleme: ['Rândul nu e o grilă.'], suprascrie: false };
     }
 
-    const { ciorna, probleme } = catreCiorna(el, implicite);
-    probleme.push(...valideaza(ciorna, taxonomie));
+    const { ciorna, probleme } = catreCiorna(el, implicite, tipuri);
+    probleme.push(...valideaza(ciorna, taxonomie, tipuri));
     if (ciorna.id !== '') deCateOri.set(ciorna.id, (deCateOri.get(ciorna.id) ?? 0) + 1);
 
     return {
       pozitie,
       id: ciorna.id,
-      grila: probleme.length === 0 ? catreSalvare(ciorna, stareaRandului(el, implicite.status)) : null,
+      grila: probleme.length === 0 ? catreSalvare(ciorna, stareaRandului(el, implicite.status), tipuri) : null,
       probleme,
       suprascrie: idExistent.has(ciorna.id),
     };

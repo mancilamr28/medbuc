@@ -12,7 +12,7 @@ import { EmptyState } from '../components/EmptyState';
 import { Icon } from '../components/Icon';
 import { PoartaContinut } from '../components/PoartaContinut';
 import { Progress } from '../components/Progress';
-import { OPTION_KEYS, questionCap, questionMaterie, tipLabel, type OptionKey } from '../data/questions';
+import { OPTION_KEYS, questionCap, questionMaterie, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow } from '../lib/hooks';
 import { INTERVALE_RECAPITULARE_ZILE, urmatoareaScadenta } from '../lib/recapitulare';
 import { numar } from '../lib/text';
@@ -231,7 +231,7 @@ function ListaRecapitulare() {
 }
 
 function RulareRecapitulare() {
-  const { go, recapitulare } = useApp();
+  const { go, recapitulare, tipuri } = useApp();
   const now = useNow();
   const { question, qi, total, answer, isRevealed, isCorrect, pick, primary } = recapitulare;
   const ultima = qi === total - 1;
@@ -299,7 +299,7 @@ function RulareRecapitulare() {
 
         <div className="card" style={{ padding: 26 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ ...eyebrow('var(--brand)'), background: 'var(--brandS)', borderRadius: 6, padding: '6px 9px' }}>{tipLabel(question.tip)}</span>
+            <span style={{ ...eyebrow('var(--brand)'), background: 'var(--brandS)', borderRadius: 6, padding: '6px 9px' }}>{tipuri.eticheta(question.tip)}</span>
             <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>{questionMaterie(question)} · {questionCap(question)}</span>
           </div>
           <p style={{ margin: '18px 0 0', font: `400 21px/1.45 ${SERIF}`, textWrap: 'pretty' }}>{question.text}</p>
@@ -310,7 +310,7 @@ function RulareRecapitulare() {
               ))}
             </div>
           )}
-          <AnswerOptions question={question} answer={answer} revealed={isRevealed} onPick={recapitulare.pick} />
+          <AnswerOptions question={question} tip={tipuri.tip(question.tip)} answer={answer} revealed={isRevealed} onPick={recapitulare.pick} />
           {isRevealed && (
             <div style={{ marginTop: 18, padding: 18, borderRadius: 12, border: `1px solid ${isCorrect ? 'var(--ok)' : 'var(--bad)'}`, background: isCorrect ? 'var(--okS)' : 'var(--badS)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

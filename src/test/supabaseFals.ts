@@ -27,7 +27,9 @@ export const supabase = {
         single: async () => ({ data: null, error: null }),
         maybeSingle: async () => ({ data: null, error: null }),
       }),
-      order: async () => ({ data: [], error: null }),
+      order: () => ({
+        range: async () => ({ data: [], error: null, count: 0 }),
+      }),
     }),
   }),
   rpc: async () => ({ error: null }),

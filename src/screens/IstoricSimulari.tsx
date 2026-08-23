@@ -115,7 +115,7 @@ export function LucrareRedeschisa({
   lucrare: LucrareIstoric;
   onInchide: () => void;
 }) {
-  const { questions } = useApp();
+  const { questions, tipuri } = useApp();
   const [grile, setGrile] = useState<GrilaRecitita[] | null>(null);
   const [eroare, setEroare] = useState(false);
   const [incercare, setIncercare] = useState(0);
@@ -228,7 +228,7 @@ export function LucrareRedeschisa({
             />
           </div>
         ) : (
-          <RecitireGrile grile={grile} />
+          <RecitireGrile grile={grile} tipuri={tipuri} />
         )}
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { Segmented } from '../components/Segmented';
 import { chapterLabel, type ChapterId } from '../data/chapters';
-import { OPTION_KEYS, SURSE, tipLabel, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, SURSE, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import { salveazaGrila, stergeGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
 import { useIsDesktop } from '../lib/hooks';
 import { numar } from '../lib/text';
@@ -72,7 +72,7 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
  */
 function AdminPanel() {
-  const { grile, taxonomie, loading, error, reload } = useContent();
+  const { grile, taxonomie, tipuri, loading, error, reload } = useContent();
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
@@ -85,7 +85,7 @@ function AdminPanel() {
   const [deSters, setDeSters] = useState<string | null>(null);
   const [aratatProbleme, setAratatProbleme] = useState(false);
 
-  const probleme = valideaza(ciorna, taxonomie);
+  const probleme = valideaza(ciorna, taxonomie, tipuri);
   const scrise = variantScrise(ciorna);
 
   const lista = useMemo(() => {
@@ -134,7 +134,7 @@ function AdminPanel() {
 
     setSeSalveaza(true);
     try {
-      await salveazaGrila(catreSalvare(ciorna, status));
+      await salveazaGrila(catreSalvare(ciorna, status, tipuri));
       await reload();
       notify('succes', status === 'publicata' ? 'Grila e publicată.' : 'Ciorna a fost salvată.');
       reseteaza();
@@ -154,7 +154,7 @@ function AdminPanel() {
    */
   const schimbaStarea = async (g: GrilaCuStare, status: QuestionStatus) => {
     try {
-      await salveazaGrila(catreSalvare(dinGrila(g), status));
+      await salveazaGrila(catreSalvare(dinGrila(g), status, tipuri));
       await reload();
       notify('info', status === 'retrasa' ? 'Grila a fost retrasă din fața elevilor.' : 'Grila e publicată.');
     } catch (e: unknown) {
@@ -204,7 +204,7 @@ function AdminPanel() {
 
       <div style={twoCol(isDesktop)}>
         {mod === 'import' ? (
-          <ImportGrile grile={grile} taxonomie={taxonomie} reload={reload} />
+          <ImportGrile grile={grile} taxonomie={taxonomie} tipuri={tipuri} reload={reload} />
         ) : (
         <div className="card" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
@@ -255,9 +255,9 @@ function AdminPanel() {
                 onChange={(e) => camp('tip', e.target.value as QuestionType)}
                 style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
               >
-                {(['simplu', 'grupat'] as QuestionType[]).map((t) => (
-                  <option key={t} value={t}>
-                    {tipLabel(t)}
+                {tipuri.lista.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nume}
                   </option>
                 ))}
               </select>
@@ -299,7 +299,7 @@ function AdminPanel() {
             />
           </label>
 
-          {ciorna.tip === 'grupat' && (
+          {tipuri.tip(ciorna.tip)?.cereEnunturi && (
             <div style={{ marginTop: 18 }}>
               <span style={label}>Cele patru afirmații</span>
               <div style={{ display: 'grid', gap: 8 }}>
