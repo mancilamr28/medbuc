@@ -15,6 +15,8 @@ import {
 } from '../lib/continut';
 import { PE_PAGINA, useBibliotecaAdmin } from './adminBiblioteca';
 import { AcoperireCapitole } from './AcoperireCapitole';
+import { AdminColectii } from './AdminColectii';
+import { AdminTaxonomie } from './AdminTaxonomie';
 import { useSectiuneAdmin } from '../lib/router';
 import { useIsDesktop } from '../lib/hooks';
 import { reportError } from '../lib/sentry';
@@ -85,7 +87,7 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
  */
 function AdminPanel() {
-  const { grile, taxonomie, tipuri, colectii, reload } = useContent();
+  const { grile, taxonomie, tipuri, colectii, reload, reloadStructura } = useContent();
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
@@ -234,8 +236,10 @@ function AdminPanel() {
             { id: 'grile' as const, label: 'O grilă' },
             { id: 'import' as const, label: 'Import în masă' },
             { id: 'acoperire' as const, label: 'Acoperire' },
+            { id: 'taxonomie' as const, label: 'Materii' },
+            { id: 'colectii' as const, label: 'Colecții' },
           ]}
-          value={sectiune === 'taxonomie' || sectiune === 'colectii' ? 'grile' : sectiune}
+          value={sectiune}
           onChange={mergiLa}
           ariaLabel="Ce faci în administrare"
         />
@@ -245,6 +249,10 @@ function AdminPanel() {
           lângă ea lista de grile n-ar avea ce adăuga. */}
       {sectiune === 'acoperire' ? (
         <AcoperireCapitole taxonomie={taxonomie} />
+      ) : sectiune === 'taxonomie' ? (
+        <AdminTaxonomie taxonomie={taxonomie} dupaSalvare={() => void reloadStructura()} />
+      ) : sectiune === 'colectii' ? (
+        <AdminColectii colectii={colectii} dupaSalvare={() => void reloadStructura()} />
       ) : (
       <div style={twoCol(isDesktop)}>
         {sectiune === 'import' ? (

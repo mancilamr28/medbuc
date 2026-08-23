@@ -1,0 +1,264 @@
+import { useState } from 'react';
+import { salveazaColectie } from '../lib/continut';
+import type { Colectie, Colectii } from '../lib/colectii';
+import { reportError } from '../lib/sentry';
+import { SANS, autoGrid, eyebrow, label, pageLead, statusChip } from '../lib/ui';
+import { useToast } from '../state/toastState';
+
+/**
+ * Colecțiile — loturile din care vin grilele.
+ *
+ * Erau text liber pe fiecare grilă până la migrarea 0011, deci nu se puteau
+ * renumi, filtra sau descrie. Ecranul ăsta e capătul acelei mutări: aici se
+ * scriu lucrările de admitere, simulările oficiale și culegerile.
+ *
+ * `sursaBibliografica` nu e decor. Vânzarea accesului la culegeri digitizate e
+ * un risc de drepturi de autor, iar subiectele oficiale sunt teren mult mai
+ * sigur — câmpul ăsta e locul unde diferența se înregistrează, înainte să fie
+ * nevoie de ea.
+ */
+const FELURI: { id: string; eticheta: string }[] = [
+  { id: 'subiect_oficial', eticheta: 'Subiect oficial' },
+  { id: 'simulare_oficiala', eticheta: 'Simulare oficială' },
+  { id: 'culegere', eticheta: 'Culegere' },
+  { id: 'autor', eticheta: 'Scrisă de noi' },
+];
+
+const etichetaFelului = (id: string) => FELURI.find((f) => f.id === id)?.eticheta ?? id;
+
+export function AdminColectii({
+  colectii,
+  dupaSalvare,
+}: {
+  colectii: Colectii;
+  dupaSalvare: () => void;
+}) {
+  const { notify } = useToast();
+  const [inLucru, setInLucru] = useState(false);
+
+  const salveaza = async (c: Parameters<typeof salveazaColectie>[0], reusit: string) => {
+    if (inLucru) return;
+    setInLucru(true);
+    try {
+      await salveazaColectie(c);
+      dupaSalvare();
+      notify('succes', reusit);
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Nu am putut salva colecția.');
+      reportError(e, 'Administrare: colecții');
+    } finally {
+      setInLucru(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 18 }}>
+      <p style={pageLead}>
+        Loturile din care vin grilele: lucrări de admitere, simulări oficiale, culegeri. O colecție
+        depublicată nu mai apare la alegere, dar grilele ei rămân.
+      </p>
+
+      <FormularColectie
+        inLucru={inLucru}
+        onSalveaza={(c) => void salveaza(c, 'Colecția a fost creată.')}
+      />
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        {colectii.lista.length === 0 ? (
+          <div style={{ padding: 20, font: `400 13px ${SANS}`, color: 'var(--fg3)' }}>
+            Nicio colecție încă. Prima scrisă mai sus apare aici.
+          </div>
+        ) : (
+          colectii.lista.map((c) => (
+            <RandColectie
+              key={c.id}
+              colectie={c}
+              inLucru={inLucru}
+              onSalveaza={(x) => void salveaza(x, 'Colecția a fost salvată.')}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FormularColectie({
+  inLucru,
+  onSalveaza,
+}: {
+  inLucru: boolean;
+  onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => void;
+}) {
+  const gol = { id: '', nume: '', tip: 'subiect_oficial', an: '', sursa: '' };
+  const [c, setC] = useState(gol);
+
+  const poate = c.id.trim() !== '' && c.nume.trim() !== '';
+  const eCulegere = c.tip === 'culegere';
+
+  return (
+    <div className="card" style={{ padding: 18 }}>
+      <div style={eyebrow(undefined, 11)}>Colecție nouă</div>
+
+      <div style={{ marginTop: 12, ...autoGrid(170, 12) }}>
+        <label style={{ display: 'block' }}>
+          <span style={label}>Identificator</span>
+          <input
+            className="field"
+            value={c.id}
+            onChange={(e) => setC((p) => ({ ...p, id: e.target.value }))}
+            placeholder="umfcd-2027-mg"
+            style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
+          />
+        </label>
+        <label style={{ display: 'block' }}>
+          <span style={label}>Nume</span>
+          <input
+            className="field"
+            value={c.nume}
+            onChange={(e) => setC((p) => ({ ...p, nume: e.target.value }))}
+            placeholder="Admitere UMFCD · Medicină · 2027"
+            style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
+          />
+        </label>
+        <label style={{ display: 'block' }}>
+          <span style={label}>Fel</span>
+          <select
+            className="field"
+            value={c.tip}
+            onChange={(e) => setC((p) => ({ ...p, tip: e.target.value }))}
+            style={{ padding: '9px 11px', font: `400 13px ${SANS}`, cursor: 'pointer' }}
+          >
+            {FELURI.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.eticheta}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: 'block' }}>
+          <span style={label}>Anul</span>
+          <input
+            className="field"
+            value={c.an}
+            onChange={(e) => setC((p) => ({ ...p, an: e.target.value }))}
+            placeholder="2027"
+            inputMode="numeric"
+            style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
+          />
+        </label>
+      </div>
+
+      <label style={{ display: 'block', marginTop: 12 }}>
+        <span style={label}>Sursa bibliografică</span>
+        <input
+          className="field"
+          value={c.sursa}
+          onChange={(e) => setC((p) => ({ ...p, sursa: e.target.value }))}
+          placeholder="Corint, ediția 2024"
+          aria-label="Sursa bibliografică"
+          style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
+        />
+        <span style={{ display: 'block', marginTop: 6, font: `400 11.5px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
+          Cartea și ediția, pentru colecțiile digitizate. E singura evidență a provenienței, iar
+          întrebarea de drepturi vine înaintea oricărei plăți.
+        </span>
+      </label>
+
+      <button
+        type="button"
+        className="btn-primary"
+        disabled={!poate || inLucru}
+        onClick={() => {
+          onSalveaza({
+            id: c.id.trim(),
+            nume: c.nume.trim(),
+            tip: c.tip,
+            // O culegere nu ține de un centru de admitere; o lucrare, da.
+            centruId: eCulegere ? null : 'umfcd',
+            an: c.an.trim() === '' ? null : Number(c.an.trim()),
+            sursaBibliografica: c.sursa.trim(),
+          });
+          setC(gol);
+        }}
+        style={{ marginTop: 14, padding: '9px 15px', font: `600 13px ${SANS}`, opacity: poate ? 1 : 0.5 }}
+      >
+        Adaugă colecția
+      </button>
+    </div>
+  );
+}
+
+function RandColectie({
+  colectie,
+  inLucru,
+  onSalveaza,
+}: {
+  colectie: Colectie;
+  inLucru: boolean;
+  onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => void;
+}) {
+  const [nume, setNume] = useState(colectie.nume);
+  const [editez, setEditez] = useState(false);
+
+  return (
+    <div
+      className="list-row"
+      style={{
+        padding: '11px 18px',
+        borderBottom: '1px solid var(--line)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+      }}
+    >
+      {editez ? (
+        <input
+          className="field"
+          value={nume}
+          onChange={(e) => setNume(e.target.value)}
+          aria-label={`Numele colecției ${colectie.id}`}
+          style={{ flex: 1, minWidth: 160, padding: '7px 10px', font: `400 13px ${SANS}` }}
+        />
+      ) : (
+        <span style={{ flex: 1, minWidth: 0, font: `400 13px ${SANS}` }} className="truncate">
+          {colectie.nume}
+        </span>
+      )}
+
+      <span style={statusChip('var(--surf3)', 'var(--fg3)')}>{etichetaFelului(colectie.tip)}</span>
+      {colectie.an !== null && (
+        <span className="tabular" style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+          {colectie.an}
+        </span>
+      )}
+
+      {editez ? (
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={inLucru || nume.trim() === ''}
+          onClick={() => {
+            // Doar numele. Anul, cartea, centrul și poziția rămân ce erau —
+            // formularul ăsta nu le arată, deci n-are ce să spună despre ele.
+            onSalveaza({ id: colectie.id, nume: nume.trim(), tip: colectie.tip });
+            setEditez(false);
+          }}
+          style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
+        >
+          Salvează
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-quiet"
+          onClick={() => setEditez(true)}
+          style={{ font: `500 12px ${SANS}` }}
+        >
+          Redenumește
+        </button>
+      )}
+    </div>
+  );
+}

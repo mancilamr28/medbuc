@@ -77,24 +77,34 @@ export function ContentProvider({ children }: { children: ReactNode }) {
    * oprește nimic: fiecare funcție din `Taxonomie` cade înapoi pe id-ul brut,
    * deci ecranul arată id-uri în loc de titluri — vizibil, nu stricat.
    */
-  // Colecțiile sunt vizibile doar cu sesiune: politica lor e dată lui
-  // `authenticated`, spre deosebire de taxonomie, pe care o citește și pagina
-  // publică. Se cer odată cu biblioteca.
-  useEffect(() => {
-    if (!user) {
-      setColectii(COLECTII_GOALE);
-      return;
-    }
-    let anulat = false;
-    void incarcaColectii()
-      .then((c) => {
-        if (!anulat) setColectii(c);
-      })
-      .catch((e: unknown) => console.warn('[medbuc] Încărcarea colecțiilor a eșuat.', e));
-    return () => {
-      anulat = true;
-    };
+  /**
+   * Structura: taxonomia (publică) și colecțiile (doar cu sesiune).
+   *
+   * Într-o singură funcție fiindcă ecranele de administrare le schimbă împreună
+   * și au nevoie să le reciteasca împreună. O eroare nu oprește nimic: fiecare
+   * căutare cade înapoi pe id-ul brut, deci ecranul arată id-uri în loc de
+   * titluri — vizibil, nu stricat.
+   */
+  const incarcaStructura = useCallback(async () => {
+    const [t, c] = await Promise.all([
+      incarcaTaxonomie().catch((e: unknown) => {
+        console.warn('[medbuc] Încărcarea taxonomiei a eșuat.', e);
+        return null;
+      }),
+      user
+        ? incarcaColectii().catch((e: unknown) => {
+            console.warn('[medbuc] Încărcarea colecțiilor a eșuat.', e);
+            return null;
+          })
+        : Promise.resolve(COLECTII_GOALE),
+    ]);
+    if (t) setTaxonomie(t);
+    if (c) setColectii(c);
   }, [user]);
+
+  useEffect(() => {
+    void incarcaStructura();
+  }, [incarcaStructura]);
 
   useEffect(() => {
     let anulat = false;
@@ -103,18 +113,6 @@ export function ContentProvider({ children }: { children: ReactNode }) {
         if (!anulat) setTipuri(t);
       })
       .catch((e: unknown) => console.warn('[medbuc] Încărcarea tipurilor a eșuat.', e));
-    return () => {
-      anulat = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let anulat = false;
-    void incarcaTaxonomie()
-      .then((t) => {
-        if (!anulat) setTaxonomie(t);
-      })
-      .catch((e: unknown) => console.warn('[medbuc] Încărcarea taxonomiei a eșuat.', e));
     return () => {
       anulat = true;
     };
@@ -136,8 +134,9 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       reload: incarca,
+      reloadStructura: incarcaStructura,
     }),
-    [grile, taxonomie, tipuri, colectii, loading, error, incarca],
+    [grile, taxonomie, tipuri, colectii, loading, error, incarca, incarcaStructura],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

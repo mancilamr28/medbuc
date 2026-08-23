@@ -22,6 +22,15 @@ export interface ContentValue {
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
+  /**
+   * Reîncarcă taxonomia și colecțiile.
+   *
+   * Separat de `reload`, care aduce biblioteca de grile: ecranele de
+   * administrare a materiilor și colecțiilor schimbă structura, nu conținutul,
+   * iar o reîncărcare a celor 181 de grile după fiecare redenumire ar fi muncă
+   * degeaba.
+   */
+  reloadStructura: () => Promise<void>;
 }
 
 export const ContentContext = createContext<ContentValue | null>(null);

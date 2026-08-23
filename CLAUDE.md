@@ -215,6 +215,22 @@ A `capId` with no row in the database still renders its raw id rather than vanis
 
 The bank flows in as a **parameter, not an import**: `AppProvider` takes `questions` as a prop and passes it to `useSession`/`useSimulare`, which is what keeps `AppState.test.tsx` able to mount the provider alone with no network. `numaraGrile()` in `continut.ts` replaces the old module-level count maps, since a bank that changes at runtime cannot be counted once at import time.
 
+### Administrarea, la scară
+
+Administrarea are acum secțiuni, citite din **al doilea segment de hash** (`#/admin/colectii`). Secțiunile nu intră în `SCREENS`: nu sunt ecrane ale aplicației, nu apar în `Sidebar` sau `MobileNav`, iar `go()` n-are ce face cu ele. Ecranul se citește din primul segment — altfel `admin/colectii` n-ar fi niciun `Screen` și ar cădea tăcut pe `acasa`.
+
+**Lista de grile se interoghează pe server**, nu se filtrează în client: căutare, stare, capitol, colecție, tip, plus paginare și contoare cu `head: true`. Fără RPC nou — PostgREST le face pe toate, iar `questions_citire` distinge deja elevul de administrator, deci o funcție `security definer` ar fi trebuit să reimplementeze regula aia singură.
+
+**Tiparul de căutare are două scăpări suprapuse** (`pentruIlike`), și amândouă sunt necesare: `%`/`_` sunt metacaractere `ilike` — o căutare după „50%" ar întoarce toată biblioteca — iar valoarea se pune între ghilimele fiindcă într-un `or=(...)` **virgula desparte termenii**, deci „1, 2, 3" (chiar textul variantelor unui complement grupat) primea 400.
+
+**Scrierile de structură trec prin RPC** (`salveaza_materie`, `salveaza_capitol`, `salveaza_colectie`), deși politicile ar permite scrierea directă. Motivul e că **id-ul e identitate**: `chapter_id` e scris în `questions`, în `sessions.chapter_ids` și în cheia notițelor, deci un capitol cu grile nu se mai poate muta în altă materie — regula stă lângă date, nu în formular.
+
+**Nu există ștergere de taxonomie sau colecții**, deliberat: depublicarea scoate din fața elevului fără să atingă nimic din ce s-a scris, exact ca retragerea unei grile față de ștergerea ei.
+
+**În `salveaza_materie`/`salveaza_capitol`/`salveaza_colectie`, o cheie absentă înseamnă „las-o cum e".** Prima versiune făcea `coalesce(payload ->> 'x', <implicit>)`, adică absent = pune implicitul — pe dos față de ce spune un formular de redenumire, care trimite doar ce a schimbat omul. `Materie`, `Chapter` și `Colectie` consumă `position` la sortare și n-o mai poartă pe obiect, deci formularul chiar **nu are** ce trimite: rezultatul era că orice corectare de titlu muta rândul în capul listei (toate trei se citesc `order by position`), iar redenumirea unei colecții îi ștergea anul și cartea. Poziția unui rând nou se calculează în bază (`max + 1`), nu se numără în client — `lista.length` greșește de îndată ce pozițiile au goluri. `an`, `centruId` și `sursaBibliografica` se citesc cu `jsonb_exists`, fiindcă pentru ele un `null` trimis explicit chiar înseamnă ceva, iar `coalesce` nu poate distinge asta de o cheie lipsă.
+
+`acoperire_capitole` e `security invoker` — RLS decide ce se numără, deci un elev n-ar vedea ciornele nici ca cifră. Operațiile în masă (`schimba_starea_grilelor`, `atribuie_colectia`) sunt `security definer` fiindcă poarta e rolul, deci intră în allowlist-ul din `rls.test.ts`.
+
 ### Writing content — the form and the batch
 
 Admin has two modes over the same library, both reaching the database through the one `salveaza_grila` RPC: the single-question form (`Admin.tsx`, state in `adminCiorna.ts`) and the bulk JSON import (`ImportGrile.tsx`, logic in `importLot.ts`). The paired naming is the convention — PascalCase `.tsx` for the component, camelCase `.ts` for the pure logic beside it. Keep the two names more than a capital letter apart: `ImportGrile.tsx` next to an `importGrile.ts` is a hard `tsc` error on Windows ("differs only in casing"), not a style question.

@@ -455,3 +455,59 @@ export async function atribuieColectia(
   if (error) throw new Error(error.message);
   return (data as number | null) ?? 0;
 }
+
+// ---------------------------------------------------------------------------
+// Scrierea taxonomiei și a colecțiilor.
+//
+// Prin RPC, ca `salveaza_grila`, deși politicile ar permite scrierea directă:
+// regulile care nu au voie să depindă de client stau lângă date. Cea mai
+// importantă e că **id-ul e identitate** — `chapter_id` e scris în `questions`,
+// în `sessions.chapter_ids` și în cheia notițelor.
+//
+// Nu există ștergere, deliberat: un capitol depublicat iese din fața elevului
+// fără să atingă nimic din ce s-a scris deja, exact ca retragerea unei grile.
+// ---------------------------------------------------------------------------
+
+// Câmpurile opționale de mai jos nu sunt o comoditate, sunt contractul:
+// `cheamaRpc` trimite obiectul ca JSON, deci un `undefined` dispare din payload
+// — iar o cheie absentă îi spune funcției din bază „las-o cum e". Exact ce vrea
+// să spună un formular de redenumire, care nu cunoaște poziția (n-o poartă nici
+// `Materie`, nici `Chapter`, nici `Colectie`) și n-are treabă cu publicarea. Un
+// `null` trimis explicit rămâne o ștergere de valoare.
+export interface MaterieDeSalvat {
+  id: string;
+  nume: string;
+  centruId?: string;
+  position?: number;
+  publicat?: boolean;
+}
+
+export interface CapitolDeSalvat {
+  id: string;
+  materieId: string;
+  nr?: string;
+  nume: string;
+  position?: number;
+  publicat?: boolean;
+}
+
+export interface ColectieDeSalvat {
+  id: string;
+  nume: string;
+  tip: string;
+  centruId?: string | null;
+  an?: number | null;
+  sursaBibliografica?: string;
+  position?: number;
+  publicat?: boolean;
+}
+
+const cheamaRpc = async (nume: string, payload: unknown): Promise<void> => {
+  const { supabase } = await import('./supabase');
+  const { error } = await supabase.rpc(nume, { payload });
+  if (error) throw new Error(error.message);
+};
+
+export const salveazaMaterie = (m: MaterieDeSalvat) => cheamaRpc('salveaza_materie', m);
+export const salveazaCapitol = (c: CapitolDeSalvat) => cheamaRpc('salveaza_capitol', c);
+export const salveazaColectie = (c: ColectieDeSalvat) => cheamaRpc('salveaza_colectie', c);

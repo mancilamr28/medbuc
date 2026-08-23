@@ -178,7 +178,10 @@ describe('funcțiile', () => {
    */
   const RPC_INTENTIONAT = [
     'atribuie_colectia',
+    'salveaza_capitol',
+    'salveaza_colectie',
     'salveaza_grila',
+    'salveaza_materie',
     'schimba_starea_grilelor',
     'sterge_contul',
     'sterge_grila',
@@ -915,5 +918,182 @@ describe('operațiile în masă', () => {
         baza.db.query("select public.atribuie_colectia(array['bio-nervos-01'], 'lot-inventat')"),
       ),
     ).rejects.toThrow(/Colecția nu există/i);
+  });
+});
+
+/**
+ * Scrierea taxonomiei și a colecțiilor.
+ *
+ * Politicile permit deja unui administrator să scrie direct în tabele; funcțiile
+ * există pentru regulile care nu au voie să depindă de client. Cea mai
+ * importantă: **id-ul e identitate**, scris în `questions`, în
+ * `sessions.chapter_ids` și în cheia notițelor. Ce apără testele de aici e
+ * tocmai ce n-ar fi apărat un formular.
+ */
+describe('scrierea taxonomiei', () => {
+  it('creează și redenumește o materie, dar nu de către un elev', async () => {
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(`select public.salveaza_materie('{"id":"fiz","nume":"Fizică"}'::jsonb)`),
+      ),
+    ).rejects.toThrow(/administrator/i);
+
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(`select public.salveaza_materie('{"id":"fiz","nume":"Fizică"}'::jsonb)`),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(`select public.salveaza_materie('{"id":"fiz","nume":"Fizică — probă"}'::jsonb)`),
+    );
+
+    const r = await baza.db.query<{ name: string; centru_id: string }>(
+      "select name, centru_id from materii where id = 'fiz'",
+    );
+    expect(r.rows[0]).toMatchObject({ name: 'Fizică — probă', centru_id: 'umfcd' });
+  });
+
+  it('refuză un identificator care nu e un slug', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(`select public.salveaza_materie('{"id":"Fizica Generala","nume":"x"}'::jsonb)`),
+      ),
+    ).rejects.toThrow(/litere mici/i);
+  });
+
+  /**
+   * Numele unui capitol se poate corecta oricând. Apartenența la materie, nu:
+   * mutarea unui capitol cu grile ar rescrie retroactiv la ce materie a răspuns
+   * elevul, iar `attempts` e jurnal — nu are cum să fie corectat după.
+   */
+  it('nu mută un capitol cu grile în altă materie, dar îl lasă redenumit', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(`select public.salveaza_materie('{"id":"fiz","nume":"Fizică"}'::jsonb)`),
+    );
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(
+          `select public.salveaza_capitol('{"id":"bio-nervos","materieId":"fiz","nume":"Sistemul nervos"}'::jsonb)`,
+        ),
+      ),
+    ).rejects.toThrow(/nu se mai poate muta/i);
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_capitol('{"id":"bio-nervos","materieId":"bio","nr":"03","nume":"Sistemul nervos (revizuit)"}'::jsonb)`,
+      ),
+    );
+    const r = await baza.db.query<{ name: string }>("select name from chapters where id = 'bio-nervos'");
+    expect(r.rows[0]!.name).toBe('Sistemul nervos (revizuit)');
+  });
+
+  it('refuză un capitol pus într-o materie inexistentă', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(`select public.salveaza_capitol('{"id":"x-1","materieId":"nu-exista","nume":"X"}'::jsonb)`),
+      ),
+    ).rejects.toThrow(/Materia nu există/i);
+  });
+
+  it('scrie o colecție cu felul și anul ei, și refuză un fel necunoscut', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint","tip":"culegere","sursaBibliografica":"Corint, ed. 2024"}'::jsonb)`,
+      ),
+    );
+
+    const r = await baza.db.query<{ tip: string; centru_id: string | null; sursa_bibliografica: string }>(
+      "select tip::text, centru_id, sursa_bibliografica from colectii where id = 'corint-nervos'",
+    );
+    // Culegerea n-are centru: o carte nu ține de un centru de admitere.
+    expect(r.rows[0]).toMatchObject({ tip: 'culegere', centru_id: null, sursa_bibliografica: 'Corint, ed. 2024' });
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(`select public.salveaza_colectie('{"id":"x","nume":"X","tip":"ziar"}'::jsonb)`),
+      ),
+    ).rejects.toThrow(/Fel de colecție necunoscut/i);
+  });
+
+  /**
+   * O redenumire nu e o reordonare.
+   *
+   * Formularul de redenumire nu are de unde ști poziția: `Chapter`, `Materie` și
+   * `Colectie` o consumă la sortare și n-o mai poartă pe obiect. Prima versiune
+   * trimitea `position: 0`, deci orice corectare de titlu muta rândul în capul
+   * listei — materiile, capitolele și colecțiile se citesc toate `order by
+   * position`. Regula stă acum în bază: **o cheie absentă înseamnă „las-o cum
+   * e"**, exact ce vrea să spună un formular de redenumire.
+   */
+  it('păstrează poziția și publicarea când doar se redenumește', async () => {
+    await baza.faAdmin(ana);
+
+    const inainte = await baza.db.query<{ position: number }>(
+      "select position from chapters where id = 'bio-nervos'",
+    );
+    expect(inainte.rows[0]!.position).toBeGreaterThan(0);
+
+    await baza.db.query("update chapters set publicat = false where id = 'bio-nervos'");
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_capitol('{"id":"bio-nervos","materieId":"bio","nr":"03","nume":"Sistemul nervos"}'::jsonb)`,
+      ),
+    );
+
+    const dupa = await baza.db.query<{ position: number; publicat: boolean }>(
+      "select position, publicat from chapters where id = 'bio-nervos'",
+    );
+    expect(dupa.rows[0]!.position).toBe(inainte.rows[0]!.position);
+    expect(dupa.rows[0]!.publicat).toBe(false);
+  });
+
+  /** Un rând nou se pune la coadă, nu peste poziția altuia. */
+  it('pune o materie nouă la coada listei, fără să i se spună poziția', async () => {
+    await baza.faAdmin(ana);
+    const max = await baza.db.query<{ m: number }>('select max(position) as m from materii');
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(`select public.salveaza_materie('{"id":"fiz","nume":"Fizică"}'::jsonb)`),
+    );
+
+    const r = await baza.db.query<{ position: number }>("select position from materii where id = 'fiz'");
+    expect(r.rows[0]!.position).toBe(max.rows[0]!.m + 1);
+  });
+
+  /** La fel pentru colecții: anul și cartea nu se pierd la o redenumire. */
+  it('păstrează anul, cartea și poziția colecției la redenumire', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint","tip":"culegere","an":2024,"sursaBibliografica":"Corint, ed. 2024"}'::jsonb)`,
+      ),
+    );
+    const inainte = await baza.db.query<{ position: number }>(
+      "select position from colectii where id = 'corint-nervos'",
+    );
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint · Biologie","tip":"culegere"}'::jsonb)`,
+      ),
+    );
+
+    const r = await baza.db.query<{
+      nume: string;
+      an: number | null;
+      sursa_bibliografica: string;
+      position: number;
+    }>("select nume, an, sursa_bibliografica, position from colectii where id = 'corint-nervos'");
+    expect(r.rows[0]).toMatchObject({
+      nume: 'Corint · Biologie',
+      an: 2024,
+      sursa_bibliografica: 'Corint, ed. 2024',
+      position: inainte.rows[0]!.position,
+    });
   });
 });
