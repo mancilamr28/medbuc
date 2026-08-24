@@ -219,8 +219,12 @@ describe('funcțiile', () => {
    */
   const RPC_INTENTIONAT = [
     'atribuie_colectia',
+    'citeste_grila_admin',
+    'citeste_test',
     'genereaza_test',
     'numara_candidati',
+    'preda_test',
+    'raspunde',
     'salveaza_capitol',
     'salveaza_colectie',
     'salveaza_grila',
@@ -288,8 +292,10 @@ describe('funcțiile', () => {
       'handle_new_user',
       'ingheata_instantaneul',
       'is_admin',
+      'predata_la',
       'propaga_materia',
       'protect_role',
+      'sursa_pentru',
       'touch_updated_at',
     ]);
     for (const f of r.rows) {
@@ -1735,5 +1741,357 @@ describe('numărătoarea de candidați', () => {
     await expect(
       baza.caVizitator(() => baza.db.query(`select public.numara_candidati('{}'::jsonb)`)),
     ).rejects.toThrow(/permission denied/i);
+  });
+});
+
+/**
+ * Rezolvarea lucrării: citire, răspuns, predare.
+ *
+ * Ce se apără aici e mai ales **ce nu traversează granița**. Azi banca ajunge
+ * întreagă în browser cu tot cu `correct`, iar `is_correct` se calculează acolo
+ * — deci oricine are cheia publicabilă poate insera oricâte răspunsuri corecte
+ * vrea. Testele de mai jos verifică amândouă capetele: că răspunsul corect nu se
+ * trimite înainte de a fi câștigat, și că nota o pune serverul.
+ */
+describe('rezolvarea lucrării', () => {
+  type Citire = {
+    run: { id: string; mod: string; finished_at: string | null; nr_cerut: number; qi: number };
+    grile: {
+      position: number;
+      question_id: string;
+      chosen: string | null;
+      revealed: boolean;
+      text: string | null;
+      optiuni: { key: string; text: string }[] | null;
+      correct?: string;
+      expl?: string;
+      why?: Record<string, string>;
+    }[];
+  };
+
+  const genereaza = async (userId: string, payload: object) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ rezultat: { run_id: string } }>('select public.genereaza_test($1::jsonb) as rezultat', [
+        JSON.stringify(payload),
+      ]),
+    );
+    return r.rows[0]!.rezultat.run_id;
+  };
+
+  const citeste = async (userId: string, runId: string) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ t: Citire }>('select public.citeste_test($1::uuid) as t', [runId]),
+    );
+    return r.rows[0]!.t;
+  };
+
+  const raspunde = async (userId: string, payload: object) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ r: Record<string, unknown> }>('select public.raspunde($1::jsonb) as r', [
+        JSON.stringify(payload),
+      ]),
+    );
+    return r.rows[0]!.r;
+  };
+
+  const preda = async (userId: string, runId: string) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ r: { corecte: number; gresite: number; nr_cerut: number; pct: number; finished_at: string } }>(
+        'select public.preda_test($1::uuid) as r',
+        [runId],
+      ),
+    );
+    return r.rows[0]!.r;
+  };
+
+  /** Răspunsul corect al primei poziții, citit direct din bancă. */
+  const corectaLa = async (runId: string, pozitie: number) => {
+    const r = await baza.db.query<{ correct: string }>(
+      `select q.correct from test_run_items i join questions q on q.id = i.question_id
+       where i.run_id = $1 and i.position = $2`,
+      [runId, pozitie],
+    );
+    return r.rows[0]!.correct;
+  };
+
+  const gresitaLa = async (runId: string, pozitie: number) => {
+    const r = await baza.db.query<{ key: string }>(
+      `select o.key from test_run_items i
+       join questions q on q.id = i.question_id
+       join question_options o on o.question_id = q.id and o.key <> q.correct
+       where i.run_id = $1 and i.position = $2 limit 1`,
+      [runId, pozitie],
+    );
+    return r.rows[0]!.key;
+  };
+
+  it('nu lasă un elev să citească lucrarea altuia', async () => {
+    const alAnei = await genereaza(ana, { mod: 'exersare', nr: 3 });
+
+    await expect(
+      baza.caUtilizator(bogdan, () => baza.db.query('select public.citeste_test($1::uuid)', [alAnei])),
+    ).rejects.toThrow(/lucrare_inexistenta/i);
+
+    await expect(
+      raspunde(bogdan, { run_id: alAnei, pozitie: 0, aleasa: 'A' }),
+    ).rejects.toThrow(/lucrare_inexistenta/i);
+  });
+
+  it('trimite enunțul și variantele, dar nu răspunsul corect', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const t = await citeste(ana, run);
+
+    expect(t.grile).toHaveLength(3);
+    for (const g of t.grile) {
+      expect(g.text).not.toBeNull();
+      expect(g.optiuni!.length).toBeGreaterThan(0);
+      expect(g.correct).toBeUndefined();
+      expect(g.expl).toBeUndefined();
+      expect(g.why).toBeUndefined();
+    }
+  });
+
+  /**
+   * La exersare explicația vine odată cu verificarea, nu înainte. Regula e una
+   * singură — „verificată sau predată" — deci nu are ramuri pe mod care să
+   * diveargă.
+   */
+  it('dă explicația abia după ce grila a fost verificată', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const corecta = await corectaLa(run, 0);
+
+    const r = await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta });
+    expect(r.corect).toBe(true);
+    expect(r.correct).toBe(corecta);
+    expect(r.expl).toBeTruthy();
+
+    const t = await citeste(ana, run);
+    expect(t.grile[0]!.correct).toBe(corecta);
+    expect(t.grile[0]!.revealed).toBe(true);
+    // Celelalte, neatinse, rămân fără răspuns.
+    expect(t.grile[1]!.correct).toBeUndefined();
+  });
+
+  /**
+   * Miezul mutării: nota o pune serverul, comparând cu `questions.correct`.
+   * Clientul nu mai are ce trimite, deci nu mai are ce falsifica.
+   */
+  it('pune nota pe server, nu o primește de la client', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const gresita = await gresitaLa(run, 0);
+
+    const r = await raspunde(ana, { run_id: run, pozitie: 0, aleasa: gresita });
+    expect(r.corect).toBe(false);
+
+    const jurnal = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ is_correct: boolean; chosen: string; source: string }>(
+        'select is_correct, chosen, source::text from attempts where run_id = $1',
+        [run],
+      ),
+    );
+    expect(jurnal.rows).toHaveLength(1);
+    expect(jurnal.rows[0]).toMatchObject({ is_correct: false, chosen: gresita, source: 'sesiune' });
+  });
+
+  /** „Am greșit, mai încerc o dată" ar rescrie jurnalul și ar umfla stăpânirea. */
+  it('închide grila odată verificată', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const gresita = await gresitaLa(run, 0);
+    const corecta = await corectaLa(run, 0);
+
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: gresita });
+    await expect(raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta })).rejects.toThrow(
+      /raspuns_blocat/i,
+    );
+  });
+
+  /** Un retry după o întrerupere de rețea nu are voie să dubleze jurnalul. */
+  it('nu dublează jurnalul la o repetare a aceluiași răspuns', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const corecta = await corectaLa(run, 0);
+
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta });
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta });
+
+    const n = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from attempts where run_id = $1', [run]),
+    );
+    expect(n.rows[0]!.n).toBe(1);
+  });
+
+  /**
+   * Simularea e altfel, și e chiar rostul separării: până la predare nu afli
+   * nimic, iar răspunsul se poate schimba.
+   */
+  it('nu spune nimic la simulare până la predare, dar lasă răspunsul schimbat', async () => {
+    const run = await genereaza(ana, { mod: 'simulare', nr: 3, durata_minute: 180 });
+    const corecta = await corectaLa(run, 0);
+    const gresita = await gresitaLa(run, 0);
+
+    const r = await raspunde(ana, { run_id: run, pozitie: 0, aleasa: gresita });
+    expect(r).toEqual({ inregistrat: true });
+
+    const t = await citeste(ana, run);
+    expect(t.grile[0]!.correct).toBeUndefined();
+    expect(t.grile[0]!.revealed).toBe(false);
+
+    // Se răzgândește — la simulare are voie.
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta });
+
+    // Și nimic n-a intrat încă în jurnal.
+    const n = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from attempts where run_id = $1', [run]),
+    );
+    expect(n.rows[0]!.n).toBe(0);
+  });
+
+  it('la predare scrie jurnalul, dă scorul și deschide răspunsurile', async () => {
+    const run = await genereaza(ana, { mod: 'simulare', nr: 3, durata_minute: 180 });
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: await corectaLa(run, 0) });
+    await raspunde(ana, { run_id: run, pozitie: 1, aleasa: await gresitaLa(run, 1) });
+
+    const scor = await preda(ana, run);
+    expect(scor).toMatchObject({ corecte: 1, gresite: 1, nr_cerut: 3 });
+    // Nedata contează împotrivă: 1 din 3, nu 1 din 2.
+    expect(Number(scor.pct)).toBe(33);
+
+    const jurnal = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number; source: string }>(
+        "select count(*)::int as n, min(source::text) as source from attempts where run_id = $1",
+        [run],
+      ),
+    );
+    expect(jurnal.rows[0]).toMatchObject({ n: 2, source: 'simulare' });
+
+    const t = await citeste(ana, run);
+    for (const g of t.grile) expect(g.correct).toBeTruthy();
+  });
+
+  /**
+   * `source = 'simulare'` era structural imposibil: `AttemptInsert.source` nici
+   * nu-l putea exprima, deci rândul „Simulări" din Statistici era mereu zero.
+   */
+  it('face în sfârșit posibil un răspuns cu sursa „simulare"', async () => {
+    const run = await genereaza(ana, { mod: 'simulare', nr: 2, durata_minute: 60 });
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: await corectaLa(run, 0) });
+    await preda(ana, run);
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>("select count(*)::int as n from attempts where source = 'simulare'"),
+    );
+    expect(r.rows[0]!.n).toBe(1);
+  });
+
+  it('e idempotentă la predare: a doua chemare nu mișcă nimic', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: await corectaLa(run, 0) });
+
+    const intai = await preda(ana, run);
+    const apoi = await preda(ana, run);
+
+    expect(apoi.finished_at).toBe(intai.finished_at);
+    expect(apoi.corecte).toBe(intai.corecte);
+
+    const n = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from attempts where run_id = $1', [run]),
+    );
+    expect(n.rows[0]!.n).toBe(1);
+  });
+
+  it('nu mai primește răspunsuri după predare', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    await preda(ana, run);
+
+    await expect(raspunde(ana, { run_id: run, pozitie: 1, aleasa: 'A' })).rejects.toThrow(
+      /lucrare_predata/i,
+    );
+  });
+
+  /**
+   * Expirarea încheie lucrarea fără s-o piardă, și dă același rezultat după o
+   * reîncărcare — garanția pe care `useSimulare` o dă deja în client.
+   */
+  it('tratează o lucrare expirată ca predată, cu ora expirării', async () => {
+    const run = await genereaza(ana, { mod: 'simulare', nr: 3, durata_minute: 60 });
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: await corectaLa(run, 0) });
+
+    await baza.db.query(
+      "update test_runs set started_at = now() - interval '3 hours', ends_at = now() - interval '1 hour' where id = $1",
+      [run],
+    );
+
+    const t = await citeste(ana, run);
+    expect(t.run.finished_at).not.toBeNull();
+    // Predată prin expirare: răspunsurile sunt deschise.
+    for (const g of t.grile) expect(g.correct).toBeTruthy();
+
+    await expect(raspunde(ana, { run_id: run, pozitie: 1, aleasa: 'A' })).rejects.toThrow(
+      /lucrare_predata/i,
+    );
+
+    const scor = await preda(ana, run);
+    const orasEnds = await baza.db.query<{ ends_at: string }>('select ends_at from test_runs where id = $1', [run]);
+    expect(new Date(scor.finished_at).getTime()).toBe(new Date(orasEnds.rows[0]!.ends_at).getTime());
+  });
+
+  it('refuză o poziție care nu există în lucrare', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 2 });
+    await expect(raspunde(ana, { run_id: run, pozitie: 99, aleasa: 'A' })).rejects.toThrow(
+      /pozitie_inexistenta/i,
+    );
+  });
+
+  /**
+   * O grilă retrasă din bibliotecă lasă poziția ei goală, nu o scoate: altfel
+   * s-ar renumerota tot ce urmează, iar răspunsurile sunt cheiate pe poziție.
+   */
+  it('păstrează poziția unei grile dispărute din bibliotecă', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const t0 = await citeste(ana, run);
+    const disparuta = t0.grile[1]!.question_id;
+
+    await baza.db.query('delete from questions where id = $1', [disparuta]);
+
+    const t = await citeste(ana, run);
+    expect(t.grile.map((g) => g.position)).toEqual([0, 1, 2]);
+    expect(t.grile[1]!.question_id).toBe(disparuta);
+    expect(t.grile[1]!.text).toBeNull();
+    expect(t.grile[1]!.optiuni).toBeNull();
+  });
+});
+
+/**
+ * Citirea de administrator există înaintea nevoii ei: când `correct`, `expl` și
+ * `why` vor fi revocate la nivel de coloană, editorul din Administrare le-ar
+ * pierde odată cu elevul. Acordarea pe coloană e la nivel de rol de bază de
+ * date, iar „administrator" e rol al aplicației — deci nu există un rol căruia
+ * să i se acorde, și drumul administratorului trebuie să fie o funcție.
+ */
+describe('citirea de administrator', () => {
+  it('dă grila întreagă unui administrator', async () => {
+    await baza.faAdmin(ana);
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ g: { id: string; correct: string; expl: string; optiuni: { key: string; why: string | null }[] } }>(
+        "select public.citeste_grila_admin('bio-nervos-01') as g",
+      ),
+    );
+
+    expect(r.rows[0]!.g.id).toBe('bio-nervos-01');
+    expect(r.rows[0]!.g.correct).toBeTruthy();
+    expect(r.rows[0]!.g.expl).toBeTruthy();
+    expect(r.rows[0]!.g.optiuni.length).toBeGreaterThan(0);
+  });
+
+  it('nu dă nimic unui elev', async () => {
+    await expect(
+      baza.caUtilizator(ana, () => baza.db.query("select public.citeste_grila_admin('bio-nervos-01')")),
+    ).rejects.toThrow(/administrator/i);
+  });
+
+  it('spune limpede când grila nu există', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () => baza.db.query("select public.citeste_grila_admin('nu-exista-01')")),
+    ).rejects.toThrow(/nu există/i);
   });
 });
