@@ -27,6 +27,47 @@ afterEach(async () => {
   await baza.inchide();
 });
 
+/**
+ * Plasa de sub toate celelalte teste de aici.
+ *
+ * Fiecare test de mai jos verifică o politică anume, ceea ce înseamnă că
+ * verifică un tabel la care cineva s-a gândit. Tabelul la care nu s-a gândit
+ * nimeni e tocmai cel periculos: Supabase acordă implicit `select/insert/
+ * update/delete` lui `anon` și `authenticated` pe orice tabel nou din `public`,
+ * deci un `enable row level security` uitat nu dă nicio eroare — publică
+ * tabelul întreg, pentru oricine are cheia publicabilă.
+ *
+ * Testul ăsta nu întreabă ce politici există, ci dacă mai există vreun tabel
+ * fără RLS. E singurul de aici care apără și tabelele care încă nu s-au scris.
+ */
+describe('fiecare tabel din public', () => {
+  it('are RLS pornit', async () => {
+    const r = await baza.db.query<{ relname: string }>(`
+      select c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+      order by c.relname
+    `);
+    expect(r.rows.map((x) => x.relname)).toEqual([]);
+  });
+
+  /**
+   * RLS pornit fără nicio politică refuză tot, ceea ce e sigur dar arată ca un
+   * tabel stricat. Perechea celuilalt test: unul prinde tabelul deschis, ăsta
+   * prinde tabelul mut.
+   */
+  it('are cel puțin o politică', async () => {
+    const r = await baza.db.query<{ relname: string }>(`
+      select c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r'
+        and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+      order by c.relname
+    `);
+    expect(r.rows.map((x) => x.relname)).toEqual([]);
+  });
+});
+
 describe('notițele', () => {
   it('nu se văd între elevi', async () => {
     await baza.caUtilizator(ana, async () => {
@@ -178,6 +219,8 @@ describe('funcțiile', () => {
    */
   const RPC_INTENTIONAT = [
     'atribuie_colectia',
+    'genereaza_test',
+    'numara_candidati',
     'salveaza_capitol',
     'salveaza_colectie',
     'salveaza_grila',
@@ -222,14 +265,33 @@ describe('funcțiile', () => {
     expect(r.rows[0]!.poate).toBe(false);
   });
 
+  /**
+   * Fără `search_path` fix, cine poate crea obiecte într-o schemă din calea de
+   * căutare poate pune în fața unei funcții de sistem una a lui, iar corpul
+   * `security definer` o execută cu drepturi de proprietar.
+   *
+   * Lista e numită, nu numărată: un simplu `toHaveLength` trece dacă adaugi o
+   * funcție și ștergi alta, și oricum nu spune care lipsește când pică.
+   */
   it('au toate un search_path fix', async () => {
     const r = await baza.db.query<{ proname: string; proconfig: string[] | null }>(`
       select p.proname, p.proconfig
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'private'
+      order by p.proname
     `);
 
-    expect(r.rows).toHaveLength(4);
+    expect(r.rows.map((x) => x.proname)).toEqual([
+      'are_acces',
+      'candidati',
+      'completeaza_materia',
+      'handle_new_user',
+      'ingheata_instantaneul',
+      'is_admin',
+      'propaga_materia',
+      'protect_role',
+      'touch_updated_at',
+    ]);
     for (const f of r.rows) {
       expect(f.proconfig?.some((c) => c.startsWith('search_path='))).toBe(true);
     }
@@ -1095,5 +1157,583 @@ describe('scrierea taxonomiei', () => {
       sursa_bibliografica: 'Corint, ed. 2024',
       position: inainte.rows[0]!.position,
     });
+  });
+});
+
+/**
+ * Favoritele — un tabel nou, deci exact clasa de scăpare pe care o prinde
+ * „fiecare tabel din public": Supabase acordă implicit drepturi lui `anon` și
+ * `authenticated` pe orice tabel proaspăt, iar un `enable row level security`
+ * uitat nu dă nicio eroare, doar publică tot.
+ */
+describe('favoritele', () => {
+  it('nu se văd între elevi', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-nervos-01']),
+    );
+
+    const aleLuiBogdan = await baza.caUtilizator(bogdan, () =>
+      baza.db.query<{ question_id: string }>('select question_id from favorite'),
+    );
+    expect(aleLuiBogdan.rows).toEqual([]);
+
+    const aleAnei = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ question_id: string }>('select question_id from favorite'),
+    );
+    expect(aleAnei.rows.map((x) => x.question_id)).toEqual(['bio-nervos-01']);
+  });
+
+  it('nu pot fi puse pe contul altcuiva', async () => {
+    await expect(
+      baza.caUtilizator(bogdan, () =>
+        baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-nervos-01']),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  /** Un vizitator fără sesiune n-are ce căuta în tabel, în niciun fel. */
+  it('nu sunt citibile de un vizitator', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-nervos-01']),
+    );
+
+    const r = await baza.caVizitator(() => baza.db.query('select question_id from favorite'));
+    expect(r.rows).toEqual([]);
+  });
+});
+
+/**
+ * Lucrările — masa de lucru comună a tuturor felurilor de test.
+ *
+ * Două lucruri se apără aici, și niciunul nu dă eroare când e greșit: că
+ * lucrarea unui elev nu e vizibilă altuia, și că instantaneul ei nu se mai
+ * poate schimba după ce a fost generat. A doua e regula pe care se sprijină
+ * tot restul — răspunsurile se cheie pe poziție, deci o poziție mutată nu
+ * strică lucrarea, ci o rescrie.
+ */
+describe('lucrările', () => {
+  const faLucrare = async (userId: string, nr = 2) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ id: string }>(
+        `insert into test_runs (user_id, mod, nr_cerut) values ($1, 'exersare', $2) returning id`,
+        [userId, nr],
+      ),
+    );
+    const id = r.rows[0]!.id;
+    await baza.caUtilizator(userId, () =>
+      baza.db.query(
+        `insert into test_run_items (run_id, position, question_id)
+         values ($1, 0, 'bio-nervos-01'), ($1, 1, 'bio-celula-01')`,
+        [id],
+      ),
+    );
+    return id;
+  };
+
+  it('nu se văd între elevi, nici lucrarea, nici grilele ei', async () => {
+    await faLucrare(ana);
+
+    const lucrari = await baza.caUtilizator(bogdan, () => baza.db.query('select * from test_runs'));
+    expect(lucrari.rows).toEqual([]);
+
+    const grile = await baza.caUtilizator(bogdan, () => baza.db.query('select * from test_run_items'));
+    expect(grile.rows).toEqual([]);
+  });
+
+  it('nu pot primi grile de la altcineva', async () => {
+    const alAnei = await faLucrare(ana);
+
+    await expect(
+      baza.caUtilizator(bogdan, () =>
+        baza.db.query(
+          `insert into test_run_items (run_id, position, question_id) values ($1, 9, 'bio-celula-01')`,
+          [alAnei],
+        ),
+      ),
+    ).rejects.toThrow(/row-level security/i);
+  });
+
+  /**
+   * Miezul. O grilă mutată pe altă poziție dezlipește tot ce s-a răspuns după
+   * ea, fiindcă `attempts.client_key` e `'<lucrare>:<poziție>'`. Un `with check`
+   * n-ar putea prinde asta — vede doar rândul nou — deci regula e declanșator.
+   */
+  it('nu-și mai schimbă instantaneul după generare', async () => {
+    const id = await faLucrare(ana);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("update test_run_items set question_id = 'bio-celula-01' where run_id = $1 and position = 0", [id]),
+      ),
+    ).rejects.toThrow(/nu se mai schimbă/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query('update test_run_items set position = 5 where run_id = $1 and position = 0', [id]),
+      ),
+    ).rejects.toThrow(/nu se mai schimbă/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(
+          `update test_run_items set option_order = array['B','A','C','D','E']::option_key[]
+           where run_id = $1 and position = 0`,
+          [id],
+        ),
+      ),
+    ).rejects.toThrow(/nu se mai schimbă/i);
+  });
+
+  it('lasă răspunsul să se schimbe cât timp lucrarea e în lucru', async () => {
+    const id = await faLucrare(ana);
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("update test_run_items set chosen = 'B', answered_at = now() where run_id = $1 and position = 0", [id]),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("update test_run_items set chosen = 'C' where run_id = $1 and position = 0", [id]),
+    );
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ chosen: string }>('select chosen from test_run_items where run_id = $1 and position = 0', [id]),
+    );
+    expect(r.rows[0]!.chosen).toBe('C');
+  });
+
+  /** După predare, lucrarea e ce a fost la predare — altfel scorul e o părere. */
+  it('nu mai lasă răspunsurile să se schimbe după predare', async () => {
+    const id = await faLucrare(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query("update test_run_items set chosen = 'B' where run_id = $1 and position = 0", [id]),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('update test_runs set finished_at = now() where id = $1', [id]),
+    );
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query("update test_run_items set chosen = 'A' where run_id = $1 and position = 0", [id]),
+      ),
+    ).rejects.toThrow(/predată/i);
+
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query('update test_run_items set marked = true where run_id = $1 and position = 0', [id]),
+      ),
+    ).rejects.toThrow(/predată/i);
+  });
+
+  /**
+   * O lucrare se aruncă întreagă, nu rând cu rând: scoaterea unei poziții din
+   * mijloc renumerotează tot ce urmează. De aceea `test_run_items` n-are
+   * politică de ștergere, dar cascada de la lucrare curăță corect.
+   */
+  it('nu se pot scoate grile una câte una, dar lucrarea se aruncă întreagă', async () => {
+    const id = await faLucrare(ana);
+
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('delete from test_run_items where run_id = $1 and position = 1', [id]),
+    );
+    const ramase = await baza.caUtilizator(ana, () =>
+      baza.db.query('select position from test_run_items where run_id = $1', [id]),
+    );
+    expect(ramase.rows).toHaveLength(2);
+
+    await baza.caUtilizator(ana, () => baza.db.query('delete from test_runs where id = $1', [id]));
+    const dupa = await baza.db.query('select * from test_run_items where run_id = $1', [id]);
+    expect(dupa.rows).toEqual([]);
+  });
+
+  /**
+   * Grila poate dispărea din bibliotecă; lucrarea rămâne. Fără cheie externă pe
+   * `question_id`, o retragere de conținut nu poate strica o lucrare dată, iar
+   * pozițiile nu se mișcă.
+   */
+  it('supraviețuiește ștergerii unei grile din bibliotecă', async () => {
+    const id = await faLucrare(ana);
+
+    // Variantele cad în cascadă; șterse întâi, ar rupe cheia amânată
+    // `questions_correct_exists`, care cere ca varianta corectă să existe.
+    await baza.db.query("delete from questions where id = 'bio-nervos-01'");
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ position: number; question_id: string }>(
+        'select position, question_id from test_run_items where run_id = $1 order by position',
+        [id],
+      ),
+    );
+    expect(r.rows.map((x) => x.question_id)).toEqual(['bio-nervos-01', 'bio-celula-01']);
+  });
+
+  it('refuză o lucrare cu limita de timp înaintea începutului', async () => {
+    await expect(
+      baza.caUtilizator(ana, () =>
+        baza.db.query(
+          `insert into test_runs (user_id, mod, nr_cerut, ends_at)
+           values ($1, 'simulare', 10, now() - interval '1 hour')`,
+          [ana],
+        ),
+      ),
+    ).rejects.toThrow(/test_runs_ends_after_start/i);
+  });
+});
+
+
+/**
+ * Generarea testului.
+ *
+ * Seed-ul are 6 grile (vezi `src/data/questions.ts`), toate publicate: 4 de
+ * biologie și 2 de chimie, 4 complement simplu și 2 grupat. Cifrele mici sunt
+ * un avantaj, nu o limitare — cazul „ai cerut mai multe decât există" e greu de
+ * produs pe o bancă mare și e tocmai cel care, netratat, umflă tăcut procentul.
+ */
+describe('generarea testului', () => {
+  type Rezultat = {
+    run_id: string;
+    nr_cerut: number;
+    nr_obtinut: number;
+    insuficient: boolean;
+    lipsa: { materie_id: string; lipsa: number }[];
+  };
+
+  const genereaza = async (userId: string, payload: object) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ rezultat: Rezultat }>('select public.genereaza_test($1::jsonb) as rezultat', [
+        JSON.stringify(payload),
+      ]),
+    );
+    return r.rows[0]!.rezultat;
+  };
+
+  // `option_order` se întoarce ca literal Postgres (`{A,B,C}`), nu ca listă, deci
+  // se cere direct ca text unit — altfel un `new Set(...)` numără caractere.
+  const pozitii = async (userId: string, runId: string) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ position: number; question_id: string; ordine: string | null }>(
+        `select position, question_id, array_to_string(option_order, ',') as ordine
+         from test_run_items where run_id = $1 order by position`,
+        [runId],
+      ),
+    );
+    return r.rows;
+  };
+
+  /**
+   * Nu „neautentificat", ci refuz din drepturi: `execute` e revocat de la `anon`,
+   * deci cererea nici nu ajunge în corpul funcției. E gardul mai tare dintre cele
+   * două, și tocmai de aceea merită pinuit — o acordare pusă din neatenție l-ar
+   * coborî tăcut la verificarea dinăuntru.
+   */
+  it('nu e apelabilă de un vizitator fără sesiune', async () => {
+    await expect(
+      baza.caVizitator(() => baza.db.query(`select public.genereaza_test('{"nr":3}'::jsonb)`)),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it('scrie o lucrare cu pozițiile numerotate de la zero, fără repetări', async () => {
+    const rez = await genereaza(ana, { mod: 'exersare', nr: 4 });
+
+    expect(rez.nr_obtinut).toBe(4);
+    expect(rez.insuficient).toBe(false);
+
+    const items = await pozitii(ana, rez.run_id);
+    expect(items.map((x) => x.position)).toEqual([0, 1, 2, 3]);
+    expect(new Set(items.map((x) => x.question_id)).size).toBe(4);
+  });
+
+  /**
+   * `buildOrder` repeta banca ciclic (`pool[i % pool.length]`) ca să umple
+   * numărul cerut — cu 6 grile era un compromis, cu o bancă adevărată e un bug.
+   * Aici o grilă se poate trage o singură dată **prin construcție**, fiindcă
+   * selecția e peste `questions.id`.
+   */
+  it('nu repetă niciodată o grilă, nici când se cere mai mult decât există', async () => {
+    for (let i = 0; i < 40; i += 1) {
+      const rez = await genereaza(ana, { mod: 'exersare', nr: 50 });
+      const items = await pozitii(ana, rez.run_id);
+      expect(new Set(items.map((x) => x.question_id)).size).toBe(items.length);
+    }
+  });
+
+  /**
+   * Livrează mai puțin și **o spune**. `nr_cerut` rămâne ce s-a cerut, fiindcă
+   * el e numitorul scorului: o lucrare mai scurtă n-are voie să umfle procentul.
+   */
+  it('spune când sunt mai puține decât s-au cerut, și păstrează numitorul', async () => {
+    const rez = await genereaza(ana, { mod: 'exersare', nr: 50 });
+
+    expect(rez.nr_obtinut).toBe(6);
+    expect(rez.nr_cerut).toBe(50);
+    expect(rez.insuficient).toBe(true);
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ nr_cerut: number }>('select nr_cerut from test_runs where id = $1', [rez.run_id]),
+    );
+    expect(r.rows[0]!.nr_cerut).toBe(50);
+  });
+
+  /** O simulare oficială care trebuie să aibă fix 100 de grile nu poate livra 47. */
+  it('refuză, în loc să scurteze, când formatul e strict', async () => {
+    await expect(genereaza(ana, { mod: 'simulare', nr: 50, strict: true })).rejects.toThrow(
+      /insuficient_strict/i,
+    );
+  });
+
+  it('respectă cotele pe materii și spune exact ce a lipsit', async () => {
+    const rez = await genereaza(ana, {
+      mod: 'simulare',
+      cote: [
+        { materie_id: 'bio', nr: 2 },
+        { materie_id: 'chim', nr: 5 },
+      ],
+    });
+
+    expect(rez.nr_cerut).toBe(7);
+    expect(rez.nr_obtinut).toBe(4);
+    expect(rez.lipsa).toEqual([{ materie_id: 'chim', lipsa: 3 }]);
+
+    const items = await pozitii(ana, rez.run_id);
+    const materii = await baza.db.query<{ materie_id: string; n: number }>(
+      `select q.materie_id, count(*)::int as n from questions q
+       where q.id = any ($1::text[]) group by 1 order by 1`,
+      [items.map((x) => x.question_id)],
+    );
+    expect(materii.rows).toEqual([
+      { materie_id: 'bio', n: 2 },
+      { materie_id: 'chim', n: 2 },
+    ]);
+  });
+
+  it('nu compune nimic dacă filtrele nu lasă nicio grilă', async () => {
+    await expect(
+      genereaza(ana, { mod: 'exersare', nr: 5, filtre: { capitole: ['chim-izomerie'] } }),
+    ).rejects.toThrow(/fara_candidati/i);
+  });
+
+  it('ține scopul: pe un capitol vin numai grilele lui', async () => {
+    const rez = await genereaza(ana, { mod: 'exersare', nr: 5, filtre: { capitole: ['bio-nervos'] } });
+    const items = await pozitii(ana, rez.run_id);
+
+    expect(items).toHaveLength(1);
+    const straine = await baza.db.query<{ n: number }>(
+      `select count(*)::int as n from questions where id = any ($1::text[]) and chapter_id <> 'bio-nervos'`,
+      [items.map((x) => x.question_id)],
+    );
+    expect(straine.rows[0]!.n).toBe(0);
+  });
+
+  /**
+   * Regula de amestecare stă pe tip, nu pe grilă, iar aplicarea ei e aici, la
+   * generare: când ajunge clientul s-o randeze, ordinea e deja scrisă și paguba
+   * e făcută. La complementul grupat variantele sunt cheia formatului („1, 2,
+   * 3", „doar 4"), deci amestecate strică grila.
+   */
+  it('nu amestecă niciodată variantele unui complement grupat', async () => {
+    const rez = await genereaza(ana, {
+      mod: 'exersare',
+      nr: 6,
+      amesteca_optiuni: true,
+      filtre: { tipuri: ['grupat'] },
+    });
+    const items = await pozitii(ana, rez.run_id);
+
+    expect(items).toHaveLength(2);
+    for (const it of items) expect(it.ordine).toBeNull();
+  });
+
+  it('amestecă variantele unui complement simplu, dar numai la cerere', async () => {
+    const cu = await genereaza(ana, {
+      mod: 'exersare',
+      nr: 6,
+      amesteca_optiuni: true,
+      filtre: { tipuri: ['simplu'] },
+    });
+    const amestecate = await pozitii(ana, cu.run_id);
+    expect(amestecate).toHaveLength(4);
+    for (const it of amestecate) {
+      const chei = it.ordine!.split(',');
+      expect(new Set(chei).size).toBe(chei.length);
+    }
+
+    const fara = await genereaza(ana, { mod: 'exersare', nr: 6, filtre: { tipuri: ['simplu'] } });
+    for (const it of await pozitii(ana, fara.run_id)) expect(it.ordine).toBeNull();
+  });
+
+  it('pune o limită de timp absolută doar când i se cere o durată', async () => {
+    const cu = await genereaza(ana, { mod: 'simulare', nr: 3, durata_minute: 180 });
+    const fara = await genereaza(ana, { mod: 'exersare', nr: 3 });
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string; minute: number | null }>(
+        `select id::text, extract(epoch from (ends_at - started_at)) / 60 as minute
+         from test_runs where id = any ($1::uuid[])`,
+        [[cu.run_id, fara.run_id]],
+      ),
+    );
+    const peId = new Map(r.rows.map((x) => [x.id, x.minute]));
+    expect(Math.round(Number(peId.get(cu.run_id)))).toBe(180);
+    expect(peId.get(fara.run_id)).toBeNull();
+  });
+
+  /** Filtrele pe utilizator sunt ale celui care cheamă, nu ale nimănui altcuiva. */
+  it('„nevăzute" scoate exact grilele la care omul ăsta a răspuns', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source)
+         values ($1, 'bio-nervos-01', 'A', false, 'sesiune')`,
+        [ana],
+      ),
+    );
+
+    const alAnei = await genereaza(ana, { mod: 'nevazute', nr: 10 });
+    const aleAnei = await pozitii(ana, alAnei.run_id);
+    expect(aleAnei.map((x) => x.question_id)).not.toContain('bio-nervos-01');
+    expect(aleAnei).toHaveLength(5);
+
+    // Bogdan n-a răspuns nimic, deci pentru el sunt toate nevăzute.
+    const alLuiBogdan = await genereaza(bogdan, { mod: 'nevazute', nr: 10 });
+    expect(await pozitii(bogdan, alLuiBogdan.run_id)).toHaveLength(6);
+  });
+
+  /**
+   * „Ultimul răspuns e greșit", nu „a fost greșit vreodată": altfel o grilă
+   * învățată între timp rămâne în coadă pentru totdeauna.
+   */
+  it('„greșeli" ia ultimul răspuns, nu istoria', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source, answered_at)
+         values ($1, 'bio-nervos-01', 'A', false, 'sesiune', now() - interval '2 days'),
+                ($1, 'bio-osos-01', 'A', false, 'sesiune', now() - interval '2 days')`,
+        [ana],
+      ),
+    );
+
+    const doar = await genereaza(ana, { mod: 'greseli', nr: 10 });
+    expect((await pozitii(ana, doar.run_id)).map((x) => x.question_id).sort()).toEqual([
+      'bio-nervos-01',
+      'bio-osos-01',
+    ]);
+
+    // Între timp o rezolvă corect: iese din coadă.
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source)
+         values ($1, 'bio-nervos-01', 'B', true, 'sesiune')`,
+        [ana],
+      ),
+    );
+
+    const dupa = await genereaza(ana, { mod: 'greseli', nr: 10 });
+    expect((await pozitii(ana, dupa.run_id)).map((x) => x.question_id)).toEqual(['bio-osos-01']);
+  });
+
+  it('„favorite" ia doar ce a marcat omul', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('insert into favorite (user_id, question_id) values ($1, $2)', [ana, 'bio-osos-01']),
+    );
+
+    const rez = await genereaza(ana, { mod: 'favorite', nr: 10 });
+    expect((await pozitii(ana, rez.run_id)).map((x) => x.question_id)).toEqual(['bio-osos-01']);
+
+    await expect(genereaza(bogdan, { mod: 'favorite', nr: 10 })).rejects.toThrow(/fara_candidati/i);
+  });
+
+  /**
+   * Cusătura de abonament, verificată prin efect. Predicatul e în `where`, deci
+   * o grilă închisă nu e rând — nu rând ascuns pe care clientul l-ar putea cere
+   * pe altă cale.
+   */
+  it('nu trage o grilă premium pentru un cont fără abonament', async () => {
+    await baza.db.query("update questions set acces = 'premium' where materie_id = 'bio'");
+
+    const rez = await genereaza(ana, { mod: 'exersare', nr: 10 });
+    const items = await pozitii(ana, rez.run_id);
+    expect(items).toHaveLength(2);
+
+    const bio = await baza.db.query<{ n: number }>(
+      `select count(*)::int as n from questions where id = any ($1::text[]) and materie_id = 'bio'`,
+      [items.map((x) => x.question_id)],
+    );
+    expect(bio.rows[0]!.n).toBe(0);
+
+    await baza.db.query("update profiles set abonament_pana = now() + interval '30 days' where id = $1", [ana]);
+    const cu = await genereaza(ana, { mod: 'exersare', nr: 10 });
+    expect(await pozitii(ana, cu.run_id)).toHaveLength(6);
+  });
+
+  it('nu pune în lucrare nicio ciornă și nicio grilă retrasă', async () => {
+    await baza.db.query("update questions set status = 'ciorna' where id = 'bio-nervos-01'");
+    await baza.db.query("update questions set status = 'retrasa' where id = 'bio-osos-01'");
+
+    const rez = await genereaza(ana, { mod: 'exersare', nr: 10 });
+    const ids = (await pozitii(ana, rez.run_id)).map((x) => x.question_id);
+    expect(ids).not.toContain('bio-nervos-01');
+    expect(ids).not.toContain('bio-osos-01');
+    expect(ids).toHaveLength(4);
+  });
+
+  it('refuză un mod care nu există', async () => {
+    await expect(genereaza(ana, { mod: 'ghicit', nr: 3 })).rejects.toThrow(/mod_necunoscut/i);
+  });
+
+  it('refuză un număr fără sens', async () => {
+    await expect(genereaza(ana, { mod: 'exersare', nr: 0 })).rejects.toThrow(/nr_invalid/i);
+  });
+});
+
+describe('numărătoarea de candidați', () => {
+  const numara = async (userId: string, payload: object) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ rezultat: { total: number; pe_materie: { materie_id: string; nr: number }[] } }>(
+        'select public.numara_candidati($1::jsonb) as rezultat',
+        [JSON.stringify(payload)],
+      ),
+    );
+    return r.rows[0]!.rezultat;
+  };
+
+  it('numără toată biblioteca publicată, defalcat pe materii', async () => {
+    const r = await numara(ana, { mod: 'exersare' });
+    expect(r.total).toBe(6);
+    expect(r.pe_materie).toEqual([
+      { materie_id: 'bio', nr: 4 },
+      { materie_id: 'chim', nr: 2 },
+    ]);
+  });
+
+  it('scade când se strânge filtrul', async () => {
+    const r = await numara(ana, { mod: 'exersare', filtre: { materii: ['bio'] } });
+    expect(r.total).toBe(4);
+    expect(r.pe_materie).toEqual([{ materie_id: 'bio', nr: 4 }]);
+  });
+
+  /**
+   * Contorul și generarea trebuie să spună același lucru. Sunt două drumuri la
+   * server peste același `where`, iar asistentul arată contorul chiar înainte de
+   * a apăsa „Începe" — dacă diverg, minte exact în clipa aia.
+   */
+  it('e de acord cu ce livrează generarea', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `insert into attempts (user_id, question_id, chosen, is_correct, source)
+         values ($1, 'bio-nervos-01', 'A', false, 'sesiune')`,
+        [ana],
+      ),
+    );
+
+    const contor = await numara(ana, { mod: 'nevazute' });
+    const rez = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ rezultat: { nr_obtinut: number } }>(
+        `select public.genereaza_test('{"mod":"nevazute","nr":100}'::jsonb) as rezultat`,
+      ),
+    );
+    expect(rez.rows[0]!.rezultat.nr_obtinut).toBe(contor.total);
+  });
+
+  it('nu e apelabilă de un vizitator fără sesiune', async () => {
+    await expect(
+      baza.caVizitator(() => baza.db.query(`select public.numara_candidati('{}'::jsonb)`)),
+    ).rejects.toThrow(/permission denied/i);
   });
 });

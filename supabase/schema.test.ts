@@ -212,3 +212,128 @@ describe('tipurile de grilă', () => {
     }
   });
 });
+
+/**
+ * Materia de pe grilă e derivată, nu declarată.
+ *
+ * E o denormalizare, deci singura întrebare care contează e dacă poate diverge.
+ * Cele două declanșatoare din 0015 sunt răspunsul, iar testele de aici sunt
+ * dovada — inclusiv pentru drumul pe care `salveaza_capitol` nu-l apără, adică
+ * scrierea directă în tabel.
+ */
+describe('materia denormalizată pe grilă', () => {
+  // `questions_correct_exists` e o cheie externă compusă și **amânată**, deci
+  // grila și varianta ei trebuie să intre în aceeași tranzacție — exact motivul
+  // pentru care `salveaza_grila` există ca RPC și nu ca două apeluri PostgREST.
+  const scrieGrila = async (sql: string, id: string) => {
+    await baza.db.query('begin');
+    await baza.db.query(sql);
+    await baza.db.query(`insert into question_options (question_id, key, text) values ('${id}', 'A', 'Varianta A')`);
+    await baza.db.query('commit');
+  };
+
+  it('se umple singură la scrierea unei grile', async () => {
+    await scrieGrila(
+      `insert into questions (id, chapter_id, tip, tip_id, status, text, correct, expl, src)
+       values ('chim-alcani-99', 'chim-alcani', 'simplu', 'simplu', 'ciorna', 'Enunț', 'A', 'Explicație', '')`,
+      'chim-alcani-99',
+    );
+
+    const r = await baza.db.query<{ materie_id: string }>(
+      "select materie_id from questions where id = 'chim-alcani-99'",
+    );
+    expect(r.rows[0]!.materie_id).toBe('chim');
+  });
+
+  it('urmează grila când i se schimbă capitolul', async () => {
+    await baza.db.query("update questions set chapter_id = 'chim-alcani' where id = 'bio-nervos-01'");
+
+    const r = await baza.db.query<{ materie_id: string }>(
+      "select materie_id from questions where id = 'bio-nervos-01'",
+    );
+    expect(r.rows[0]!.materie_id).toBe('chim');
+  });
+
+  /**
+   * Capătul pe care un formular nu-l poate apăra: `salveaza_capitol` refuză
+   * mutarea unui capitol cu grile, dar editorul SQL nu întreabă pe nimeni.
+   */
+  it('urmează capitolul când capitolul își schimbă materia', async () => {
+    await baza.db.query("update chapters set materie_id = 'chim' where id = 'bio-nervos'");
+
+    const r = await baza.db.query<{ n: number }>(
+      "select count(*)::int as n from questions where chapter_id = 'bio-nervos' and materie_id <> 'chim'",
+    );
+    expect(r.rows[0]!.n).toBe(0);
+  });
+
+  it('nu poate fi contrazisă de client la inserare', async () => {
+    await scrieGrila(
+      `insert into questions (id, chapter_id, materie_id, tip, tip_id, status, text, correct, expl, src)
+       values ('chim-alcani-98', 'chim-alcani', 'bio', 'simplu', 'simplu', 'ciorna', 'Enunț', 'A', 'Explicație', '')`,
+      'chim-alcani-98',
+    );
+
+    const r = await baza.db.query<{ materie_id: string }>(
+      "select materie_id from questions where id = 'chim-alcani-98'",
+    );
+    expect(r.rows[0]!.materie_id).toBe('chim');
+  });
+
+  it('e în acord cu capitolele pe tot seed-ul', async () => {
+    const r = await baza.db.query<{ n: number }>(`
+      select count(*)::int as n
+      from questions q join chapters c on c.id = q.chapter_id
+      where q.materie_id <> c.materie_id
+    `);
+    expect(r.rows[0]!.n).toBe(0);
+  });
+});
+
+/**
+ * Cusătura de abonament, pusă înainte să fie nevoie de ea.
+ *
+ * Tot rostul e ca azi să nu schimbe nimic: dacă `are_acces` ar refuza ceva
+ * acum, s-ar închide conținut care e liber. Testele pinează exact asta —
+ * implicit totul e `liber`, și abia un rând marcat `premium` face diferența.
+ */
+describe('nivelul de acces', () => {
+  it('lasă totul liber cât timp nimic nu e marcat premium', async () => {
+    const r = await baza.db.query<{ n: number }>(
+      "select count(*)::int as n from questions where acces <> 'liber'",
+    );
+    expect(r.rows[0]!.n).toBe(0);
+  });
+
+  it('deschide o grilă premium doar unui abonament încă valabil', async () => {
+    const ana = await baza.creeazaUtilizator('ana@exemplu.ro');
+    await baza.db.query("update questions set acces = 'premium' where id = 'bio-nervos-01'");
+
+    const fara = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ ok: boolean }>("select private.are_acces('premium'::nivel_acces) as ok"),
+    );
+    expect(fara.rows[0]!.ok).toBe(false);
+
+    // Un abonament expirat e tot lipsă de abonament — de aceea comparația e cu
+    // `now()`, nu cu `is not null`.
+    await baza.db.query("update profiles set abonament_pana = now() - interval '1 day' where id = $1", [ana]);
+    const expirat = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ ok: boolean }>("select private.are_acces('premium'::nivel_acces) as ok"),
+    );
+    expect(expirat.rows[0]!.ok).toBe(false);
+
+    await baza.db.query("update profiles set abonament_pana = now() + interval '30 days' where id = $1", [ana]);
+    const cu = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ ok: boolean }>("select private.are_acces('premium'::nivel_acces) as ok"),
+    );
+    expect(cu.rows[0]!.ok).toBe(true);
+  });
+
+  it('lasă liberul liber pentru cine n-are abonament', async () => {
+    const ana = await baza.creeazaUtilizator('ana@exemplu.ro');
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ ok: boolean }>("select private.are_acces('liber'::nivel_acces) as ok"),
+    );
+    expect(r.rows[0]!.ok).toBe(true);
+  });
+});
