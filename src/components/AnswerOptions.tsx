@@ -1,6 +1,20 @@
 import { SANS } from '../lib/ui';
-import type { OptionKey, Question } from '../data/questions';
+import type { OptionKey } from '../data/questions';
 import type { TipGrila } from '../lib/tipuriGrile';
+
+/**
+ * Cât are nevoie componenta dintr-o grilă, nu grila întreagă.
+ *
+ * `correct` e opțional fiindcă pe drumul prin motor **chiar lipsește** până e
+ * câștigat: `citeste_test` nu-l trimite la o simulare în curs. Cerând un
+ * `Question` întreg, singura cale ar fi fost o literă inventată pusă acolo ca
+ * să treacă tipul — adică exact minciuna pe care ecranul o randează apoi.
+ * `Question` se potrivește tiparului ăstuia, deci apelanții vechi nu se schimbă.
+ */
+export interface GrilaDeRaspuns {
+  opts: [OptionKey, string][];
+  correct?: OptionKey;
+}
 
 /**
  * Variantele de răspuns. La complementul grupat se afișează doar litera —
@@ -15,7 +29,7 @@ export function AnswerOptions({
   onPick,
   showIcons = true,
 }: {
-  question: Question;
+  question: GrilaDeRaspuns;
   /** Formatul grilei. Lipsă (încă neîncărcat) înseamnă randare simplă. */
   tip?: TipGrila | undefined;
   answer: OptionKey | undefined;

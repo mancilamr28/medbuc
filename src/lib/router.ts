@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 export const SCREENS = [
   'acasa',
   'grile',
+  'test-nou',
+  'lucrare',
   'recapitulare',
   'simulari',
   'statistici',
@@ -18,6 +20,8 @@ export type Screen = (typeof SCREENS)[number];
 export const BUILT_SCREENS: Screen[] = [
   'acasa',
   'grile',
+  'test-nou',
+  'lucrare',
   'recapitulare',
   'simulari',
   'statistici',
@@ -96,6 +100,45 @@ export function useSectiuneAdmin(): [SectiuneAdmin, (s: SectiuneAdmin) => void] 
 
   return [sectiune, goAdmin];
 }
+// ---------------------------------------------------------------------------
+// Al doilea segment, folosit de ecranul unei lucrări.
+//
+// Id-ul lucrării stă în adresă (`#/lucrare/<uuid>`), nu într-o cheie de
+// `localStorage`, fiindcă lucrarea trăiește pe server: adresa e de-ajuns ca să
+// o redeschizi de pe alt dispozitiv, iar o a doua sursă de adevăr locală ar
+// trebui migrată mai târziu, ca cele trei chei pe care motorul le înlocuiește.
+// ---------------------------------------------------------------------------
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Id-ul din `#/lucrare/<id>`; `null` pentru orice altceva.
+ *
+ * Forma se verifică aici, nu la server: un segment inventat de cineva care se
+ * joacă în bara de adrese trebuie să dea ecranul „n-am ce deschide", nu un
+ * drum la bază cu un `uuid` invalid care iese ca eroare de tip.
+ */
+export const idLucrareDin = (raw: string | undefined): string | null =>
+  raw !== undefined && UUID.test(raw) ? raw : null;
+
+export const goLucrare = (runId: string): void => {
+  window.location.hash = `/lucrare/${runId}`;
+  window.scrollTo(0, 0);
+};
+
+/** Id-ul lucrării din adresă, urmărind `hashchange` ca și `useHashRoute`. */
+export function useIdLucrare(): string | null {
+  const [id, setId] = useState<string | null>(() => idLucrareDin(segmente()[1]));
+
+  useEffect(() => {
+    const laSchimbare = () => setId(idLucrareDin(segmente()[1]));
+    window.addEventListener('hashchange', laSchimbare);
+    return () => window.removeEventListener('hashchange', laSchimbare);
+  }, []);
+
+  return id;
+}
+
 /**
  * Rutare pe hash: ecranele au adrese proprii, butonul „înapoi” funcționează și
  * un link către #/materii deschide direct materiile — fără dependințe externe.
