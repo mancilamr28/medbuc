@@ -59,7 +59,9 @@ Which layer owns what:
 | Answers (`attempts`) | Supabase | An immutable journal. Progress, statistics and the review queue are all *derived* from it — nothing stores a `pct` |
 | Notes, theme, settings, exam-in-progress | `localStorage` | `medbuc.*`, via `usePersistentState`. The `notes` table exists but nothing writes to it yet |
 
-**A practice session is memory-only** and syncs once, at `finish()`; **a simulation is never persisted at all** — there is no `syncFinishedSimulare` and `AttemptInsert.source` (`src/lib/attempts.ts`) cannot even express `'simulare'`, although the DB enum, the `sim_run_id` column and the Statistici filter all expect it. Consequences to know before touching that area: a finished exam contributes nothing to progress, its mistakes never reach Recapitulare, and Statistici's "Simulări" row is structurally always zero.
+**A practice session is memory-only while it runs** (a reload loses it, results included) and syncs once at `finish()`. **A simulation is persisted to `localStorage` while it runs and syncs at submission** through `syncFinishedSimulare` (`src/lib/syncSimulare.ts`), which upserts the `sim_runs` row and the `attempts` in two retry-safe operations. Both write through `AttemptSync.tsx`, which calls `ProgressContext.reload()` only after the write succeeds.
+
+Until PR #49 a simulation was *not* persisted at all: a finished exam contributed nothing to progress, its mistakes never reached Recapitulare, and Statistici's "Simulări" row was structurally zero. That is fixed and the row is populated — do not repeat the old description, which survived in this file long after it stopped being true.
 
 ### Routing — `src/lib/router.ts`
 
@@ -347,9 +349,25 @@ Selection moved off the client. `buildOrder` receives the whole bank and cuts fr
 - **`raspunde` branches on mode**: practice reveals, locks, journals and returns the explanation; simulation records only and can be changed until submission, where `preda_test` journals everything at once.
 - **Expiry ends a paper without losing it.** `private.predata_la` is `finished_at`, or `ends_at` if that has passed — so a reload gives the same result, the guarantee `useSimulare` already makes client-side. That function is `stable`, not `immutable`, despite looking pure: it reads `now()`, and Postgres believes the declaration, so a lying `immutable` could be folded to a constant and leave a paper permanently "not expired".
 - **`preda_test` is idempotent** and the score is computed, never stored. The denominator is `nr_cerut`, so unanswered questions count against you — same as `score` in `useSession`.
-- **Modes map onto `attempt_source` rather than extending the enum**, because `statistici.ts` reads it; a new enum value would mean a new Statistici row smuggled in through a migration. `greseli` maps to `recapitulare` because that is what it is. This finally makes `source='simulare'` reachable — that row in Statistici was structurally always zero.
+- **Modes map onto `attempt_source` rather than extending the enum**, because `statistici.ts` reads it; a new enum value would mean a new Statistici row smuggled in through a migration. `greseli` maps to `recapitulare` because that is what it is.
 - **Only answered questions reach the journal**, as today. `attempts_chosen_or_blank` permits a blank row and it would be good data ("how many you leave blank under time pressure"), but recording them would retroactively change what `progres.ts` counts — blanks would enter `grileIncercate` and lower the correctness percentage. That is a statistics change, so it gets taken deliberately and separately.
 - **`citeste_grila_admin` exists before it is needed.** Once the answer columns are revoked, the Admin editor loses them along with the student. A column grant is per database role, but "admin" is an application role (`profiles.role`), so there is no role to grant to — the admin path has to be a `security definer` function, written and tested before the revoke rather than alongside it.
+
+### The client's one door to the engine — `src/lib/lucrari.ts`
+
+The five RPCs are wrapped there and **nowhere else touches `test_runs`**. That is a rule, not an accident: a direct `supabase.from('test_runs')` would bypass exactly the guarantees the engine was moved server-side for — grading on the server, the correct answer arriving only once earned, the snapshot frozen after generation.
+
+Errors from the database are **codes**, and `codEroare()` extracts them against a closed list (`CODURI_LUCRARE`). Matching is on whole words, so a longer identifier that happens to contain a code is not read as that code, and an arbitrary message cannot be mistaken for one. Translation into Romanian belongs at the screen, where the context is known — "no questions found" reads differently in practice than in review.
+
+### Moving the old runs across — migration 0019
+
+The 23 pre-engine runs are **copied, not moved**: `sessions` and `sim_runs` keep their rows and the deployed client keeps writing to them, so switching the client can be rolled back without losing anything. The migration is idempotent for that reason — it runs now, and runs again the day the client switches, to catch sessions created in between.
+
+- **Simulations rebuild completely.** `sim_runs.question_ids` *is* the paper's order, so it becomes `test_run_items` position by position, numbered **from 0** — `attempts.client_key` is `'<run>:<index>'`, so an off-by-one here would unstick every old answer from its question. `option_order` stays null because nothing was ever shuffled; that is the true value, not a placeholder.
+- **Practice sessions do not rebuild.** Their order lived only in `localStorage` (`SessionRun.order`), never in the database. The row moves without items and `nr_cerut` stays null. A count could have been invented from the number of answers, but it would then be the score's denominator, and a session where questions were skipped would read 100% — precisely the hand-written figure this project spent a phase removing. `nr_cerut` is nullable now, and `preda_test` returns `pct: null` rather than a fabricated zero.
+- **Mode is derived from the journal, not assumed.** Recapitulare also writes a `sessions` row, so `attempts.source` is the only thing that distinguishes it.
+
+The migration ends with a `do $$ … $$` block that raises on any row-count mismatch: a half-copy must fail the deploy, not ship.
 
 ### Two derived columns that are not state
 

@@ -2095,3 +2095,204 @@ describe('citirea de administrator', () => {
     ).rejects.toThrow(/nu există/i);
   });
 });
+
+/**
+ * Mutarea lucrărilor vechi în `test_runs`.
+ *
+ * Pe o bază proaspătă nu e nimic de mutat, deci testele își fac singure
+ * rândurile vechi și cheamă migrarea din nou — ceea ce verifică și
+ * idempotența, care e chiar proprietatea de care depinde planul: migrarea se
+ * rulează o dată acum și încă o dată în ziua în care trece clientul, ca să
+ * prindă sesiunile create între timp.
+ */
+describe('mutarea lucrărilor vechi', () => {
+  const MIGRARE = '0019_mutarea_lucrarilor.sql';
+
+  const ruleazaMutarea = async () => {
+    const { readFileSync } = await import('node:fs');
+    const sql = readFileSync(new URL(`./migrations/${MIGRARE}`, import.meta.url), 'utf8');
+    // Prima linie schimbă o coloană deja schimbată; restul e idempotent.
+    await baza.db.exec(sql.replace('alter table test_runs alter column nr_cerut drop not null;', ''));
+  };
+
+  const sesiuneVeche = async (userId: string, capitole: string[] = ['bio-nervos']) => {
+    const r = await baza.db.query<{ id: string }>(
+      `insert into sessions (user_id, started_at, finished_at, chapter_ids)
+       values ($1, now() - interval '2 days', now() - interval '2 days' + interval '10 minutes', $2)
+       returning id`,
+      [userId, capitole],
+    );
+    return r.rows[0]!.id;
+  };
+
+  const simulareVeche = async (userId: string, grile: string[]) => {
+    const r = await baza.db.query<{ id: string }>(
+      `insert into sim_runs (user_id, started_at, ends_at, finished_at, config, question_ids)
+       values ($1, now() - interval '3 days', now() - interval '3 days' + interval '3 hours',
+               now() - interval '3 days' + interval '2 hours', '{"nr":3}'::jsonb, $2)
+       returning id`,
+      [userId, grile],
+    );
+    return r.rows[0]!.id;
+  };
+
+  it('mută o sesiune păstrându-i id-ul, dar fără să-i inventeze numărul de grile', async () => {
+    const id = await sesiuneVeche(ana, ['bio-nervos', 'bio-osos']);
+    await ruleazaMutarea();
+
+    const r = await baza.db.query<{
+      id: string;
+      mod: string;
+      nr_cerut: number | null;
+      config: { capitole: string[] };
+      ends_at: string | null;
+    }>('select id::text, mod::text, nr_cerut, config, ends_at from test_runs where id = $1', [id]);
+
+    expect(r.rows[0]).toMatchObject({
+      id,
+      mod: 'exersare',
+      // Ordinea sesiunii a trăit doar în localStorage: nu se știe câte au fost.
+      nr_cerut: null,
+      ends_at: null,
+    });
+    expect(r.rows[0]!.config.capitole).toEqual(['bio-nervos', 'bio-osos']);
+
+    // Și nicio grilă inventată pentru ea.
+    const grile = await baza.db.query<{ n: number }>(
+      'select count(*)::int as n from test_run_items where run_id = $1',
+      [id],
+    );
+    expect(grile.rows[0]!.n).toBe(0);
+  });
+
+  /**
+   * Recapitularea scrie tot un rând în `sessions`, deci singurul semn care o
+   * deosebește e `attempts.source`. Se derivă, nu se presupune.
+   */
+  it('recunoaște o recapitulare după jurnalul ei, nu o trece drept exersare', async () => {
+    const id = await sesiuneVeche(ana);
+    await baza.db.query(
+      `insert into attempts (user_id, question_id, chosen, is_correct, source, session_id, client_key)
+       values ($1, 'bio-nervos-01', 'A', false, 'recapitulare', $2, $3)`,
+      [ana, id, `${id}:0`],
+    );
+
+    await ruleazaMutarea();
+
+    const r = await baza.db.query<{ mod: string }>('select mod::text from test_runs where id = $1', [id]);
+    expect(r.rows[0]!.mod).toBe('recapitulare');
+  });
+
+  /**
+   * Simularea se reconstruiește întreagă: `question_ids` e chiar ordinea
+   * lucrării. Pozițiile pornesc de la 0, ca `SimRun.order` în client — o
+   * deplasare cu unu ar dezlipi fiecare răspuns vechi de grila lui, fiindcă
+   * `client_key` e „<lucrare>:<indice>".
+   */
+  it('reconstruiește simularea poziție cu poziție, numerotând de la zero', async () => {
+    const ordine = ['bio-osos-01', 'chim-arene-01', 'bio-nervos-01'];
+    const id = await simulareVeche(ana, ordine);
+    await ruleazaMutarea();
+
+    const lucrare = await baza.db.query<{ mod: string; nr_cerut: number; ends_at: string | null }>(
+      'select mod::text, nr_cerut, ends_at from test_runs where id = $1',
+      [id],
+    );
+    expect(lucrare.rows[0]!.mod).toBe('simulare');
+    expect(lucrare.rows[0]!.nr_cerut).toBe(3);
+    expect(lucrare.rows[0]!.ends_at).not.toBeNull();
+
+    const grile = await baza.db.query<{ position: number; question_id: string; option_order: unknown }>(
+      'select position, question_id, option_order from test_run_items where run_id = $1 order by position',
+      [id],
+    );
+    expect(grile.rows.map((x) => x.position)).toEqual([0, 1, 2]);
+    expect(grile.rows.map((x) => x.question_id)).toEqual(ordine);
+    // Nimic nu s-a amestecat vreodată: null e valoarea adevărată, nu o umplutură.
+    for (const g of grile.rows) expect(g.option_order).toBeNull();
+  });
+
+  it('leagă jurnalul vechi de lucrare, fără să-i atingă cheia de idempotență', async () => {
+    const sesiune = await sesiuneVeche(ana);
+    const simulare = await simulareVeche(ana, ['bio-nervos-01']);
+    await baza.db.query(
+      `insert into attempts (user_id, question_id, chosen, is_correct, source, session_id, client_key)
+       values ($1, 'bio-nervos-01', 'A', false, 'sesiune', $2, $3)`,
+      [ana, sesiune, `${sesiune}:0`],
+    );
+    await baza.db.query(
+      `insert into attempts (user_id, question_id, chosen, is_correct, source, sim_run_id, client_key)
+       values ($1, 'bio-nervos-01', 'B', true, 'simulare', $2, $3)`,
+      [ana, simulare, `${simulare}:0`],
+    );
+
+    await ruleazaMutarea();
+
+    const r = await baza.db.query<{ run_id: string; client_key: string }>(
+      'select run_id::text, client_key from attempts order by client_key',
+    );
+    expect(r.rows.every((x) => x.run_id !== null)).toBe(true);
+    expect(r.rows.map((x) => x.client_key).sort()).toEqual([`${sesiune}:0`, `${simulare}:0`].sort());
+  });
+
+  /**
+   * Se rulează de două ori dinadins: o dată acum, o dată în ziua în care trece
+   * clientul, ca să prindă sesiunile din fereastra dintre ele.
+   */
+  it('se poate rula de două ori fără să dubleze nimic', async () => {
+    const sesiune = await sesiuneVeche(ana);
+    const simulare = await simulareVeche(ana, ['bio-nervos-01', 'bio-osos-01']);
+
+    await ruleazaMutarea();
+    // O sesiune apărută între cele două rulări trebuie prinsă de a doua.
+    const intreTimp = await sesiuneVeche(bogdan);
+    await ruleazaMutarea();
+
+    const n = await baza.db.query<{ lucrari: number; grile: number }>(
+      `select (select count(*)::int from test_runs) as lucrari,
+              (select count(*)::int from test_run_items) as grile`,
+    );
+    expect(n.rows[0]).toEqual({ lucrari: 3, grile: 2 });
+
+    const noua = await baza.db.query<{ n: number }>('select count(*)::int as n from test_runs where id = $1', [
+      intreTimp,
+    ]);
+    expect(noua.rows[0]!.n).toBe(1);
+    expect(sesiune).not.toBe(simulare);
+  });
+
+  /**
+   * O lucrare mutată n-are numitor, deci procentul e „nu se știe", nu zero.
+   * Fără ramura asta, `preda_test` ar împărți la null și ar întoarce null pe
+   * tot obiectul, sau — mai rău — cineva ar pune un 0 ca să nu crape.
+   */
+  it('dă un procent null la o lucrare fără numitor, în loc să crape', async () => {
+    const id = await simulareVeche(ana, ['bio-nervos-01']);
+    await ruleazaMutarea();
+    await baza.db.query('update test_runs set nr_cerut = null, finished_at = null where id = $1', [id]);
+
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ s: { pct: number | null; corecte: number; nr_cerut: number | null } }>(
+        'select public.preda_test($1::uuid) as s',
+        [id],
+      ),
+    );
+    expect(r.rows[0]!.s.pct).toBeNull();
+    expect(r.rows[0]!.s.nr_cerut).toBeNull();
+    expect(r.rows[0]!.s.corecte).toBe(0);
+  });
+
+  /** Copierea nu atinge tabelele vechi: dacă trecerea se dă înapoi, sunt acolo. */
+  it('lasă tabelele vechi neatinse', async () => {
+    const sesiune = await sesiuneVeche(ana);
+    const simulare = await simulareVeche(ana, ['bio-nervos-01']);
+    await ruleazaMutarea();
+
+    const r = await baza.db.query<{ sesiuni: number; simulari: number }>(
+      `select (select count(*)::int from sessions) as sesiuni,
+              (select count(*)::int from sim_runs) as simulari`,
+    );
+    expect(r.rows[0]).toEqual({ sesiuni: 1, simulari: 1 });
+    expect(sesiune).not.toBe(simulare);
+  });
+});
