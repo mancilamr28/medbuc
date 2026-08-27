@@ -3,11 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { useNavGroups } from './useNavGroups';
 
 const sesiune = { hasStarted: false, finished: false, total: 0, revealed: {} as Record<number, boolean> };
+const simulare = { phase: 'config' };
 
-vi.mock('../state/appContextValue', () => ({ useApp: () => ({ session: sesiune }) }));
+vi.mock('../state/appContextValue', () => ({ useApp: () => ({ session: sesiune, sim: simulare }) }));
 vi.mock('../state/authState', () => ({ useAuth: () => ({ role: 'elev' }) }));
 
-const badgeGrile = () => renderHook(() => useNavGroups()).result.current.main.find((e) => e.id === 'grile')?.badge;
+const navigarea = () => renderHook(() => useNavGroups()).result.current.main;
+const badgeGrile = () => navigarea().find((e) => e.id === 'grile')?.badge;
 
 describe('useNavGroups', () => {
   /**
@@ -16,16 +18,35 @@ describe('useNavGroups', () => {
    * deci un elev care nu începuse niciodată nimic vedea lângă „Grile" un număr
    * egal cu întreaga bibliotecă, ca și cum ar fi avut o sesiune în așteptare.
    */
-  it('nu pune insignă pe „Grile" cât timp nicio sesiune n-a fost pornită', () => {
+  it('nu arată drumurile vechi cât timp nu e nimic de reluat', () => {
     Object.assign(sesiune, { hasStarted: false, finished: false, total: 181, revealed: {} });
+    simulare.phase = 'config';
 
-    expect(badgeGrile()).toBeUndefined();
+    expect(navigarea().map((e) => e.id)).toEqual(['acasa', 'test-nou', 'recapitulare', 'statistici']);
   });
 
   it('pune insigna cu câte au rămas în sesiunea pornită', () => {
     Object.assign(sesiune, { hasStarted: true, finished: false, total: 10, revealed: { 0: true, 1: true } });
 
     expect(badgeGrile()).toBe('8');
+  });
+
+  it('nu ascunde sesiunea nepredată doar fiindcă toate grilele au fost verificate', () => {
+    Object.assign(sesiune, {
+      hasStarted: true,
+      finished: false,
+      total: 2,
+      revealed: { 0: true, 1: true },
+    });
+
+    expect(navigarea().find((e) => e.id === 'grile')?.label).toBe('Continuă sesiunea');
+    expect(badgeGrile()).toBeUndefined();
+  });
+
+  it('păstrează simularea veche în navigare numai cât este în curs', () => {
+    simulare.phase = 'rulare';
+
+    expect(navigarea().find((e) => e.id === 'simulari')?.label).toBe('Continuă simularea');
   });
 
   /** O sesiune încheiată n-are „rămase": panoul de rezultat e ce urmează, nu grile. */

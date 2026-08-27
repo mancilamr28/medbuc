@@ -4,10 +4,27 @@ import {
   SCREENS,
   SECTIUNI_ADMIN,
   idLucrareDin,
+  intentieTestNouDin,
   publicViewFor,
   screenFor,
   sectiuneAdminPentru,
 } from './router';
+
+describe('intenția asistentului de test', () => {
+  it('păstrează felul și capitolul cerute din adresă', () => {
+    expect(intentieTestNouDin('simulare', 'bio-nervos')).toEqual({
+      mod: 'simulare',
+      capitol: 'bio-nervos',
+    });
+  });
+
+  it('cade pe exersare și ignoră capitolul când felul nu există', () => {
+    expect(intentieTestNouDin('inventat', 'bio-nervos')).toEqual({
+      mod: 'exersare',
+      capitol: null,
+    });
+  });
+});
 
 /**
  * Rutarea publică.

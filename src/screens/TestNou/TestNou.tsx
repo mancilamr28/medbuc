@@ -6,7 +6,7 @@ import { PoartaContinut } from '../../components/PoartaContinut';
 import { chapterLabel, type ChapterId, type MaterieId } from '../../data/chapters';
 import { numaraGrile } from '../../lib/continut';
 import { codEroare, genereazaTest, numaraCandidati } from '../../lib/lucrari';
-import { goLucrare } from '../../lib/router';
+import { goLucrare, useIntentieTestNou, type IntentieTestNou } from '../../lib/router';
 import { numar } from '../../lib/text';
 import { SANS, eyebrow, pageLead, pageTitle } from '../../lib/ui';
 import { useApp } from '../../state/appContextValue';
@@ -42,9 +42,10 @@ import {
  * rând deloc.
  */
 export function TestNou() {
+  const intentie = useIntentieTestNou();
   return (
     <PoartaContinut>
-      <Asistent />
+      <Asistent key={`${intentie.mod}:${intentie.capitol ?? ''}`} intentie={intentie} />
     </PoartaContinut>
   );
 }
@@ -114,10 +115,15 @@ function useNumarPeMod() {
   return pe;
 }
 
-function Asistent() {
+function Asistent({ intentie }: { intentie: IntentieTestNou }) {
   const { questions, taxonomie } = useApp();
   const { notify } = useToast();
-  const [stare, setStare] = useState<StareAsistent>(() => stareInitiala());
+  const [stare, setStare] = useState<StareAsistent>(() =>
+    stareInitiala(
+      intentie.mod,
+      intentie.capitol === null ? [] : [intentie.capitol as ChapterId],
+    ),
+  );
   const [pas, setPas] = useState<PasAsistent>('mod');
   const [seGenereaza, setSeGenereaza] = useState(false);
 

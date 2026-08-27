@@ -1,10 +1,17 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS } from '../data/questions';
 import type { AttemptRow } from '../lib/progres';
 import { Acasa } from './Acasa';
 
 const go = vi.fn();
+const router = vi.hoisted(() => ({ goTestNou: vi.fn() }));
+
+vi.mock('../lib/router', async (original) => ({
+  ...(await original<typeof import('../lib/router')>()),
+  goTestNou: router.goTestNou,
+}));
 
 const stare = vi.hoisted(() => ({ attempts: [] as AttemptRow[] }));
 
@@ -17,7 +24,13 @@ vi.mock('../state/appContextValue', async () => {
       go,
       questions: QUESTIONS,
       taxonomie: TAXONOMIE_SEED,
-      session: { answers: {}, finished: false, total: 5, start: vi.fn() },
+      session: {
+        answers: {},
+        finished: false,
+        total: 5,
+        start: vi.fn(),
+        cereConfigurare: vi.fn(),
+      },
       recapitulare: { items: [], scadente: [] },
     }),
   };
@@ -47,9 +60,20 @@ vi.mock('../state/progressState', () => ({
 
 beforeEach(() => {
   stare.attempts = [];
+  go.mockReset();
+  router.goTestNou.mockReset();
 });
 
 describe('Acasă', () => {
+  it('pornește o sesiune nouă prin asistentul nou', async () => {
+    const user = userEvent.setup();
+    render(<Acasa />);
+
+    await user.click(screen.getByRole('button', { name: 'Începe o sesiune →' }));
+    expect(router.goTestNou).toHaveBeenCalledWith('exersare');
+    expect(go).not.toHaveBeenCalledWith('grile');
+  });
+
   it('afișează acțiunea de recapitulare ca buton secundar complet', () => {
     render(<Acasa />);
 
@@ -79,6 +103,15 @@ describe('Acasă', () => {
 
     expect(screen.getByText('03. Sistemul nervos')).toBeInTheDocument();
     expect(screen.queryByText('Nu avem încă greșeli înregistrate')).not.toBeInTheDocument();
+  });
+
+  it('trimite capitolul slab ales în asistent, fără să pornească motorul vechi', async () => {
+    const user = userEvent.setup();
+    stare.attempts = [raspuns('bio-nervos-01', false)];
+    render(<Acasa />);
+
+    await user.click(screen.getByRole('button', { name: /Sistemul nervos/ }));
+    expect(router.goTestNou).toHaveBeenCalledWith('exersare', 'bio-nervos');
   });
 
 });

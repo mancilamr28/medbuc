@@ -29,8 +29,8 @@ interface NavMobil {
 const PRINCIPALE: NavMobil[] = [
   { id: 'acasa', label: 'Acasă', icon: faHouse },
   { id: 'test-nou', label: 'Test nou', icon: faWandMagicSparkles },
-  { id: 'grile', label: 'Grile', icon: faListCheck },
-  { id: 'simulari', label: 'Simulări', icon: faStopwatch },
+  { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft },
+  { id: 'statistici', label: 'Statistici', icon: faChartLine },
 ];
 
 const IN_CURAND: NavMobil[] = [{ id: 'plan', label: 'Planul meu', icon: faCalendarDays }];
@@ -39,7 +39,7 @@ const MENU_ID = 'navigare-mobila-mai-multe';
 
 /** Navigația de jos, pe telefon, plus destinațiile secundare într-un meniu familiar. */
 export function MobileNav() {
-  const { screen, go } = useApp();
+  const { screen, go, session, sim } = useApp();
   const { role } = useAuth();
   const [deschis, setDeschis] = useState(false);
   const butonMaiMulte = useRef<HTMLButtonElement>(null);
@@ -168,8 +168,10 @@ export function MobileNav() {
             </div>
 
             <div style={{ display: 'grid', gap: 3 }}>
-              {randMeniu({ id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft })}
-              {randMeniu({ id: 'statistici', label: 'Statistici și progres', icon: faChartLine })}
+              {session.hasStarted && !session.finished &&
+                randMeniu({ id: 'grile', label: 'Continuă sesiunea', icon: faListCheck })}
+              {sim.phase === 'rulare' &&
+                randMeniu({ id: 'simulari', label: 'Continuă simularea', icon: faStopwatch })}
               {randMeniu({ id: 'notite', label: 'Notițe', icon: faNoteSticky })}
               {randMeniu({ id: 'setari', label: 'Profil și setări', icon: faGear })}
               {role === 'admin' && randMeniu({ id: 'admin', label: 'Administrare', icon: faShieldHalved })}

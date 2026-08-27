@@ -1,5 +1,6 @@
 import type { ChapterId, MaterieId } from '../../data/chapters';
 import type { CerereTest, ModTest } from '../../lib/lucrari';
+import type { ModTestNou } from '../../lib/router';
 import { numar } from '../../lib/text';
 
 /**
@@ -18,7 +19,7 @@ import { numar } from '../../lib/text';
  * lui, iar celălalt n-are încă testele pe care să le ruleze. Un mod în plus se
  * adaugă aici, nu în bază.
  */
-export type ModAsistent = 'exersare' | 'simulare' | 'greseli' | 'favorite' | 'nevazute';
+export type ModAsistent = ModTestNou;
 
 export interface DescriereMod {
   id: ModAsistent;
@@ -106,12 +107,15 @@ export interface StareAsistent {
   amestecaOptiuni: boolean;
 }
 
-export const stareInitiala = (mod: ModAsistent = 'exersare'): StareAsistent => {
+export const stareInitiala = (
+  mod: ModAsistent = 'exersare',
+  capitole: ChapterId[] = [],
+): StareAsistent => {
   const d = descriereMod(mod);
   return {
     mod,
     materii: [],
-    capitole: [],
+    capitole,
     nr: d.nrImplicit,
     durataMinute: d.durataImplicita,
     amestecaGrile: true,

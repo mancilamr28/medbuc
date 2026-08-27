@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { usePersistentState } from '../lib/hooks';
 import { calculeazaProgres, capitoleSlabe } from '../lib/progres';
 import { urmatoareaScadenta } from '../lib/recapitulare';
+import { goTestNou } from '../lib/router';
 import { numar, primulNume } from '../lib/text';
 import { daysUntil } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, pctPill } from '../lib/ui';
@@ -65,13 +66,12 @@ export function Acasa() {
   /**
    * O sesiune încheiată nu se poate „continua": ecranul de grile ar arăta iar
    * panoul de rezultat, deși butonul de aici scrie „Începe o sesiune". Una
-   * neîncheiată se reia ca atare; orice altceva cere configurarea din nou, ca
-   * elevul să aleagă materia, scopul și sursa, nu să repornească orbește pe
-   * toată biblioteca.
+   * neîncheiată se reia pe drumul vechi ca să nu se piardă. Orice început nou
+   * intră prin asistentul comun, unde elevul își alege felul și conținutul.
    */
   const deschideGrile = () => {
-    if (!inSesiune) session.cereConfigurare();
-    go('grile');
+    if (inSesiune) go('grile');
+    else goTestNou('exersare');
   };
 
   return (
@@ -112,10 +112,7 @@ export function Acasa() {
               <button
                 type="button"
                 className="btn-ghost"
-                onClick={() => {
-                  session.cereConfigurare();
-                  go('grile');
-                }}
+                onClick={() => goTestNou('exersare')}
                 style={{ padding: '12px 16px', font: `500 14px ${SANS}` }}
               >
                 Alege capitolele
@@ -183,10 +180,7 @@ export function Acasa() {
                   key={c.capId}
                   type="button"
                   className="row-btn"
-                  onClick={() => {
-                    session.start([c.capId]);
-                    go('grile');
-                  }}
+                  onClick={() => goTestNou('exersare', c.capId)}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 4px', borderTop: '1px solid var(--line)' }}
                 >
                   <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>

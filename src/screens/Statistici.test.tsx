@@ -50,6 +50,9 @@ describe('statisticile reale', () => {
     expect(screen.getByText('Nu există răspunsuri în perioada aleasă')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Tot timpul' }));
     expect(screen.getByText('Încheie o sesiune de grile și progresul va apărea aici.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Alege un capitol' }));
+    expect(window.location.hash).toBe('#/test-nou/exersare');
   });
 
   it('nu transformă o eroare de citire în zero și poate reîncerca', async () => {

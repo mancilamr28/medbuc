@@ -7,10 +7,17 @@ const stare = vi.hoisted(() => ({
   ecran: 'acasa',
   rol: 'elev',
   go: vi.fn(),
+  sesiuneInCurs: false,
+  simulareInCurs: false,
 }));
 
 vi.mock('../state/appContextValue', () => ({
-  useApp: () => ({ screen: stare.ecran, go: stare.go }),
+  useApp: () => ({
+    screen: stare.ecran,
+    go: stare.go,
+    session: { hasStarted: stare.sesiuneInCurs, finished: false },
+    sim: { phase: stare.simulareInCurs ? 'rulare' : 'config' },
+  }),
 }));
 
 vi.mock('../state/authState', () => ({
@@ -21,10 +28,12 @@ describe('Navigarea mobilă', () => {
   beforeEach(() => {
     stare.ecran = 'acasa';
     stare.rol = 'elev';
+    stare.sesiuneInCurs = false;
+    stare.simulareInCurs = false;
     stare.go.mockReset();
   });
 
-  it('ține destinațiile principale la îndemână și deschide direct simulările', async () => {
+  it('ține un singur drum pentru testele noi în navigarea principală', async () => {
     const user = userEvent.setup();
     render(<MobileNav />);
 
@@ -32,13 +41,25 @@ describe('Navigarea mobilă', () => {
     expect(within(navigare).getAllByRole('button').map((buton) => buton.textContent)).toEqual([
       'Acasă',
       'Test nou',
-      'Grile',
-      'Simulări',
+      'Recapitulare',
+      'Statistici',
       'Mai multe',
     ]);
 
-    await user.click(within(navigare).getByRole('button', { name: 'Simulări' }));
-    expect(stare.go).toHaveBeenCalledWith('simulari');
+    await user.click(within(navigare).getByRole('button', { name: 'Test nou' }));
+    expect(stare.go).toHaveBeenCalledWith('test-nou');
+  });
+
+  it('ține în meniul secundar lucrările vechi care încă sunt în curs', async () => {
+    stare.sesiuneInCurs = true;
+    stare.simulareInCurs = true;
+    const user = userEvent.setup();
+    render(<MobileNav />);
+
+    await user.click(screen.getByRole('button', { name: 'Mai multe' }));
+    const meniu = screen.getByRole('dialog', { name: 'Mai multe' });
+    expect(within(meniu).getByRole('button', { name: 'Continuă sesiunea' })).toBeInTheDocument();
+    expect(within(meniu).getByRole('button', { name: 'Continuă simularea' })).toBeInTheDocument();
   });
 
   it('separă opțiunile reale de funcțiile care sunt încă în lucru', async () => {
@@ -49,8 +70,8 @@ describe('Navigarea mobilă', () => {
     const meniu = screen.getByRole('dialog', { name: 'Mai multe' });
 
     expect(within(meniu).getByRole('button', { name: 'Profil și setări' })).toBeInTheDocument();
-    expect(within(meniu).getByRole('button', { name: 'Recapitulare' })).toBeInTheDocument();
-    expect(within(meniu).getByRole('button', { name: 'Statistici și progres' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Navigare principală' })).toHaveTextContent('Recapitulare');
+    expect(screen.getByRole('navigation', { name: 'Navigare principală' })).toHaveTextContent('Statistici');
     expect(within(meniu).getByRole('button', { name: 'Notițe' })).toBeInTheDocument();
     // Un singur ecran mai e „în lucru" acum (Planul meu): un antet + o pastilă.
     expect(within(meniu).getAllByText('În curând')).toHaveLength(2);
@@ -59,15 +80,10 @@ describe('Navigarea mobilă', () => {
     expect(stare.go).toHaveBeenCalledWith('notite');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Mai multe' }));
-
     await user.click(screen.getByRole('button', { name: 'Recapitulare' }));
     expect(stare.go).toHaveBeenCalledWith('recapitulare');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Mai multe' }));
-
-    await user.click(screen.getByRole('button', { name: 'Statistici și progres' }));
+    await user.click(screen.getByRole('button', { name: 'Statistici' }));
     expect(stare.go).toHaveBeenCalledWith('statistici');
 
     await user.click(screen.getByRole('button', { name: 'Mai multe' }));

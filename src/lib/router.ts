@@ -100,6 +100,53 @@ export function useSectiuneAdmin(): [SectiuneAdmin, (s: SectiuneAdmin) => void] 
 
   return [sectiune, goAdmin];
 }
+
+// ---------------------------------------------------------------------------
+// Intenția cu care se deschide asistentul de test.
+//
+// Drumurile vechi rămân accesibile cât timp mai pot exista sesiuni locale în
+// curs, dar orice început nou intră prin același asistent. Felul și, opțional,
+// capitolul stau în adresă ca un buton din Acasă să poată păstra alegerea fără
+// stare globală ori localStorage (`#/test-nou/exersare/bio-nervos`).
+// ---------------------------------------------------------------------------
+
+export const MODURI_TEST_NOU = ['exersare', 'simulare', 'greseli', 'favorite', 'nevazute'] as const;
+export type ModTestNou = (typeof MODURI_TEST_NOU)[number];
+
+export interface IntentieTestNou {
+  mod: ModTestNou;
+  capitol: string | null;
+}
+
+const esteModTestNou = (v: string | undefined): v is ModTestNou =>
+  v !== undefined && (MODURI_TEST_NOU as readonly string[]).includes(v);
+
+/** Pură: o adresă inventată cade pe exersare, fără să păstreze un filtru străin. */
+export const intentieTestNouDin = (
+  mod: string | undefined,
+  capitol: string | undefined,
+): IntentieTestNou =>
+  esteModTestNou(mod)
+    ? { mod, capitol: capitol && capitol.length > 0 ? capitol : null }
+    : { mod: 'exersare', capitol: null };
+
+export const goTestNou = (mod: ModTestNou = 'exersare', capitol?: string): void => {
+  window.location.hash = `/test-nou/${mod}${capitol ? `/${capitol}` : ''}`;
+  window.scrollTo(0, 0);
+};
+
+export function useIntentieTestNou(): IntentieTestNou {
+  const citeste = () => intentieTestNouDin(segmente()[1], segmente()[2]);
+  const [intentie, setIntentie] = useState<IntentieTestNou>(citeste);
+
+  useEffect(() => {
+    const laSchimbare = () => setIntentie(citeste());
+    window.addEventListener('hashchange', laSchimbare);
+    return () => window.removeEventListener('hashchange', laSchimbare);
+  }, []);
+
+  return intentie;
+}
 // ---------------------------------------------------------------------------
 // Al doilea segment, folosit de ecranul unei lucrări.
 //

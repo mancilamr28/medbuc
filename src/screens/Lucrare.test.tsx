@@ -52,7 +52,10 @@ const lucrarea = (mod: ModTest, grile: GrilaDinLucrare[], predata = false): Lucr
     mod,
     config: { mod },
     started_at: '2026-08-25T10:00:00.000Z',
-    ends_at: mod === 'simulare' ? '2026-08-25T13:00:00.000Z' : null,
+    // Trebuie să fie în viitor față de momentul rulării testului. Data fixă de
+    // aici a expirat la două zile după ce a fost scris testul, iar simularea
+    // „în curs" se preda singură înainte ca testul să poată alege o variantă.
+    ends_at: mod === 'simulare' ? new Date(Date.now() + 3 * 60 * 60_000).toISOString() : null,
     finished_at: predata ? '2026-08-25T11:00:00.000Z' : null,
     qi: 0,
     nr_cerut: grile.length,
