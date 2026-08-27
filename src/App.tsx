@@ -11,12 +11,14 @@ import { Admin } from './screens/Admin';
 import { Autentificare, type ModAutentificare } from './screens/Autentificare';
 import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
+import { Lucrare } from './screens/Lucrare';
 import { Notite } from './screens/Notite';
 import { Recapitulare } from './screens/Recapitulare';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
 import { Simulari } from './screens/Simulari';
 import { Statistici } from './screens/Statistici';
+import { TestNou } from './screens/TestNou/TestNou';
 import { useApp } from './state/appContextValue';
 import { useAuth } from './state/authState';
 
@@ -66,6 +68,10 @@ function Content() {
   switch (screen) {
     case 'grile':
       return <Grile />;
+    case 'test-nou':
+      return <TestNou />;
+    case 'lucrare':
+      return <Lucrare />;
     case 'recapitulare':
       return <Recapitulare />;
     case 'simulari':

@@ -3,6 +3,7 @@ import {
   PUBLIC_ROUTES,
   SCREENS,
   SECTIUNI_ADMIN,
+  idLucrareDin,
   publicViewFor,
   screenFor,
   sectiuneAdminPentru,
@@ -113,5 +114,30 @@ describe('rutarea pe două segmente', () => {
     expect(publicViewFor('admin')).toBe('autentificare');
     expect(publicViewFor('inregistrare')).toBe('inregistrare');
     expect(publicViewFor('altceva')).toBe('landing');
+  });
+});
+
+/**
+ * Id-ul lucrării stă în adresă, nu în `localStorage`: lucrarea trăiește pe
+ * server, deci adresa e de-ajuns ca să o redeschizi, iar o a doua sursă locală
+ * de adevăr ar trebui migrată mai târziu.
+ */
+describe('id-ul lucrării din adresă', () => {
+  it('citește un uuid din al doilea segment', () => {
+    expect(idLucrareDin('0f5b9c2e-1a3d-4e5f-8a9b-0c1d2e3f4a5b')).toBe(
+      '0f5b9c2e-1a3d-4e5f-8a9b-0c1d2e3f4a5b',
+    );
+  });
+
+  /**
+   * Forma se verifică aici, nu la server: un segment inventat în bara de adrese
+   * trebuie să dea „n-am ce deschide", nu un drum la bază cu un `uuid` invalid.
+   */
+  it('refuză orice nu e uuid, inclusiv lipsa segmentului', () => {
+    expect(idLucrareDin(undefined)).toBeNull();
+    expect(idLucrareDin('')).toBeNull();
+    expect(idLucrareDin('ultima')).toBeNull();
+    expect(idLucrareDin('0f5b9c2e-1a3d-4e5f-8a9b-0c1d2e3f4a5')).toBeNull();
+    expect(idLucrareDin('../../questions')).toBeNull();
   });
 });

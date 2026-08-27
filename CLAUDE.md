@@ -74,6 +74,8 @@ Hash-based, no router dependency. The `SCREENS` tuple is the single source of tr
 
 **Adding a screen requires coordinated edits**: add the id to `SCREENS`, add it to `BUILT_SCREENS`, add a `case` in `Content()` in `src/App.tsx`, and add nav entries in `src/components/Sidebar.tsx` and `src/components/MobileNav.tsx`.
 
+`lucrare` is the exception that proves the rule: it *is* in `SCREENS` and `BUILT_SCREENS` and has a `case`, but **no nav entry**, because there is nothing to navigate to without a run id. Its id lives in the second hash segment (`#/lucrare/<uuid>`), read by `useIdLucrare()` and written by `goLucrare()` — the same second-segment mechanism `SECTIUNI_ADMIN` uses, and for the same reason: it is not a screen. The id is deliberately **not** in `localStorage`. The run lives on the server, so the address is the whole handle — it reopens on another device, and there is no fourth persisted key to migrate later. `idLucrareDin` validates the uuid shape client-side so a hand-typed segment produces "nothing to open" rather than a database round trip that fails on a cast.
+
 The same module also carries a second, disjoint route space for visitors without a session — see "The public route space" below. A page meant for logged-out visitors does **not** go in `SCREENS`.
 
 ### Global state — `src/state/AppState.tsx`
@@ -368,6 +370,25 @@ The 23 pre-engine runs are **copied, not moved**: `sessions` and `sim_runs` keep
 - **Mode is derived from the journal, not assumed.** Recapitulare also writes a `sessions` row, so `attempts.source` is the only thing that distinguishes it.
 
 The migration ends with a `do $$ … $$` block that raises on any row-count mismatch: a half-copy must fail the deploy, not ship.
+
+### The new path runs beside the old one — `#/test-nou` and `#/lucrare/<id>`
+
+The engine landed with nothing calling it. The client half is `TestNou` (the wizard) plus `Lucrare` (solving and the result panel), and it is a **second, parallel path**: `Grile`, `Simulari` and `Recapitulare` are untouched and still write to `sessions`/`sim_runs`. The plan called for converting those three hooks onto one `useTestRun` first; building the new path beside them instead means nothing a student already uses can break while the new one is proven, and the old screens get retired rather than rebuilt. Migration 0019 is re-runnable precisely so the runs created in that window are caught at switchover.
+
+**`useLucrare` is not `useSession` with a different backend.** The two differ by *owner*: `useSession`/`useSimulare` hold the truth and sync at the end, `useLucrare` holds nothing — every pick, mark and submission goes through `src/lib/lucrari.ts`, and there is no `localStorage` and no in-memory bank anywhere in it. That is what makes a run resumable from another device, and it is why the countdown still derives from an absolute `ends_at` rather than a decremented counter.
+
+Four things in the client half that are load-bearing:
+
+- **Picking a letter is local in practice, sent immediately in a simulation.** In practice modes `raspunde` *is* the check — it reveals, journals and returns the explanation — so sending on click would hand over the answer nobody asked to see. In a simulation nothing is revealed, so sending immediately is free and a reload does not lose the answer. `verificaPeLoc()` mirrors `v_verific` in `raspunde`; if one changes, the other must.
+- **Marking retransmits the current `chosen`, never `null`.** On a checked question `raspunde` raises `raspuns_blocat` for any other value, and `null` would read as "I erased my answer".
+- **`AnswerOptions` takes `correct?`, not a whole `Question`.** On this path the correct answer genuinely is absent until earned, and demanding a full `Question` would have forced a made-up letter into the prop just to satisfy the type — the exact lie the screen then renders.
+- **The wizard's steps are derived, not a fixed page count.** `pasiVizibili()` drops the content step when the mode picks its own questions (your mistakes do not narrow by chapter) or when fewer than two chapters have anything written. With today's bank that is three visible steps, and it grows on its own as content is written. Per-chapter numbers on that step come from the in-memory library and are labelled as such; the authoritative total under the card is `numara_candidati`, debounced, with out-of-order responses discarded.
+
+### `raspunde` used to hand over the answer for a mark — migration 0020
+
+`revealed = revealed or v_verific` with `v_verific` always true outside a simulation meant **any** call revealed, including the `aleasa: null` shape the mark button sends for an untouched question. That did two wrong things at once: it returned `correct`/`expl`/`why` for a question nobody had answered, and it left the row `revealed` with `chosen` null — journaling nothing (the insert is guarded on `v_aleasa is not null`) while the block on a checked question then refused every later answer. The question left the paper silently. Nothing called it with `aleasa: null` before `Lucrare`, so there was no data to repair.
+
+Revealing belongs to answering, not to touching the row: `v_dezvaluie` is `v_verific and v_aleasa is not null`, and it now gates the write and the response alike.
 
 ### Two derived columns that are not state
 

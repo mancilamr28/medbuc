@@ -9,6 +9,7 @@ import {
   faRotateLeft,
   faShieldHalved,
   faStopwatch,
+  faWandMagicSparkles,
   faXmark,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
@@ -27,6 +28,7 @@ interface NavMobil {
 
 const PRINCIPALE: NavMobil[] = [
   { id: 'acasa', label: 'Acasă', icon: faHouse },
+  { id: 'test-nou', label: 'Test nou', icon: faWandMagicSparkles },
   { id: 'grile', label: 'Grile', icon: faListCheck },
   { id: 'simulari', label: 'Simulări', icon: faStopwatch },
 ];
@@ -43,7 +45,10 @@ export function MobileNav() {
   const butonMaiMulte = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLElement>(null);
 
-  const esteMaiMulte = !PRINCIPALE.some((n) => n.id === screen);
+  // Lucrarea nu are intrare nicăieri — se ajunge în ea din asistent, după id —
+  // deci n-are ce aprinde. Fără excepția asta ar aprinde „Mai multe", adică ar
+  // arăta spre un meniu în care nu e.
+  const esteMaiMulte = !PRINCIPALE.some((n) => n.id === screen) && screen !== 'lucrare';
 
   useEffect(() => {
     if (!deschis) return;

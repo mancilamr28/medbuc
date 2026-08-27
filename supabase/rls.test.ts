@@ -1919,6 +1919,48 @@ describe('rezolvarea lucrării', () => {
     expect(n.rows[0]!.n).toBe(1);
   });
 
+
+  /**
+   * Marcarea nu e un răspuns.
+   *
+   * `raspunde` era singurul drum spre `marked`, iar la exersare dezvăluia
+   * necondiționat: un semn pus pe o grilă neatinsă o închidea pe loc, fără
+   * răspuns și fără rând în jurnal — adică o scotea definitiv din sesiune, în
+   * tăcere. Dezvăluirea ține de răspuns, nu de atingerea rândului.
+   */
+  it('nu deschide răspunsul când doar se pune un semn pe grilă', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+
+    const r = await raspunde(ana, { run_id: run, pozitie: 0, aleasa: null, marcata: true });
+    expect(r.correct).toBeUndefined();
+
+    const dupaMarcaj = await citeste(ana, run);
+    expect(dupaMarcaj.grile[0]).toMatchObject({ marked: true, revealed: false, chosen: null });
+    // Și tot ce ține de răspunsul corect trebuie să lipsească în continuare.
+    expect(dupaMarcaj.grile[0]!.correct).toBeUndefined();
+
+    // Grila rămâne de rezolvat, nu blocată.
+    const corecta = await corectaLa(run, 0);
+    const dupaRaspuns = await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta });
+    expect(dupaRaspuns.corect).toBe(true);
+
+    const jurnal = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ n: number }>('select count(*)::int as n from attempts where run_id = $1', [run]),
+    );
+    expect(jurnal.rows[0]!.n).toBe(1);
+  });
+
+  /** Semnul se poate scoate, iar scoaterea lui nu atinge răspunsul deja dat. */
+  it('lasă semnul să fie scos fără să rescrie răspunsul', async () => {
+    const run = await genereaza(ana, { mod: 'exersare', nr: 3 });
+    const corecta = await corectaLa(run, 0);
+
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta, marcata: true });
+    await raspunde(ana, { run_id: run, pozitie: 0, aleasa: corecta, marcata: false });
+
+    const dupa = await citeste(ana, run);
+    expect(dupa.grile[0]).toMatchObject({ marked: false, revealed: true, chosen: corecta });
+  });
   /**
    * Simularea e altfel, și e chiar rostul separării: până la predare nu afli
    * nimic, iar răspunsul se poate schimba.

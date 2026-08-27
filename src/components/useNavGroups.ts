@@ -8,6 +8,7 @@ import {
   faRotateLeft,
   faShieldHalved,
   faStopwatch,
+  faWandMagicSparkles,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import type { Screen } from '../lib/router';
@@ -35,6 +36,7 @@ export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
   return {
     main: [
       { id: 'acasa', label: 'Acasă', icon: faHouse },
+      { id: 'test-nou', label: 'Test nou', icon: faWandMagicSparkles },
       { id: 'grile', label: 'Grile', icon: faListCheck, badge: ramase > 0 ? String(ramase) : undefined },
       { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft },
       { id: 'simulari', label: 'Simulări', icon: faStopwatch },
