@@ -50,6 +50,30 @@ beforeEach(() => {
 const buton = (name: RegExp | string) => screen.getByRole('button', { name });
 
 describe('asistentul de test nou', () => {
+  it('pornește cu felul cerut în adresă și valorile lui implicite', async () => {
+    contorul(6);
+    window.location.hash = '#/test-nou/simulare';
+    deschide();
+
+    await waitFor(() => expect(buton(/Simulare/)).toHaveAttribute('aria-pressed', 'true'));
+    await userEvent.setup().click(buton(/Simulare/));
+    await userEvent.setup().click(buton('Mai departe →'));
+    expect(screen.getByRole('spinbutton', { name: 'Numărul de grile' })).toHaveValue(100);
+    expect(screen.getByRole('spinbutton', { name: 'Durata în minute' })).toHaveValue(180);
+  });
+
+  it('păstrează capitolul ales pe pagina Acasă', async () => {
+    contorul(6);
+    window.location.hash = '#/test-nou/exersare/bio-nervos';
+    deschide();
+
+    await userEvent.setup().click(buton(/Exersare/));
+    expect(screen.getByRole('button', { name: /Sistemul nervos/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('începe cu felul testului și arată câte grile are fiecare', async () => {
     contorul(6, { greseli: 0, favorite: 0 });
     deschide();

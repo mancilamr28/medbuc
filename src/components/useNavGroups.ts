@@ -23,23 +23,34 @@ export interface NavEntry {
 }
 
 export function useNavGroups(): { main: NavEntry[]; sec: NavEntry[] } {
-  const { session } = useApp();
+  const { session, sim } = useApp();
   const { role } = useAuth();
 
   // Doar o sesiune pornită și neterminată are „rămase". Fără `hasStarted`,
   // `session.total` e biblioteca întreagă (scop gol = toată materia), așa că un
   // elev care n-a început nimic vedea lângă „Grile" un număr egal cu toată
   // biblioteca, ca și cum ar avea o sesiune în așteptare.
-  const ramase =
-    session.hasStarted && !session.finished ? session.total - Object.keys(session.revealed).length : 0;
+  const sesiuneVecheInCurs = session.hasStarted && !session.finished;
+  const ramase = sesiuneVecheInCurs
+    ? session.total - Object.keys(session.revealed).length
+    : 0;
 
   return {
     main: [
       { id: 'acasa', label: 'Acasă', icon: faHouse },
       { id: 'test-nou', label: 'Test nou', icon: faWandMagicSparkles },
-      { id: 'grile', label: 'Grile', icon: faListCheck, badge: ramase > 0 ? String(ramase) : undefined },
+      ...(sesiuneVecheInCurs
+        ? [{
+            id: 'grile' as Screen,
+            label: 'Continuă sesiunea',
+            icon: faListCheck,
+            badge: ramase > 0 ? String(ramase) : undefined,
+          }]
+        : []),
+      ...(sim.phase === 'rulare'
+        ? [{ id: 'simulari' as Screen, label: 'Continuă simularea', icon: faStopwatch }]
+        : []),
       { id: 'recapitulare', label: 'Recapitulare', icon: faRotateLeft },
-      { id: 'simulari', label: 'Simulări', icon: faStopwatch },
       { id: 'statistici', label: 'Statistici', icon: faChartLine },
     ],
     sec: [

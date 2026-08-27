@@ -15,6 +15,7 @@ import { Progress } from '../components/Progress';
 import { OPTION_KEYS, questionCap, questionMaterie, type OptionKey } from '../data/questions';
 import { useIsDesktop, useNow } from '../lib/hooks';
 import { INTERVALE_RECAPITULARE_ZILE, urmatoareaScadenta } from '../lib/recapitulare';
+import { goTestNou } from '../lib/router';
 import { numar } from '../lib/text';
 import { formatClock } from '../lib/time';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle, sideStack, twoCol } from '../lib/ui';
@@ -97,7 +98,7 @@ function RitmRecapitulare() {
 }
 
 function ListaRecapitulare() {
-  const { go, recapitulare, session } = useApp();
+  const { recapitulare } = useApp();
   const isDesktop = useIsDesktop();
   const progress = useProgressOptional();
   const urmatoarea = urmatoareaScadenta(recapitulare.items);
@@ -165,10 +166,7 @@ function ListaRecapitulare() {
               <button
                 type="button"
                 className="btn-primary tinta-tactila"
-                onClick={() => {
-                  session.cereConfigurare();
-                  go('grile');
-                }}
+                onClick={() => goTestNou('exersare')}
                 style={{ marginTop: 20, padding: '12px 18px', font: `600 14px ${SANS}` }}
               >
                 Exersează din capitole →

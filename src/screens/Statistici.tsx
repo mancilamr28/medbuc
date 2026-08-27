@@ -6,6 +6,7 @@ import { ScoreChart } from '../components/ScoreChart';
 import { Segmented } from '../components/Segmented';
 import { numar } from '../lib/text';
 import { calculeazaStatistici, type PerioadaStatistici } from '../lib/statistici';
+import { goTestNou } from '../lib/router';
 import { SANS, SERIF, autoGrid, eyebrow, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
 import { useProgressOptional } from '../state/progressState';
@@ -35,7 +36,7 @@ function Cifra({ label, value, suffix }: { label: string; value: number | string
 }
 
 export function Statistici() {
-  const { go, questions, session, taxonomie } = useApp();
+  const { questions, taxonomie } = useApp();
   const progress = useProgressOptional();
   const [perioada, setPerioada] = useState<PerioadaStatistici>('30z');
   const statistici = useMemo(
@@ -80,10 +81,7 @@ export function Statistici() {
               <button
                 type="button"
                 className="btn-primary tinta-tactila"
-                onClick={() => {
-                  session.cereConfigurare();
-                  go('grile');
-                }}
+                onClick={() => goTestNou('exersare')}
               >
                 Alege un capitol
               </button>

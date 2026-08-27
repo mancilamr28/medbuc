@@ -102,7 +102,8 @@ describe('recapitularea inteligentă', () => {
     expect(window.location.hash).toBe('#/statistici');
   });
 
-  it('nu inventează o coadă înainte de prima greșeală', () => {
+  it('nu inventează o coadă înainte de prima greșeală', async () => {
+    const user = userEvent.setup();
     deschide();
 
     expect(screen.getByRole('heading', { name: 'Construiește prima recapitulare' })).toBeInTheDocument();
@@ -111,6 +112,8 @@ describe('recapitularea inteligentă', () => {
     expect(exerseaza).toHaveClass('btn-primary', 'tinta-tactila');
     expect(exerseaza).toHaveStyle({ padding: '12px 18px' });
     expect(screen.queryByRole('button', { name: /Începe recapitularea/ })).not.toBeInTheDocument();
+    await user.click(exerseaza);
+    expect(window.location.hash).toBe('#/test-nou/exersare');
   });
 
   it('păstrează sesiunea când elevul iese temporar din recapitulare', async () => {
