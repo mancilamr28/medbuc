@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { incarcaColectii, incarcaGrile, incarcaTaxonomie, incarcaTipuri, type GrilaCuStare } from '../lib/continut';
+import { incarcaCatalogGrile, incarcaColectii, incarcaTaxonomie, incarcaTipuri, type GrilaCatalog } from '../lib/continut';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
 import { COLECTII_GOALE, type Colectii } from '../lib/colectii';
@@ -7,30 +7,31 @@ import { useAuth } from './authState';
 import { ContentContext, type ContentValue } from './contentState';
 
 /**
- * Biblioteca de grile, la runtime.
+ * Catalogul sigur al grilelor, la runtime.
  *
  * `src/data/questions.ts` a încetat să fie adevărul: e sursa pentru `npm run seed`
- * și fixtura testelor. Aici se încarcă ce e în bază, o dată, iar `reload()` e ce
- * cheamă Admin după o salvare.
+ * și fixtura testelor. Aici se încarcă numai id-ul și capitolul, o dată, iar
+ * `reload()` e ce cheamă Admin după o salvare. Enunțurile și răspunsurile nu
+ * circulă global; vin prin lucrarea generată sau prin RPC-urile de administrator.
  *
  * Se montează între `AuthProvider` și `AppProvider`: are nevoie de sesiune,
  * fiindcă politica de citire pe `questions` e dată lui `authenticated`. Dar
- * `AppProvider` **nu** cheamă `useContent()` — primește banca prin prop, ca să
+ * `AppProvider` **nu** cheamă `useContent()` — primește catalogul prin prop, ca să
  * rămână montabil singur, fără provider și fără rețea, exact cum se bazează
  * `AppState.test.tsx`.
  */
 /**
  * Contextul, fără să arunce când lipsește.
  *
- * `useContent()` aruncă intenționat: cine are nevoie de bibliotecă are nevoie și
+ * `useContent()` aruncă intenționat: cine are nevoie de catalog are nevoie și
  * de provider. Dar `PoartaContinut` e doar decor peste stări — încărcare, eroare
- * — iar ecranele își iau banca de la `AppProvider`, prin prop. Montate singure
+ * — iar ecranele își iau catalogul de la `AppProvider`, prin prop. Montate singure
  * într-un test, n-au provider de conținut și nici nu le trebuie: nu e nimic de
  * încărcat, deci nu e nimic de anunțat.
  */
 export function ContentProvider({ children }: { children: ReactNode }) {
   const { user, loading: sesiuneaSeIncarca } = useAuth();
-  const [grile, setGrile] = useState<GrilaCuStare[]>([]);
+  const [catalog, setCatalog] = useState<GrilaCatalog[]>([]);
   const [taxonomie, setTaxonomie] = useState<Taxonomie>(TAXONOMIE_GOALA);
   const [tipuri, setTipuri] = useState<TipuriGrile>(TIPURI_GOALE);
   const [colectii, setColectii] = useState<Colectii>(COLECTII_GOALE);
@@ -41,7 +42,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     setSeIncarca(true);
     setError(null);
     try {
-      setGrile(await incarcaGrile());
+      setCatalog(await incarcaCatalogGrile());
     } catch (e: unknown) {
       // Mesajul brut de la Supabase e în engleză și tehnic; ecranele au nevoie
       // de ceva ce poate fi citit de un elev, cu un buton de reîncercare lângă.
@@ -63,7 +64,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     if (!user) {
-      setGrile([]);
+      setCatalog([]);
       return;
     }
     void incarca();
@@ -124,10 +125,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ContentValue>(
     () => ({
-      grile,
-      // Motoarele primesc doar publicatele. Filtrarea se face aici, nu în
-      // interogare: administratorul are nevoie și de ciorne, în aceeași încărcare.
-      questions: grile.filter((g) => g.status === 'publicata'),
+      catalog,
       taxonomie,
       tipuri,
       colectii,
@@ -136,7 +134,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       reload: incarca,
       reloadStructura: incarcaStructura,
     }),
-    [grile, taxonomie, tipuri, colectii, loading, error, incarca, incarcaStructura],
+    [catalog, taxonomie, tipuri, colectii, loading, error, incarca, incarcaStructura],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

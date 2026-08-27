@@ -221,7 +221,9 @@ describe('funcțiile', () => {
     'atribuie_colectia',
     'citeste_grila_admin',
     'citeste_test',
+    'exporta_grile_admin',
     'genereaza_test',
+    'importa_simulare_veche',
     'numara_candidati',
     'preda_test',
     'raspunde',
@@ -1528,6 +1530,19 @@ describe('generarea testului', () => {
     expect(straine.rows[0]!.n).toBe(0);
   });
 
+  it('poate compune recapitularea din id-urile exacte care sunt scadente', async () => {
+    const cerute = ['bio-nervos-01', 'chim-alcooli-01'];
+    const rez = await genereaza(ana, {
+      mod: 'recapitulare',
+      nr: cerute.length,
+      amesteca_grile: false,
+      filtre: { ids: cerute },
+    });
+    const items = await pozitii(ana, rez.run_id);
+
+    expect(new Set(items.map((x) => x.question_id))).toEqual(new Set(cerute));
+  });
+
   /**
    * Regula de amestecare stă pe tip, nu pe grilă, iar aplicarea ei e aici, la
    * generare: când ajunge clientul s-o randeze, ordinea e deja scrisă și paguba
@@ -2135,6 +2150,89 @@ describe('citirea de administrator', () => {
     await expect(
       baza.caUtilizator(ana, () => baza.db.query("select public.citeste_grila_admin('nu-exista-01')")),
     ).rejects.toThrow(/nu există/i);
+  });
+
+  it('exportă în pagini numai administratorului, cu răspunsurile întregi', async () => {
+    await baza.faAdmin(ana);
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ p: { total: number; grile: { id: string; correct: string; optiuni: unknown[] }[] } }>(
+        'select public.exporta_grile_admin(0, 2) as p',
+      ),
+    );
+
+    expect(r.rows[0]!.p.total).toBe(6);
+    expect(r.rows[0]!.p.grile).toHaveLength(2);
+    expect(r.rows[0]!.p.grile.every((g) => Boolean(g.correct) && g.optiuni.length > 0)).toBe(true);
+
+    await expect(
+      baza.caUtilizator(bogdan, () => baza.db.query('select public.exporta_grile_admin(0, 2)')),
+    ).rejects.toThrow(/administrator/i);
+  });
+});
+
+describe('simularea locală veche', () => {
+  const id = '20000000-0000-4000-8000-000000000001';
+  const payload = {
+    id,
+    startedAt: Date.parse('2026-08-27T10:00:00Z'),
+    endsAt: Date.parse('2026-08-27T13:00:00Z'),
+    finishedAt: null,
+    config: { model: 'UMFCD · Medicină', nr: '2' },
+    order: ['bio-nervos-01', 'chim-alcooli-01'],
+    qi: 1,
+    answers: { 0: 'B' },
+    marks: { 1: true },
+  };
+
+  it('păstrează ordinea, răspunsurile, marcajele și timpul în noua lucrare', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('select public.importa_simulare_veche($1::jsonb)', [JSON.stringify(payload)]),
+    );
+
+    const run = await baza.db.query<{ user_id: string; qi: number; nr_cerut: number; ends_at: string }>(
+      'select user_id, qi, nr_cerut, ends_at from test_runs where id = $1',
+      [id],
+    );
+    expect(run.rows[0]).toMatchObject({ user_id: ana, qi: 1, nr_cerut: 2 });
+    expect(new Date(run.rows[0]!.ends_at).getTime()).toBe(payload.endsAt);
+
+    const items = await baza.db.query<{ position: number; question_id: string; chosen: string | null; marked: boolean }>(
+      'select position, question_id, chosen, marked from test_run_items where run_id = $1 order by position',
+      [id],
+    );
+    expect(items.rows).toEqual([
+      { position: 0, question_id: 'bio-nervos-01', chosen: 'B', marked: false },
+      { position: 1, question_id: 'chim-alcooli-01', chosen: null, marked: true },
+    ]);
+  });
+
+  it('este idempotentă și nu poate fi revendicată de alt elev', async () => {
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('select public.importa_simulare_veche($1::jsonb)', [JSON.stringify(payload)]),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query('select public.importa_simulare_veche($1::jsonb)', [JSON.stringify(payload)]),
+    );
+
+    const items = await baza.db.query<{ n: number }>(
+      'select count(*)::integer as n from test_run_items where run_id = $1',
+      [id],
+    );
+    expect(items.rows[0]!.n).toBe(2);
+
+    await expect(
+      baza.caUtilizator(bogdan, () =>
+        baza.db.query('select public.importa_simulare_veche($1::jsonb)', [JSON.stringify(payload)]),
+      ),
+    ).rejects.toThrow(/lucrare_inexistenta/i);
+  });
+
+  it('nu este apelabilă fără sesiune', async () => {
+    await expect(
+      baza.caVizitator(() =>
+        baza.db.query('select public.importa_simulare_veche($1::jsonb)', [JSON.stringify(payload)]),
+      ),
+    ).rejects.toThrow(/permission denied/i);
   });
 });
 

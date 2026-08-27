@@ -54,12 +54,13 @@ Which layer owns what:
 
 | Data | Lives in | Notes |
 |---|---|---|
-| Questions (`questions` + `question_options`) | Supabase | Written from Admin via the `salveaza_grila` RPC. `src/data/questions.ts` is now only a seed source and a test fixture — **adding a question there does not make it appear in the app** |
+| Question catalogue (`id` + `chapter_id`) | Supabase | `ContentContext.catalog` is the only question data loaded globally. Text and options arrive only inside a generated `test_run`; Admin gets complete rows through admin-only RPCs |
+| Questions (`questions` + `question_options`) | Supabase | Written from Admin via the `salveaza_grila` RPC. `src/data/questions.ts` is only a seed source and a test fixture — **adding a question there does not make it appear in the app** |
 | Subjects and chapters (`materii`, `chapters`) | Supabase | Read at runtime into `ContentContext.taxonomie` and passed down as a value. `src/data/taxonomieSeed.ts` is **only** a seed source for `npm run seed` and a test fixture — nothing in the running app imports it |
 | Answers (`attempts`) | Supabase | An immutable journal. Progress, statistics and the review queue are all *derived* from it — nothing stores a `pct` |
-| Notes, theme, settings, exam-in-progress | `localStorage` | `medbuc.*`, via `usePersistentState`. The `notes` table exists but nothing writes to it yet |
+| Notes, theme, settings, one legacy simulation | `localStorage` | `medbuc.*`, via `usePersistentState`. New work lives in `test_runs`; `medbuc.sim.run` is read only by the one-time migration bridge |
 
-**A practice session is memory-only while it runs** (a reload loses it, results included) and syncs once at `finish()`. **A simulation is persisted to `localStorage` while it runs and syncs at submission** through `syncFinishedSimulare` (`src/lib/syncSimulare.ts`), which upserts the `sim_runs` row and the `attempts` in two retry-safe operations. Both write through `AttemptSync.tsx`, which calls `ProgressContext.reload()` only after the write succeeds.
+**Every new practice, simulation and review run is a server-side `test_run`.** The old `useSession` and `useSimulare` hooks remain temporarily only so an already-open old session can render and a simulation left in `medbuc.sim.run` can be imported without losing answers. `AttemptSync` is no longer mounted by the application; it remains as compatibility code until those old paths are deleted.
 
 Until PR #49 a simulation was *not* persisted at all: a finished exam contributed nothing to progress, its mistakes never reached Recapitulare, and Statistici's "Simulări" row was structurally zero. That is fixed and the row is populated — do not repeat the old description, which survived in this file long after it stopped being true.
 
@@ -128,7 +129,9 @@ The global `prefers-reduced-motion` block in `styles.css` only kills `.screen`/`
 
 **The honesty rule applies hardest here.** A landing page is exactly where "1000+ grile" and student counts want to appear. Every figure shown is derived: days from `EXAM_DATE`, chapters and past sessions counted from `MATERII`, per-chapter counts from `chapterQuestionCount()`. The bank's size is deliberately *not* used as a selling point, and only shipped features are promoted. **`plan` is the only screen still `InLucru`** — `statistici`, `recapitulare` and `notite` all ship now, so the landing copy is free to name them, and a promise of anything else is a bug. The interactive question in the mockup is a real one out of `QUESTIONS`, with its real explanation. Counted nouns still go through `numar()`: "1 grilă", not "1 grile".
 
-### Two independent quiz engines (different persistence semantics)
+### The two legacy quiz engines (compatibility only)
+
+No new work starts through these hooks. `#/grile` redirects to the wizard unless an in-memory session is already active; `#/simulari` runs `MigrareSimulareVeche`, which sends the saved snapshot to `importa_simulare_veche`, clears local storage only after success, then opens the resulting `#/lucrare/<id>`.
 
 - **`useSession`** (`src/state/useSession.ts`) — the free practice session. Purely in-memory (lost on reload, results included). Navigation is clamped at both ends, so the last question stays last. Once a question is revealed the answer is locked; `primary()` implements Enter = "check, then advance if already checked, then *finish* on the last question". A session has two phases, derived from `finishedAt` and exposed as `finished`: `Grile.tsx` renders `GrileRun` while it is false and the `GrileRezultat` score panel once true. `finish()` is idempotent (it freezes `durataMs`) and `restart()` clears everything including `startedAt`. Two aggregates, deliberately different: `tally` counts only *revealed* questions (the in-run legend), while `score` counts every *answered* one and reports `pct` against `total`, so unanswered questions count against you.
 
@@ -150,7 +153,7 @@ The consequence to watch: **`session.banca` is the narrowed pool, so nothing tha
 
 Progress is read from Supabase's immutable `attempts` journal; it is never stored as a `pct` or `done` field. `ProgressProvider` mounts under `AuthProvider`, loads only for an authenticated user, and exposes the raw rows plus loading/error/reload. The context and hook live separately in `progressState.ts`, keeping the provider file a component-only Fast Refresh boundary. It keys the visible rows to the current user id so switching accounts cannot render the previous account's progress for even one frame.
 
-`calculeazaProgres()` is the pure derivation layer. It produces overall correctness, per-chapter coverage/correctness, and one score point per completed session or simulation. Repeated answers increase the answer count but only increase `grileIncercate` once. A response whose question is no longer in the visible runtime library still counts globally and in its run score, but is not guessed into a chapter. `Acasa`, `Statistici` and the per-chapter panel in `Grile` all consume this same result. `AttemptSync` calls `reload()` only after the retry-safe write succeeds, so a finished practice session appears without a page refresh.
+`calculeazaProgres()` is the pure derivation layer. It produces overall correctness, per-chapter coverage/correctness, and one score point per completed session or simulation. Repeated answers increase the answer count but only increase `grileIncercate` once. A response whose question is no longer in the visible catalogue still counts globally and in its run score, but is not guessed into a chapter. `Acasa`, `Statistici` and `Recapitulare` consume this same result. `preda_test`/`raspunde` update the immutable journal; `ProgressContext.reload()` remains the client refresh point.
 
 Real scores may range from 0 to 100. `ScoreChart` therefore uses a zero-based axis; do not restore the old minimum of 45, which came from the fabricated demo series and renders authentic low scores outside the SVG.
 
@@ -203,7 +206,7 @@ Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontaw
 
 Typed constants. `chapters.ts` (`MATERII` keyed by `MaterieId`), `questions.ts` (`QUESTIONS`, `OptionKey`), `profile.ts` (account/exam constants). `EXAM_DATE` in `profile.ts` drives every countdown via `daysUntil()` in `src/lib/time.ts` — dates are computed, never hardcoded in screens.
 
-**`QUESTIONS` is no longer the runtime truth.** Since Faza 4 the question bank is read from Supabase (`src/lib/continut.ts` → `src/state/ContentContext.tsx`), so **adding a question to `questions.ts` does not make it appear in the app** — it appears in `seed.sql` for a fresh project, and in tests as a fixture. Real content is written from Admin, which calls the `salveaza_grila` RPC. The file stays because `npm run seed` generates from it and because the Landing page needs a question it can render with no session.
+**`QUESTIONS` is not runtime truth.** The authenticated app reads only the safe catalogue (`id`, `chapter_id`) from Supabase; generated papers get their question text and options from `citeste_test`. **Adding a question to `questions.ts` does not make it appear in the app** — it appears in `seed.sql` for a fresh project, and in tests as a fixture. Real content is written from Admin, which calls `salveaza_grila`. The file stays because `npm run seed` generates from it and because the Landing page needs a question it can render with no session.
 
 **Chapters used to be a compiled constant, and that broke in production.** `MATERII` was typed `MaterieId = 'bio' | 'chim'` with 22 chapters while the live database had **three subjects and 30 chapters** — a third subject `ant` plus 8 exam-paper chapters the code did not know about. Nothing signalled: `chapterLabelById` fell back to the raw id, so those chapters rendered as `ant-2026-mg`, and `numaraGrile` could not attribute their questions to any subject.
 
@@ -217,13 +220,13 @@ Three constraints to preserve:
 
 A `capId` with no row in the database still renders its raw id rather than vanishing — visible and fixable instead of silent.
 
-The bank flows in as a **parameter, not an import**: `AppProvider` takes `questions` as a prop and passes it to `useSession`/`useSimulare`, which is what keeps `AppState.test.tsx` able to mount the provider alone with no network. `numaraGrile()` in `continut.ts` replaces the old module-level count maps, since a bank that changes at runtime cannot be counted once at import time.
+The safe catalogue flows in as a **parameter, not an import**: `AppProvider` takes `catalog`; its optional `questions` prop exists only for legacy hook tests and derives a fixture catalogue when supplied. `numaraGrile()` counts that catalogue, never complete question objects.
 
 ### Administrarea, la scară
 
 Administrarea are acum secțiuni, citite din **al doilea segment de hash** (`#/admin/colectii`). Secțiunile nu intră în `SCREENS`: nu sunt ecrane ale aplicației, nu apar în `Sidebar` sau `MobileNav`, iar `go()` n-are ce face cu ele. Ecranul se citește din primul segment — altfel `admin/colectii` n-ar fi niciun `Screen` și ar cădea tăcut pe `acasa`.
 
-**Lista de grile se interoghează pe server**, nu se filtrează în client: căutare, stare, capitol, colecție, tip, plus paginare și contoare cu `head: true`. Fără RPC nou — PostgREST le face pe toate, iar `questions_citire` distinge deja elevul de administrator, deci o funcție `security definer` ar fi trebuit să reimplementeze regula aia singură.
+**Lista de grile se interoghează pe server**, nu se filtrează în client: căutare, stare, capitol, colecție, tip, plus paginare și contoare cu `head: true`. Lista cere numai câmpurile de rezumat. Conținutul complet se cere prin `citeste_grila_admin` după alegerea unui rând, iar exportul paginat trece prin `exporta_grile_admin`; ambele verifică `private.is_admin()`. Asta este necesar înainte de revocarea coloanelor cu răspunsuri, fiindcă „admin” este un rol al aplicației, nu un rol SQL separat.
 
 **Tiparul de căutare are două scăpări suprapuse** (`pentruIlike`), și amândouă sunt necesare: `%`/`_` sunt metacaractere `ilike` — o căutare după „50%" ar întoarce toată biblioteca — iar valoarea se pune între ghilimele fiindcă într-un `or=(...)` **virgula desparte termenii**, deci „1, 2, 3" (chiar textul variantelor unui complement grupat) primea 400.
 
@@ -331,7 +334,7 @@ Three things there that are load-bearing:
 
 ### Generating a test — `numara_candidati` / `genereaza_test`
 
-Selection moved off the client. `buildOrder` receives the whole bank and cuts from it; at 181 questions that works, at 50k it means downloading the library to pick 100 rows — and downloading every correct answer before a simulation starts. **The move only half-fixes the second problem**: whatever the RPC withholds can still be asked for directly (`select id, correct from questions`), because RLS filters rows, not columns. The real close is a column-level `revoke`, which has strict deploy ordering (client that stops asking first, revoke second) and is a separate slice.
+Selection moved off the client. The global content load is now only `id` + `chapter_id`; it neither downloads the library text nor any answer. **This prepares, but does not perform, the final security close**: until the follow-up column-level `revoke`, a hand-written direct query can still ask for `correct`, because RLS filters rows, not columns. Deploy ordering is strict: this client and its admin RPCs must propagate first; the revoke is a separate migration afterward.
 
 - **Every mode goes through one candidate query** (`private.candidati`), with predicates that compose. Six parallel queries would diverge the first time a rule was added to only one — exactly what happened between the form's validation and the import's, until they were merged.
 - **Empty list means "no restriction on this axis"**, the same convention as `sessions.chapter_ids` and `filtreazaCapitole`.
@@ -357,7 +360,7 @@ Selection moved off the client. `buildOrder` receives the whole bank and cuts fr
 
 ### The client's one door to the engine — `src/lib/lucrari.ts`
 
-The five RPCs are wrapped there and **nowhere else touches `test_runs`**. That is a rule, not an accident: a direct `supabase.from('test_runs')` would bypass exactly the guarantees the engine was moved server-side for — grading on the server, the correct answer arriving only once earned, the snapshot frozen after generation.
+The six RPCs (including the one-time legacy simulation import) are wrapped there and **nowhere else touches `test_runs`**. That is a rule, not an accident: a direct `supabase.from('test_runs')` would bypass exactly the guarantees the engine was moved server-side for — grading on the server, the correct answer arriving only once earned, the snapshot frozen after generation.
 
 Errors from the database are **codes**, and `codEroare()` extracts them against a closed list (`CODURI_LUCRARE`). Matching is on whole words, so a longer identifier that happens to contain a code is not read as that code, and an arbitrary message cannot be mistaken for one. Translation into Romanian belongs at the screen, where the context is known — "no questions found" reads differently in practice than in review.
 
@@ -371,11 +374,11 @@ The 23 pre-engine runs are **copied, not moved**: `sessions` and `sim_runs` keep
 
 The migration ends with a `do $$ … $$` block that raises on any row-count mismatch: a half-copy must fail the deploy, not ship.
 
-### The new path runs beside the old one — `#/test-nou` and `#/lucrare/<id>`
+### The new path owns every new run — `#/test-nou` and `#/lucrare/<id>`
 
-The engine landed with nothing calling it. The client half is `TestNou` (the wizard) plus `Lucrare` (solving and the result panel), and it is a **second, parallel path**: `Grile`, `Simulari` and `Recapitulare` are untouched and still write to `sessions`/`sim_runs`. The plan called for converting those three hooks onto one `useTestRun` first; building the new path beside them instead means nothing a student already uses can break while the new one is proven, and the old screens get retired rather than rebuilt. Migration 0019 is re-runnable precisely so the runs created in that window are caught at switchover.
+The client half is `TestNou` (the wizard) plus `Lucrare` (solving and the result panel). `Grile` and `Simulari` are now compatibility routes only. `Recapitulare` derives the due ids from the journal, then calls `genereaza_test` with those exact ids and opens a normal persistent paper; it no longer downloads the full questions or grades in the browser. The cutover migration repeats migration 0019's idempotent backfill so runs written during the deployment window are caught.
 
-**Every new start now enters through the wizard.** `Grile` and `Simulari` no longer occupy permanent navigation slots; they reappear only as “Continuă sesiunea/simularea” while an old local run is unfinished, so the transition cannot strand work started before the cutover. Home, Statistics and the empty Recapitulare state call `goTestNou()`. Its optional route segments preserve intent (`#/test-nou/simulare`, `#/test-nou/exersare/bio-nervos`) without global state or another localStorage key. Keep the old routes in `SCREENS` until the local-run soak period is over; hiding a start path is reversible, deleting the resume path is not.
+**Every new start now enters through the wizard.** Home, Statistics, Notes and an empty Recapitulare state call `goTestNou()`. Its optional route segments preserve intent (`#/test-nou/simulare`, `#/test-nou/exersare/bio-nervos`) without global state or another localStorage key. Keep the old routes in `SCREENS` until the local-run soak period is over; hiding a start path is reversible, deleting the migration path is not.
 
 **`useLucrare` is not `useSession` with a different backend.** The two differ by *owner*: `useSession`/`useSimulare` hold the truth and sync at the end, `useLucrare` holds nothing — every pick, mark and submission goes through `src/lib/lucrari.ts`, and there is no `localStorage` and no in-memory bank anywhere in it. That is what makes a run resumable from another device, and it is why the countdown still derives from an absolute `ends_at` rather than a decremented counter.
 
@@ -384,7 +387,7 @@ Four things in the client half that are load-bearing:
 - **Picking a letter is local in practice, sent immediately in a simulation.** In practice modes `raspunde` *is* the check — it reveals, journals and returns the explanation — so sending on click would hand over the answer nobody asked to see. In a simulation nothing is revealed, so sending immediately is free and a reload does not lose the answer. `verificaPeLoc()` mirrors `v_verific` in `raspunde`; if one changes, the other must.
 - **Marking retransmits the current `chosen`, never `null`.** On a checked question `raspunde` raises `raspuns_blocat` for any other value, and `null` would read as "I erased my answer".
 - **`AnswerOptions` takes `correct?`, not a whole `Question`.** On this path the correct answer genuinely is absent until earned, and demanding a full `Question` would have forced a made-up letter into the prop just to satisfy the type — the exact lie the screen then renders.
-- **The wizard's steps are derived, not a fixed page count.** `pasiVizibili()` drops the content step when the mode picks its own questions (your mistakes do not narrow by chapter) or when fewer than two chapters have anything written. With today's bank that is three visible steps, and it grows on its own as content is written. Per-chapter numbers on that step come from the in-memory library and are labelled as such; the authoritative total under the card is `numara_candidati`, debounced, with out-of-order responses discarded.
+- **The wizard's steps are derived, not a fixed page count.** `pasiVizibili()` drops the content step when the mode picks its own questions (your mistakes do not narrow by chapter) or when fewer than two chapters have anything written. With today's bank that is three visible steps, and it grows on its own as content is written. Per-chapter numbers come from the safe catalogue; the authoritative filtered total under the card is `numara_candidati`, debounced, with out-of-order responses discarded.
 
 ### `raspunde` used to hand over the answer for a mark — migration 0020
 

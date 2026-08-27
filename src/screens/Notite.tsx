@@ -5,6 +5,7 @@ import type { ChapterId } from '../data/chapters';
 import { citesteCapitoleCuNotita } from '../lib/notite';
 import { citesteNotite } from '../lib/notiteBaza';
 import { reportError } from '../lib/sentry';
+import { goTestNou } from '../lib/router';
 import { numar } from '../lib/text';
 import { SANS, eyebrow, pageLead, pageTitle } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
@@ -81,7 +82,7 @@ function NotitaCapitol({ capId, onSters }: { capId: ChapterId; onSters: () => vo
  * s-a scris.
  */
 export function Notite() {
-  const { go, taxonomie } = useApp();
+  const { taxonomie } = useApp();
   const auth = useAuthOptional();
   const userId = auth?.user?.id ?? null;
   const [capIds, setCapIds] = useState<ChapterId[]>([]);
@@ -143,10 +144,10 @@ export function Notite() {
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => go('grile')}
+                onClick={() => goTestNou('exersare')}
                 style={{ padding: '10px 16px', font: `600 13px ${SANS}` }}
               >
-                Mergi la Grile
+                Alege un test
               </button>
             }
           />

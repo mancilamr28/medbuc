@@ -1,13 +1,12 @@
 import { createContext, useContext } from 'react';
-import type { Question } from '../data/questions';
-import type { GrilaCuStare } from '../lib/continut';
+import type { GrilaCatalog } from '../lib/continut';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
 import type { Colectii } from '../lib/colectii';
 
 export interface ContentValue {
-  grile: GrilaCuStare[];
-  questions: Question[];
+  /** Indexul sigur al bibliotecii: numai identitate și capitol, fără răspunsuri. */
+  catalog: GrilaCatalog[];
   /**
    * Materiile și capitolele, din bază.
    *

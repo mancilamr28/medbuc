@@ -1,22 +1,21 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { LandingBoundary } from './components/LandingBoundary';
-import { AttemptSync } from './components/AttemptSync';
 import { MobileNav } from './components/MobileNav';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { useIsDesktop } from './lib/hooks';
-import { BUILT_SCREENS, isPublicRouteHash, usePublicView, type PublicRoute } from './lib/router';
+import { BUILT_SCREENS, goTestNou, isPublicRouteHash, usePublicView, type PublicRoute } from './lib/router';
 import { Acasa } from './screens/Acasa';
 import { Admin } from './screens/Admin';
 import { Autentificare, type ModAutentificare } from './screens/Autentificare';
 import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
 import { Lucrare } from './screens/Lucrare';
+import { MigrareSimulareVeche } from './screens/MigrareSimulareVeche';
 import { Notite } from './screens/Notite';
 import { Recapitulare } from './screens/Recapitulare';
 import { ResetareParolaFinalizare } from './screens/ResetareParolaFinalizare';
 import { Setari } from './screens/Setari';
-import { Simulari } from './screens/Simulari';
 import { Statistici } from './screens/Statistici';
 import { TestNou } from './screens/TestNou/TestNou';
 import { useApp } from './state/appContextValue';
@@ -61,13 +60,13 @@ const GOL_LANDING = (
 );
 
 function Content() {
-  const { screen } = useApp();
+  const { screen, session } = useApp();
 
   if (!BUILT_SCREENS.includes(screen)) return <InLucru screen={screen} />;
 
   switch (screen) {
     case 'grile':
-      return <Grile />;
+      return session.hasStarted ? <Grile /> : <TrimiteLaTestNou />;
     case 'test-nou':
       return <TestNou />;
     case 'lucrare':
@@ -75,7 +74,7 @@ function Content() {
     case 'recapitulare':
       return <Recapitulare />;
     case 'simulari':
-      return <Simulari />;
+      return <MigrareSimulareVeche />;
     case 'statistici':
       return <Statistici />;
     case 'notite':
@@ -87,6 +86,12 @@ function Content() {
     default:
       return <Acasa />;
   }
+}
+
+/** O adresă veche fără sesiune activă devine o intenție în asistent. */
+function TrimiteLaTestNou() {
+  useEffect(() => goTestNou('exersare'), []);
+  return GOL;
 }
 
 export function App() {
@@ -122,7 +127,6 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', minHeight: '100vh' }}>
-      <AttemptSync />
       {isDesktop && <Sidebar />}
       <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Topbar compact={!isDesktop} />

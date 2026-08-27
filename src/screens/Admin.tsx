@@ -6,11 +6,12 @@ import { OPTION_KEYS, SURSE, type OptionKey, type QuestionSursa, type QuestionTy
 import {
   FILTRE_GOALE,
   atribuieColectia,
+  citesteGrilaAdmin,
   schimbaStareaGrilelor,
   salveazaGrila,
   stergeGrila,
   type FiltreGrile,
-  type GrilaCuStare,
+  type RezumatGrila,
   type QuestionStatus,
 } from '../lib/continut';
 import { PE_PAGINA, useBibliotecaAdmin } from './adminBiblioteca';
@@ -87,7 +88,7 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
  */
 function AdminPanel() {
-  const { grile, taxonomie, tipuri, colectii, reload, reloadStructura } = useContent();
+  const { catalog, taxonomie, tipuri, colectii, reload, reloadStructura } = useContent();
   const { notify } = useToast();
   const isDesktop = useIsDesktop();
 
@@ -153,12 +154,17 @@ function AdminPanel() {
     }
   };
 
-  const incarcaPentruEditare = (g: GrilaCuStare) => {
-    setCiorna(dinGrila(g));
-    setEditez(g.id);
-    setAratatProbleme(false);
-    mergiLa('grile');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const incarcaPentruEditare = async (g: RezumatGrila) => {
+    try {
+      const completa = await citesteGrilaAdmin(g.id);
+      setCiorna(dinGrila(completa));
+      setEditez(g.id);
+      setAratatProbleme(false);
+      mergiLa('grile');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Nu am putut deschide grila.');
+    }
   };
 
   const salveaza = async (status: QuestionStatus) => {
@@ -190,9 +196,9 @@ function AdminPanel() {
    * iese din fața elevilor, dar `attempts` rămâne întreg — pe el se sprijină tot
    * progresul, iar o ștergere ar rescrie retroactiv istoricul cuiva.
    */
-  const schimbaStarea = async (g: GrilaCuStare, status: QuestionStatus) => {
+  const schimbaStarea = async (g: RezumatGrila, status: QuestionStatus) => {
     try {
-      await salveazaGrila(catreSalvare(dinGrila(g), status, tipuri));
+      await schimbaStareaGrilelor([g.id], status);
       await reload();
       biblioteca.reincarca();
       notify('info', status === 'retrasa' ? 'Grila a fost retrasă din fața elevilor.' : 'Grila e publicată.');
@@ -257,7 +263,7 @@ function AdminPanel() {
       <div style={twoCol(isDesktop)}>
         {sectiune === 'import' ? (
           <ImportGrile
-              grile={grile}
+              catalog={catalog}
               taxonomie={taxonomie}
               tipuri={tipuri}
               colectii={colectii}
@@ -337,7 +343,7 @@ function AdminPanel() {
                   <button
                     type="button"
                     className="btn-ghost"
-                    onClick={() => camp('id', idSugerat(ciorna.capId, grile))}
+                    onClick={() => camp('id', idSugerat(ciorna.capId, catalog))}
                     style={{ flex: '0 0 auto', padding: '0 12px', font: `500 12px ${SANS}` }}
                   >
                     Sugerează
@@ -870,7 +876,7 @@ function AdminPanel() {
                           <button
                             type="button"
                             className="btn-ghost"
-                            onClick={() => incarcaPentruEditare(g)}
+                            onClick={() => void incarcaPentruEditare(g)}
                             style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
                           >
                             Editează

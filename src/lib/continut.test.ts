@@ -1,5 +1,30 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { mapeazaGrila, pentruIlike, type RandGrila } from './continut';
+
+/**
+ * Contractul de livrare pentru faza de securizare.
+ *
+ * Răspunsurile complete au voie să vină prin RPC-urile care verifică momentul
+ * și rolul, dar nu printr-un `select` direct pe bibliotecă. Testul citește chiar
+ * sursa fiindcă acesta este un contract de transport, nu o regulă a mapării.
+ */
+describe('biblioteca trimisă clientului', () => {
+  it('nu mai folosește selecția directă care conține răspunsurile', () => {
+    const sursa = readFileSync(new URL('./continut.ts', import.meta.url), 'utf8');
+    expect(sursa).not.toContain('.select(CAMPURI,');
+    expect(sursa).not.toMatch(/const CAMPURI\s*=.*\bcorrect\b/);
+  });
+
+  it('nu amestecă ciornele administratorului în numărătorile aplicației', () => {
+    const sursa = readFileSync(new URL('./continut.ts', import.meta.url), 'utf8');
+    const catalog = sursa.slice(
+      sursa.indexOf('export async function incarcaCatalogGrile'),
+      sursa.indexOf('export function numaraGrile'),
+    );
+    expect(catalog).toContain(".eq('status', 'publicata')");
+  });
+});
 
 const rand = (peste: Partial<RandGrila> = {}): RandGrila => ({
   id: 'bio-nervos-01',

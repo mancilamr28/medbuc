@@ -3,7 +3,7 @@ import {
   cautaGrile,
   numaraPeStare,
   type FiltreGrile,
-  type GrilaCuStare,
+  type RezumatGrila,
   type QuestionStatus,
 } from '../lib/continut';
 import { reportError } from '../lib/sentry';
@@ -25,7 +25,7 @@ export const PE_PAGINA = 25;
 const INTARZIERE_CAUTARE = 300;
 
 export interface Biblioteca {
-  randuri: GrilaCuStare[];
+  randuri: RezumatGrila[];
   total: number;
   contoare: Record<QuestionStatus, number> | null;
   pagina: number;
@@ -38,7 +38,7 @@ export interface Biblioteca {
 
 export function useBibliotecaAdmin(filtre: FiltreGrile): Biblioteca {
   const [pagina, setPagina] = useState(0);
-  const [randuri, setRanduri] = useState<GrilaCuStare[]>([]);
+  const [randuri, setRanduri] = useState<RezumatGrila[]>([]);
   const [total, setTotal] = useState(0);
   const [contoare, setContoare] = useState<Record<QuestionStatus, number> | null>(null);
   const [seIncarca, setSeIncarca] = useState(true);

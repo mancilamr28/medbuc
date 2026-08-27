@@ -1,4 +1,4 @@
-import type { Question } from '../data/questions';
+import type { GrilaCatalog } from './continut';
 import { calculeazaProgres, type AttemptRow, type ProgresCalculat } from './progres';
 import { TAXONOMIE_GOALA, type Taxonomie } from './taxonomie';
 
@@ -34,7 +34,7 @@ const etichetaData = (iso: string): string =>
 /** Derivă statisticile din jurnalul deja filtrat de RLS, fără stare paralelă. */
 export function calculeazaStatistici(
   attempts: readonly AttemptRow[],
-  questions: readonly Question[],
+  questions: readonly GrilaCatalog[],
   perioada: PerioadaStatistici,
   acum: number,
   taxonomie: Taxonomie = TAXONOMIE_GOALA,

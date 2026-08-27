@@ -2,7 +2,7 @@ import type { ChapterId } from '../data/chapters';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
 import { numar } from '../lib/text';
-import { OPTION_KEYS, type OptionKey, type Question, type QuestionSursa, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
 import type { GrilaCuStare, GrilaDeSalvat, QuestionStatus } from '../lib/continut';
 
 /**
@@ -171,7 +171,7 @@ export function catreSalvare(
  * — în lucrări, în `attempts` — deci merită ales, nu generat orbește. Se uită la
  * ce există ca să nu propună un id deja luat.
  */
-export function idSugerat(capId: ChapterId, existente: Question[]): string {
+export function idSugerat(capId: ChapterId, existente: readonly { id: string }[]): string {
   const prefix = `${capId}-`;
   const luate = existente
     .filter((q) => q.id.startsWith(prefix))

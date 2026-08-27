@@ -6,7 +6,7 @@ import { QUESTIONS } from '../data/questions';
 import { AppProvider } from '../state/AppState';
 import { AuthProvider } from '../state/AuthContext';
 import { ContentProvider } from '../state/ContentContext';
-import type { GrilaCuStare } from '../lib/continut';
+import type { GrilaCatalog } from '../lib/continut';
 
 /**
  * Stările prin care trece biblioteca înainte să existe grile pe ecran.
@@ -15,13 +15,13 @@ import type { GrilaCuStare } from '../lib/continut';
  * de la primul render. Acum vine prin rețea, iar o rețea care tace nu are voie să
  * arate „0 grile" — ar fi o afirmație falsă prezentată ca stare.
  */
-const GRILE = QUESTIONS.map((q) => ({ ...q, status: 'publicata' }) as GrilaCuStare);
+const GRILE = QUESTIONS.map((q) => ({ id: q.id, capId: q.capId }) as GrilaCatalog);
 
-const incarca = vi.fn<() => Promise<GrilaCuStare[]>>();
+const incarca = vi.fn<() => Promise<GrilaCatalog[]>>();
 
 vi.mock('../lib/continut', async (original) => ({
   ...(await original<typeof import('../lib/continut')>()),
-  incarcaGrile: () => incarca(),
+  incarcaCatalogGrile: () => incarca(),
 }));
 
 /** Biblioteca se cere abia când există sesiune, deci testul trebuie să aibă una. */
@@ -59,7 +59,7 @@ beforeEach(() => {
 
 describe('PoartaContinut', () => {
   it('spune că se încarcă, fără să pretindă un progres', async () => {
-    let elibereaza: (g: GrilaCuStare[]) => void = () => {};
+    let elibereaza: (g: GrilaCatalog[]) => void = () => {};
     incarca.mockReturnValue(new Promise((r) => (elibereaza = r)));
 
     monteaza();

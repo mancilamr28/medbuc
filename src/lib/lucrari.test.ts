@@ -3,6 +3,7 @@ import {
   citesteTest,
   codEroare,
   genereazaTest,
+  importaSimulareVeche,
   numaraCandidati,
   predaTest,
   raspunde,
@@ -93,6 +94,27 @@ describe('poarta către motorul de generare', () => {
   it('ridică eroarea bazei, nu o înghite', async () => {
     baza.eroare = { message: 'fara_candidati' };
     await expect(genereazaTest({ mod: 'exersare', nr: 5 })).rejects.toThrow(/fara_candidati/);
+  });
+
+  it('trimite instantaneul simulării vechi fără să-l reconstruiască în client', async () => {
+    baza.data = { run_id: 'r-vechi' };
+    const run = {
+      id: 'r-vechi',
+      startedAt: 1_000,
+      endsAt: 11_000,
+      finishedAt: null,
+      config: { model: 'UMFCD · Medicină', nr: '2', durata: '180 minute', ordine: 'Amestecate' },
+      order: ['bio-nervos-01', 'bio-sange-01'],
+      qi: 1,
+      answers: { 0: 'A' as const },
+      marks: { 1: true },
+    };
+
+    await expect(importaSimulareVeche(run)).resolves.toEqual({ run_id: 'r-vechi' });
+    expect(ultimul()).toEqual({
+      nume: 'importa_simulare_veche',
+      args: { payload: run },
+    });
   });
 });
 
