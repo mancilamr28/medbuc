@@ -5,13 +5,11 @@ import { AttemptSync } from './AttemptSync';
 
 const stare = vi.hoisted(() => ({
   syncSesiune: vi.fn(),
-  syncRecapitulare: vi.fn(),
   syncSimulare: vi.fn(),
   raporteaza: vi.fn(),
   reload: vi.fn(async () => {}),
   user: { id: 'user-1' },
   session: { id: 'sesiune-1', finished: false } as { id: string; finished: boolean; finishedAt?: number },
-  recapitulare: { id: 'recap-1', phase: 'rezultat', finishedAt: 2_000 },
   // Fără lucrare predată, efectul de simulare nu pornește.
   sim: { run: null as { id: string } | null, finishedAt: null as number | null },
 }));
@@ -19,9 +17,6 @@ const stare = vi.hoisted(() => ({
 vi.mock('../lib/sentry', () => ({ reportError: (...a: unknown[]) => stare.raporteaza(...a) }));
 vi.mock('../lib/syncAttempts', () => ({
   syncFinishedSession: (...args: unknown[]) => stare.syncSesiune(...args),
-}));
-vi.mock('../lib/syncRecapitulare', () => ({
-  syncFinishedRecapitulare: (...args: unknown[]) => stare.syncRecapitulare(...args),
 }));
 vi.mock('../lib/syncSimulare', () => ({
   syncFinishedSimulare: (...args: unknown[]) => stare.syncSimulare(...args),
@@ -33,7 +28,6 @@ vi.mock('../state/progressState', () => ({
 vi.mock('../state/appContextValue', () => ({
   useApp: () => ({
     session: stare.session,
-    recapitulare: stare.recapitulare,
     sim: stare.sim,
     questions: [],
   }),
@@ -44,28 +38,12 @@ beforeEach(() => {
   // Fără valoarea implicită, `mockReset` lasă mock-ul să întoarcă `undefined`,
   // iar `.then()` din efect crapă.
   stare.syncSesiune.mockReset().mockResolvedValue(undefined);
-  stare.syncRecapitulare.mockReset().mockResolvedValue(undefined);
   stare.syncSimulare.mockReset().mockResolvedValue(undefined);
   stare.raporteaza.mockReset();
   stare.reload.mockClear();
   stare.sim = { run: null, finishedAt: null };
   stare.session = { id: 'sesiune-1', finished: false };
   vi.spyOn(console, 'warn').mockImplementation(() => {});
-});
-
-describe('sincronizarea recapitulării', () => {
-  it('anunță eșecul și permite reîncercarea fără a dubla răspunsurile', async () => {
-    const user = userEvent.setup();
-    stare.syncRecapitulare.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined);
-    render(<AttemptSync />);
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Recapitularea nu a fost salvată');
-    await user.click(screen.getByRole('button', { name: 'Reîncearcă salvarea' }));
-
-    await waitFor(() => expect(stare.syncRecapitulare).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
-    expect(stare.reload).toHaveBeenCalledOnce();
-  });
 });
 
 describe('sincronizarea simulării', () => {

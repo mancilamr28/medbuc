@@ -1,12 +1,13 @@
 import { createContext, useContext } from 'react';
 import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
+import type { GrilaCatalog } from '../lib/continut';
 import type { Screen } from '../lib/router';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
 import type { Session } from './useSession';
 import type { Simulare } from './useSimulare';
-import type { Recapitulare } from './useRecapitulare';
+import type { CoadaRecapitulare } from './useCoadaRecapitulare';
 
 export type Theme = 'light' | 'dark';
 
@@ -17,14 +18,16 @@ export interface AppValue {
   go: (screen: Screen) => void;
   materie: MaterieId;
   setMaterie: (id: MaterieId) => void;
-  /** Biblioteca întreagă; `session.banca` este doar domeniul sesiunii curente. */
+  /** Fixtură completă pentru drumul vechi; goală în aplicația reală. */
   questions: Question[];
+  /** Index sigur pentru numărători, progres și recapitulare. */
+  catalog: GrilaCatalog[];
   /** Materiile și capitolele, din bază. Etichetele de capitol vin de aici. */
   taxonomie: Taxonomie;
   /** Formatele de grilă, din bază. */
   tipuri: TipuriGrile;
   session: Session;
-  recapitulare: Recapitulare;
+  recapitulare: CoadaRecapitulare;
   sim: Simulare;
 }
 

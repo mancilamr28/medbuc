@@ -33,15 +33,15 @@ const DATA = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long' })
  * curentă. Restul spune deschis că nu are încă date.
  */
 export function Acasa() {
-  const { go, questions, session, recapitulare, taxonomie } = useApp();
+  const { go, catalog, session, recapitulare, taxonomie } = useApp();
   const { user, profile } = useAuth();
   const loading = useContentOptional()?.loading ?? false;
   const progressContext = useProgressOptional();
   const progressLoading = progressContext?.loading ?? false;
   const progressError = progressContext?.error ?? null;
   const progress = useMemo(
-    () => calculeazaProgres(progressContext?.attempts ?? [], questions, taxonomie),
-    [progressContext?.attempts, questions, taxonomie],
+    () => calculeazaProgres(progressContext?.attempts ?? [], catalog, taxonomie),
+    [catalog, progressContext?.attempts, taxonomie],
   );
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
@@ -84,7 +84,7 @@ export function Acasa() {
               Un „0 grile" cât timp se încarcă ar fi o afirmație falsă, nu o stare. */}
           {loading
             ? 'Se încarcă biblioteca…'
-            : `Biblioteca are ${numar(questions.length, 'grilă publicată', 'grile publicate')}.`}
+            : `Biblioteca are ${numar(catalog.length, 'grilă publicată', 'grile publicate')}.`}
         </p>
       </div>
 

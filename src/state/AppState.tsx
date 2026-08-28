@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { MaterieId } from '../data/chapters';
 import type { Question } from '../data/questions';
+import type { GrilaCatalog } from '../lib/continut';
 import type { AttemptRow } from '../lib/progres';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
@@ -8,7 +9,7 @@ import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute } from '../lib/router';
 import { AppContext, type AppValue, type Theme } from './appContextValue';
 import { useSession } from './useSession';
-import { useRecapitulare } from './useRecapitulare';
+import { useCoadaRecapitulare } from './useCoadaRecapitulare';
 import { useSimulare } from './useSimulare';
 
 const readInitialTheme = (): Theme => {
@@ -17,21 +18,25 @@ const readInitialTheme = (): Theme => {
 };
 
 /**
- * Banca vine ca prop, nu din `useContent()`.
+ * Catalogul vine ca prop, nu din `useContent()`.
  *
  * `AppProvider` nu are voie să depindă de un provider care face rețea: e ce ține
  * `AppState.test.tsx` capabil să-l randeze singur, fără `AuthProvider` și fără
- * `ContentProvider`. Cine îl montează în aplicație îi dă banca încărcată; cine îl
- * montează într-un test îi dă o fixtură.
+ * `ContentProvider`. Aplicația îi dă doar catalogul sigur; testele vechi pot da
+ * încă o bancă-fixtură pentru hook-urile de compatibilitate.
  */
 export function AppProvider({
-  questions,
+  questions = [],
+  catalog = questions.map((q) => ({ id: q.id, capId: q.capId })),
   attempts = [],
   taxonomie = TAXONOMIE_GOALA,
   tipuri = TIPURI_GOALE,
   children,
 }: {
-  questions: Question[];
+  /** Banca completă mai există numai în testele drumului vechi. */
+  questions?: Question[];
+  /** Indexul sigur folosit în aplicația reală. */
+  catalog?: GrilaCatalog[];
   attempts?: readonly AttemptRow[];
   taxonomie?: Taxonomie;
   tipuri?: TipuriGrile;
@@ -44,7 +49,7 @@ export function AppProvider({
   const session = useSession(questions);
   // Recalculează scadențele rar și numai cât timp ecranul lor este deschis.
   const recapNow = useNow(screen === 'recapitulare' || screen === 'acasa', 60_000);
-  const recapitulare = useRecapitulare(recapNow, questions, attempts);
+  const recapitulare = useCoadaRecapitulare(recapNow, catalog, attempts);
   // Ceasul simulării bate doar cât timp ecranul de simulare este deschis.
   const now = useNow(screen === 'simulari');
   const sim = useSimulare(now, questions, taxonomie);
@@ -68,13 +73,14 @@ export function AppProvider({
       materie,
       setMaterie,
       questions,
+      catalog,
       taxonomie,
       tipuri,
       session,
       recapitulare,
       sim,
     }),
-    [go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, tipuri, toggleTheme],
+    [catalog, go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, tipuri, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

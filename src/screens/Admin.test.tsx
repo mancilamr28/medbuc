@@ -49,7 +49,7 @@ const filtreaza = (f: FiltreGrile) => {
 
 vi.mock('../lib/continut', async (original) => ({
   ...(await original<typeof import('../lib/continut')>()),
-  incarcaGrile: async () => GRILE,
+  incarcaCatalogGrile: async () => GRILE.map((g) => ({ id: g.id, capId: g.capId })),
   // Taxonomia, tipurile și colecțiile vin din bază de la faza 1 încoace; falsul
   // le dă pe cele reale, ca selectoarele ecranului să aibă ce afișa.
   incarcaTaxonomie: async () => TAXONOMIE_SEED,
@@ -70,6 +70,8 @@ vi.mock('../lib/continut', async (original) => ({
     const toate = filtreaza(f);
     return { randuri: toate.slice(decalaj, decalaj + limita), total: toate.length };
   },
+  citesteGrilaAdmin: async (id: string) => GRILE.find((g) => g.id === id)!,
+  exportaGrileAdmin: async () => [...GRILE],
   numaraPeStare: async (f: FiltreGrile) => ({
     ciorna: filtreaza({ ...f, status: 'ciorna' }).length,
     publicata: filtreaza({ ...f, status: 'publicata' }).length,

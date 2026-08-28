@@ -126,11 +126,11 @@ describe('poarta de acces', () => {
 
   it('păstrează adresa unui ecran intern după autentificare', async () => {
     sesiune = { user: { id: 'u1', email: 'ana@exemplu.ro' } };
-    window.location.hash = '#/recapitulare';
+    window.location.hash = '#/statistici';
     monteaza();
 
-    expect(await screen.findByRole('heading', { name: 'Recapitulare' })).toBeInTheDocument();
-    await waitFor(() => expect(window.location.hash).toBe('#/recapitulare'));
+    expect(await screen.findByRole('heading', { name: 'Statistici și progres' })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe('#/statistici'));
   });
 
   /** „Creează cont" trebuie să deschidă înregistrarea, nu autentificarea. */

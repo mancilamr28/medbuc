@@ -23,7 +23,7 @@ import { useContentOptional } from '../state/contentState';
  */
 export function PoartaContinut({ children }: { children: ReactNode }) {
   const continut = useContentOptional();
-  const { questions } = useApp();
+  const { catalog } = useApp();
 
   // Fără provider de conținut nu există nici încărcare, nici eroare de anunțat —
   // banca a venit direct din `AppProvider`. Se întâmplă în testele de randare,
@@ -67,7 +67,7 @@ export function PoartaContinut({ children }: { children: ReactNode }) {
     );
   }
 
-  if (questions.length === 0) {
+  if (catalog.length === 0) {
     return (
       <div className="screen">
         <div className="card" style={{ padding: 8, maxWidth: 520 }}>

@@ -36,12 +36,12 @@ function Cifra({ label, value, suffix }: { label: string; value: number | string
 }
 
 export function Statistici() {
-  const { questions, taxonomie } = useApp();
+  const { catalog, taxonomie } = useApp();
   const progress = useProgressOptional();
   const [perioada, setPerioada] = useState<PerioadaStatistici>('30z');
   const statistici = useMemo(
-    () => calculeazaStatistici(progress?.attempts ?? [], questions, perioada, Date.now(), taxonomie),
-    [perioada, progress?.attempts, questions, taxonomie],
+    () => calculeazaStatistici(progress?.attempts ?? [], catalog, perioada, Date.now(), taxonomie),
+    [catalog, perioada, progress?.attempts, taxonomie],
   );
   const { progres } = statistici;
   const capitole = [...progres.capitole]

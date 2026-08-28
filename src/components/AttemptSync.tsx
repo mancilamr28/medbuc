@@ -1,44 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { reportError } from '../lib/sentry';
 import { syncFinishedSession } from '../lib/syncAttempts';
-import { syncFinishedRecapitulare } from '../lib/syncRecapitulare';
 import { syncFinishedSimulare } from '../lib/syncSimulare';
 import { SANS } from '../lib/ui';
 import { useApp } from '../state/appContextValue';
 import { useAuth } from '../state/authState';
 import { useProgressOptional } from '../state/progressState';
 
-type Fel = 'sesiune' | 'simulare' | 'recapitulare';
+type Fel = 'sesiune' | 'simulare';
 
 /** Ce anume nu s-a salvat, spus în cuvintele ecranului de unde vine. */
 const MESAJ: Record<Fel, string> = {
   sesiune: 'Sesiunea nu a fost salvată.',
   simulare: 'Simularea nu a fost salvată.',
-  recapitulare: 'Recapitularea nu a fost salvată.',
 };
 
 /**
- * Scrie în jurnal ce s-a terminat — sesiune, simulare sau recapitulare — și
+ * Scrie în jurnal ce s-a terminat — sesiune sau simulare — și
  * spune când n-a reușit.
  *
- * Cele trei căi erau tratate diferit fără niciun motiv: recapitularea avea card
+ * Căile vechi erau tratate diferit fără niciun motiv: recapitularea avea card
  * de reîncercare, iar sesiunea și simularea doar un `console.warn`. Un elev
  * termina o sesiune, își vedea scorul, pleca de pe ecran — și răspunsurile nu
- * existau nicăieri, fără ca ceva să i-o spună. Acum toate trei folosesc aceeași
- * stare de eșec, același card și același buton de reîncercare.
+ * existau nicăieri, fără ca ceva să i-o spună. Recapitularea nouă este salvată
+ * direct de motorul de lucrări; acest pod rămâne doar pentru cele două formate
+ * vechi care pot exista încă în memorie sau în localStorage.
  *
  * Eșecurile ajung și la `reportError`: până acum Sentry vedea doar căderile de
  * randare, deci o respingere RLS sau o cădere de rețea era invizibilă.
  */
 export function AttemptSync() {
-  const { session, recapitulare, sim, questions } = useApp();
+  const { session, sim, questions } = useApp();
   const { user } = useAuth();
   const progress = useProgressOptional();
   const reloadProgress = progress?.reload;
 
   const sesiuneSincronizata = useRef<string | null>(null);
   const simulareSincronizata = useRef<string | null>(null);
-  const recapitulareSincronizata = useRef<string | null>(null);
 
   const [esecuri, setEsecuri] = useState<Partial<Record<Fel, true>>>({});
   // Bumpat de „Reîncearcă": intră în dependențele tuturor efectelor, deci le
@@ -109,20 +107,6 @@ export function AttemptSync() {
         marcheaza('simulare', false, error);
       });
   }, [incercare, marcheaza, reloadProgress, sim.finishedAt, sim.run, user]);
-
-  useEffect(() => {
-    if (!user || recapitulare.phase !== 'rezultat' || recapitulareSincronizata.current === recapitulare.id) return;
-    recapitulareSincronizata.current = recapitulare.id;
-    void syncFinishedRecapitulare(user.id, recapitulare, recapitulare.finishedAt ?? Date.now())
-      .then(() => {
-        marcheaza('recapitulare', true);
-        return reloadProgress?.();
-      })
-      .catch((error: unknown) => {
-        recapitulareSincronizata.current = null;
-        marcheaza('recapitulare', false, error);
-      });
-  }, [incercare, marcheaza, recapitulare, reloadProgress, user]);
 
   const nereusite = (Object.keys(esecuri) as Fel[]).filter((fel) => esecuri[fel]);
   if (nereusite.length === 0) return null;

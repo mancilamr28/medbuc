@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Segmented } from '../components/Segmented';
-import { salveazaGrila, type GrilaCuStare, type QuestionStatus } from '../lib/continut';
+import {
+  exportaGrileAdmin,
+  salveazaGrila,
+  type GrilaCatalog,
+  type QuestionStatus,
+} from '../lib/continut';
 import { descarcaText, ziua } from '../lib/exportDate';
 import { numar } from '../lib/text';
 import { MONO, SANS, autoGrid, label } from '../lib/ui';
@@ -39,14 +44,14 @@ const cifra = (n: number, culoare: string) => (
  * tipar ca `Admin.tsx` cu `adminCiorna.ts`, din care vine și separarea numelor.
  */
 export function ImportGrile({
-  grile,
+  catalog,
   taxonomie,
   tipuri,
   colectii,
   reload,
   dupaImport,
 }: {
-  grile: GrilaCuStare[];
+  catalog: GrilaCatalog[];
   taxonomie: Taxonomie;
   tipuri: TipuriGrile;
   colectii: Colectii;
@@ -65,8 +70,8 @@ export function ImportGrile({
   const [bilant, setBilant] = useState<BilantImport | null>(null);
 
   const citire = useMemo(
-    () => citesteImport(brut, { status: implicit, sursa, colectie }, grile, taxonomie, tipuri),
-    [brut, implicit, sursa, colectie, grile, taxonomie, tipuri],
+    () => citesteImport(brut, { status: implicit, sursa, colectie }, catalog, taxonomie, tipuri),
+    [brut, implicit, sursa, colectie, catalog, taxonomie, tipuri],
   );
 
   const valide = citire.randuri.filter((r) => r.grila !== null);
@@ -96,13 +101,18 @@ export function ImportGrile({
     }
   };
 
-  const exporta = () => {
-    if (grile.length === 0) {
-      notify('info', 'Biblioteca e goală, nu e ce exporta.');
-      return;
+  const exporta = async () => {
+    try {
+      const grile = await exportaGrileAdmin();
+      if (grile.length === 0) {
+        notify('info', 'Biblioteca e goală, nu e ce exporta.');
+        return;
+      }
+      descarcaText(catreJson(grile), `medbuc-grile-${ziua(new Date())}.json`);
+      notify('succes', `${numar(grile.length, 'grilă exportată', 'grile exportate')}.`);
+    } catch (e: unknown) {
+      notify('eroare', e instanceof Error ? e.message : 'Nu am putut exporta biblioteca.');
     }
-    descarcaText(catreJson(grile), `medbuc-grile-${ziua(new Date())}.json`);
-    notify('succes', `${numar(grile.length, 'grilă exportată', 'grile exportate')}.`);
   };
 
   return (
@@ -112,7 +122,7 @@ export function ImportGrile({
         <button
           type="button"
           className="btn-ghost"
-          onClick={exporta}
+          onClick={() => void exporta()}
           style={{ marginLeft: 'auto', padding: '7px 12px', font: `500 12px ${SANS}` }}
         >
           Exportă biblioteca

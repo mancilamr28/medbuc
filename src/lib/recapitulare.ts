@@ -1,4 +1,4 @@
-import type { Question } from '../data/questions';
+import type { GrilaCatalog } from './continut';
 import type { AttemptRow } from './progres';
 
 const ZI_MS = 24 * 60 * 60 * 1000;
@@ -7,7 +7,7 @@ const ZI_MS = 24 * 60 * 60 * 1000;
 export const INTERVALE_RECAPITULARE_ZILE = [1, 3, 7, 14, 30] as const;
 
 export interface GrilaDeRecapitulat {
-  question: Question;
+  question: GrilaCatalog;
   /** Momentul de la care grila trebuie să revină. */
   scadentaLa: number;
   /** Câte răspunsuri corecte consecutive are după ultima greșeală. */
@@ -25,7 +25,7 @@ export interface GrilaDeRecapitulat {
  */
 export function calculeazaRecapitulare(
   attempts: readonly AttemptRow[],
-  questions: readonly Question[],
+  questions: readonly GrilaCatalog[],
   acum: number,
 ): GrilaDeRecapitulat[] {
   const intrebari = new Map(questions.map((question) => [question.id, question]));

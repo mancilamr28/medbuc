@@ -1,6 +1,6 @@
 import type { ChapterId } from '../data/chapters';
 import { TAXONOMIE_GOALA, type Taxonomie } from './taxonomie';
-import type { Question } from '../data/questions';
+import type { GrilaCatalog } from './continut';
 
 /** Rândul minim citit din jurnalul de răspunsuri. */
 export interface AttemptRow {
@@ -58,7 +58,7 @@ const etichetaData = (iso: string): string =>
  */
 export function calculeazaProgres(
   attempts: readonly AttemptRow[],
-  questions: readonly Question[],
+  questions: readonly GrilaCatalog[],
   taxonomie: Taxonomie = TAXONOMIE_GOALA,
 ): ProgresCalculat {
   const intrebare = new Map(questions.map((q) => [q.id as string, q]));

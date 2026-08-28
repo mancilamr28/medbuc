@@ -116,7 +116,7 @@ function useNumarPeMod() {
 }
 
 function Asistent({ intentie }: { intentie: IntentieTestNou }) {
-  const { questions, taxonomie } = useApp();
+  const { catalog, taxonomie } = useApp();
   const { notify } = useToast();
   const [stare, setStare] = useState<StareAsistent>(() =>
     stareInitiala(
@@ -127,7 +127,7 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
   const [pas, setPas] = useState<PasAsistent>('mod');
   const [seGenereaza, setSeGenereaza] = useState(false);
 
-  const { peCapitol } = useMemo(() => numaraGrile(questions, taxonomie), [questions, taxonomie]);
+  const { peCapitol } = useMemo(() => numaraGrile(catalog, taxonomie), [catalog, taxonomie]);
   const capitoleCuGrile = useMemo(
     () => taxonomie.capitole.filter((c) => (peCapitol.get(c.id) ?? 0) > 0).length,
     [peCapitol, taxonomie.capitole],

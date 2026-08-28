@@ -23,6 +23,7 @@ vi.mock('../state/appContextValue', async () => {
     useApp: () => ({
       go,
       questions: QUESTIONS,
+      catalog: QUESTIONS.map((q) => ({ id: q.id, capId: q.capId })),
       taxonomie: TAXONOMIE_SEED,
       session: {
         answers: {},

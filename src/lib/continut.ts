@@ -29,9 +29,51 @@ import { citesteTot } from './paginare';
 
 export type QuestionStatus = 'ciorna' | 'publicata' | 'retrasa';
 
+/**
+ * Singura formă a bibliotecii care ajunge în mod obișnuit la elev.
+ *
+ * Id-ul leagă jurnalul de capitol, iar capitolul este suficient pentru
+ * numărători și statistici. Enunțul, variantele și răspunsul nu au motiv să fie
+ * descărcate pentru toate grilele: lucrarea le aduce numai pentru pozițiile ei.
+ */
+export interface GrilaCatalog {
+  id: string;
+  capId: ChapterId;
+}
+
+interface RandCatalog {
+  id: string;
+  chapter_id: string;
+}
+
 /** O grilă așa cum o vede administratorul: cu starea ei. */
 export interface GrilaCuStare extends Question {
   status: QuestionStatus;
+}
+
+/** Rândul ușor din lista Admin; conținutul complet se cere doar la editare. */
+export interface RezumatGrila {
+  id: string;
+  capId: ChapterId;
+  tip: string;
+  status: QuestionStatus;
+  text: string;
+  src: string;
+  sursa: QuestionSursa;
+  colectieId: string;
+  an?: number;
+}
+
+interface RandRezumatGrila {
+  id: string;
+  chapter_id: string;
+  tip_id: string;
+  status: string;
+  text: string;
+  src: string;
+  sursa: string;
+  an: number | null;
+  colectie_id: string | null;
 }
 
 /** Rândul brut, așa cum vine de la PostgREST cu variantele încorporate. */
@@ -65,7 +107,8 @@ export interface RandGrila {
  */
 export const FK_VARIANTE = 'question_options_question_id_fkey';
 
-const CAMPURI = `id, chapter_id, tip, status, text, enunturi, correct, expl, src, sursa, an, colectie_id, tip_id, question_options!${FK_VARIANTE}(key, text, why)`;
+const CAMPURI_CATALOG = 'id,chapter_id';
+const CAMPURI_REZUMAT = 'id,chapter_id,tip_id,status,text,src,sursa,an,colectie_id';
 
 /**
  * Pură peste rândul primit, ca să poată fi testată fără rețea.
@@ -102,22 +145,82 @@ export function mapeazaGrila(rand: RandGrila): GrilaCuStare {
   };
 }
 
-/**
- * Tot ce are voie contul să vadă. Filtrarea nu se face aici: politica
- * `questions_citire` întoarce doar grilele publicate elevilor și tot ce există
- * administratorilor, deci aceeași interogare dă mulțimea corectă fiecăruia.
- */
-export async function incarcaGrile(): Promise<GrilaCuStare[]> {
+export function mapeazaRezumatGrila(rand: RandRezumatGrila): RezumatGrila {
+  return {
+    id: rand.id,
+    capId: rand.chapter_id as ChapterId,
+    tip: rand.tip_id,
+    status: rand.status as QuestionStatus,
+    text: rand.text,
+    src: rand.src,
+    sursa: rand.sursa as QuestionSursa,
+    colectieId: rand.colectie_id ?? '',
+    ...(rand.an === null ? {} : { an: rand.an }),
+  };
+}
+
+/** Forma JSON a unei grile întoarse de RPC-urile de administrator. */
+interface GrilaAdminRpc extends Omit<RandGrila, 'question_options' | 'tip'> {
+  optiuni: { key: string; text: string; why: string | null }[] | null;
+}
+
+const dinRpcAdmin = (rand: GrilaAdminRpc): GrilaCuStare =>
+  mapeazaGrila({ ...rand, tip: null, question_options: rand.optiuni });
+
+/** Cere conținutul complet numai după ce administratorul a ales o grilă. */
+export async function citesteGrilaAdmin(id: string): Promise<GrilaCuStare> {
   const { supabase } = await import('./supabase');
-  const randuri = await citesteTot<RandGrila>(async (de, la) => {
+  const { data, error } = await supabase.rpc('citeste_grila_admin', { grila_id: id });
+  if (error) throw new Error(error.message);
+  return dinRpcAdmin(data as GrilaAdminRpc);
+}
+
+/**
+ * Exportă prin RPC-ul de administrator, în pagini.
+ *
+ * Nu există un `select` privilegiat ascuns în client: rolul aplicației este
+ * verificat în funcție, iar răspunsurile nu devin accesibile rolului SQL
+ * `authenticated` doar fiindcă administratorul are nevoie de un export.
+ */
+export async function exportaGrileAdmin(): Promise<GrilaCuStare[]> {
+  const { supabase } = await import('./supabase');
+  const toate: GrilaCuStare[] = [];
+  const limita = 200;
+  let total: number;
+
+  do {
+    const { data, error } = await supabase.rpc('exporta_grile_admin', {
+      de_la: toate.length,
+      limita,
+    });
+    if (error) throw new Error(error.message);
+    const pagina = data as { total: number; grile: GrilaAdminRpc[] };
+    total = pagina.total;
+    toate.push(...pagina.grile.map(dinRpcAdmin));
+  } while (toate.length < total);
+
+  return toate;
+}
+
+/**
+ * Numai grilele publicate, inclusiv pentru un administrator.
+ *
+ * RLS îi lasă administratorului și ciornele pentru ecranul Admin. Fără filtrul
+ * explicit, acele ciorne intră în numărătorile Acasă și în pașii asistentului,
+ * deși motorul de generare le refuză corect.
+ */
+export async function incarcaCatalogGrile(): Promise<GrilaCatalog[]> {
+  const { supabase } = await import('./supabase');
+  const randuri = await citesteTot<RandCatalog>(async (de, la) => {
     const r = await supabase
       .from('questions')
-      .select(CAMPURI, { count: 'exact' })
+      .select(CAMPURI_CATALOG, { count: 'exact' })
+      .eq('status', 'publicata')
       .order('id')
       .range(de, la);
-    return { data: r.data as unknown as RandGrila[] | null, error: r.error, count: r.count };
+    return { data: r.data as RandCatalog[] | null, error: r.error, count: r.count };
   });
-  return randuri.map(mapeazaGrila);
+  return randuri.map((r) => ({ id: r.id, capId: r.chapter_id as ChapterId }));
 }
 
 /**
@@ -129,7 +232,7 @@ export async function incarcaGrile(): Promise<GrilaCuStare[]> {
  * `Chapter` o poartă explicit — nu din prefixul id-ului.
  */
 export function numaraGrile(
-  questions: Question[],
+  questions: readonly GrilaCatalog[],
   taxonomie: Taxonomie = TAXONOMIE_GOALA,
 ): {
   peCapitol: ReadonlyMap<ChapterId, number>;
@@ -296,7 +399,7 @@ export const FILTRE_GOALE: FiltreGrile = {
 };
 
 export interface PaginaGrile {
-  randuri: GrilaCuStare[];
+  randuri: RezumatGrila[];
   /** Câte grile trec de filtru, nu câte s-au adus în pagina asta. */
   total: number;
 }
@@ -329,7 +432,7 @@ export async function cautaGrile(
 ): Promise<PaginaGrile> {
   const { supabase } = await import('./supabase');
 
-  let q = supabase.from('questions').select(CAMPURI, { count: 'exact' });
+  let q = supabase.from('questions').select(CAMPURI_REZUMAT, { count: 'exact' });
 
   const cautare = filtre.cautare.trim();
   if (cautare !== '') {
@@ -346,7 +449,7 @@ export async function cautaGrile(
   if (r.error) throw new Error(r.error.message);
 
   return {
-    randuri: ((r.data ?? []) as unknown as RandGrila[]).map(mapeazaGrila),
+    randuri: ((r.data ?? []) as unknown as RandRezumatGrila[]).map(mapeazaRezumatGrila),
     total: r.count ?? 0,
   };
 }

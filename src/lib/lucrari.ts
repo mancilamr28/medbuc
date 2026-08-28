@@ -1,5 +1,6 @@
 import type { ChapterId, MaterieId } from '../data/chapters';
 import type { OptionKey, QuestionId } from '../data/questions';
+import type { SimRun } from '../state/useSimulare';
 
 /**
  * Poarta către motorul de generare din bază.
@@ -29,6 +30,8 @@ export type ModTest =
 
 /** Fiecare listă goală înseamnă „fără restricție pe axa asta", ca peste tot. */
 export interface FiltreTest {
+  /** Id-uri exacte, folosite de coada inteligentă; gol înseamnă fără restricție. */
+  ids?: QuestionId[];
   materii?: MaterieId[];
   capitole?: ChapterId[];
   colectii?: string[];
@@ -182,3 +185,11 @@ export const raspunde = (v: {
   });
 
 export const predaTest = (runId: string) => rpc<ScorLucrare>('preda_test', { run_id: runId });
+
+/**
+ * Mută o simulare salvată de versiunea veche în motorul persistent.
+ * Funcția din bază este idempotentă, deci StrictMode sau o reîncercare după o
+ * întrerupere nu dublează lucrarea.
+ */
+export const importaSimulareVeche = (run: SimRun) =>
+  rpc<{ run_id: string }>('importa_simulare_veche', { payload: run });
