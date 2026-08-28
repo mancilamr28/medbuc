@@ -728,15 +728,12 @@ describe('taxonomia', () => {
   });
 
   it('nu deschide și grilele către un vizitator', async () => {
-    const r = await baza.caVizitator(() =>
-      baza.db.query<{ grile: number; variante: number }>(
-        `select (select count(*)::int from questions)        as grile,
-                (select count(*)::int from question_options) as variante`,
-      ),
-    );
-
-    expect(r.rows[0]!.grile).toBe(0);
-    expect(r.rows[0]!.variante).toBe(0);
+    await expect(
+      baza.caVizitator(() => baza.db.query('select id from questions limit 1')),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      baza.caVizitator(() => baza.db.query('select question_id from question_options limit 1')),
+    ).rejects.toThrow(/permission denied/i);
   });
 
   it('ascunde de elev materia nepublicată, dar i-o arată administratorului', async () => {
@@ -2117,12 +2114,47 @@ describe('rezolvarea lucrării', () => {
   });
 });
 
+describe('coloanele cu răspunsuri', () => {
+  it('lasă elevul să citească direct numai catalogul sigur', async () => {
+    const grile = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string; chapter_id: string; status: string; text: string }>(
+        'select id, chapter_id, status, text from public.questions order by id limit 1',
+      ),
+    );
+    const optiuni = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ question_id: string; key: string; text: string }>(
+        'select question_id, key, text from public.question_options order by question_id, key limit 1',
+      ),
+    );
+
+    expect(grile.rows).toHaveLength(1);
+    expect(optiuni.rows).toHaveLength(1);
+  });
+
+  it.each([
+    ['răspunsul corect', 'select correct from public.questions limit 1'],
+    ['explicația generală', 'select expl from public.questions limit 1'],
+    ['explicația opțiunii', 'select why from public.question_options limit 1'],
+    ['toate coloanele prin steluță', 'select * from public.questions limit 1'],
+  ])('nu lasă elevul să citească direct %s', async (_nume, sql) => {
+    await expect(baza.caUtilizator(ana, () => baza.db.query(sql))).rejects.toThrow(
+      /permission denied/i,
+    );
+  });
+
+  it('nu lasă nici administratorul să ocolească funcția de administrare', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      baza.caUtilizator(ana, () => baza.db.query('select correct from public.questions limit 1')),
+    ).rejects.toThrow(/permission denied/i);
+  });
+});
+
 /**
- * Citirea de administrator există înaintea nevoii ei: când `correct`, `expl` și
- * `why` vor fi revocate la nivel de coloană, editorul din Administrare le-ar
- * pierde odată cu elevul. Acordarea pe coloană e la nivel de rol de bază de
- * date, iar „administrator" e rol al aplicației — deci nu există un rol căruia
- * să i se acorde, și drumul administratorului trebuie să fie o funcție.
+ * `correct`, `expl` și `why` sunt revocate la nivel de coloană pentru rolul SQL
+ * comun tuturor conturilor. „Administrator" e însă rol al aplicației — deci nu
+ * există un rol SQL căruia să i se acorde separat, iar drumul administratorului
+ * trebuie să fie o funcție care îi verifică profilul.
  */
 describe('citirea de administrator', () => {
   it('dă grila întreagă unui administrator', async () => {
