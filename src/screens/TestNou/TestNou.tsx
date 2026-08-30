@@ -6,6 +6,7 @@ import { PoartaContinut } from '../../components/PoartaContinut';
 import { chapterLabel, type ChapterId, type MaterieId } from '../../data/chapters';
 import { numaraGrile } from '../../lib/continut';
 import { codEroare, genereazaTest, numaraCandidati } from '../../lib/lucrari';
+import { listaTestePredefinite, type TestPredefinitPublic } from '../../lib/testePredefinite';
 import { goLucrare, useIntentieTestNou, type IntentieTestNou } from '../../lib/router';
 import { numar } from '../../lib/text';
 import { SANS, eyebrow, pageLead, pageTitle } from '../../lib/ui';
@@ -58,13 +59,18 @@ export function TestNou() {
  * Fără garda a doua, două cereri pornite la 30 ms distanță pot ajunge în ordine
  * inversă și lasă pe ecran numărul filtrelor de dinainte.
  */
-function useNumarCandidati(filtre: ReturnType<typeof filtreDin>) {
+function useNumarCandidati(filtre: ReturnType<typeof filtreDin>, activ = true) {
   const [total, setTotal] = useState<number | null>(null);
   const [seIncarca, setSeIncarca] = useState(true);
   const cheie = JSON.stringify(filtre);
   const ultima = useRef(0);
 
   useEffect(() => {
+    if (!activ) {
+      setTotal(null);
+      setSeIncarca(false);
+      return;
+    }
     const alMeu = ++ultima.current;
     setSeIncarca(true);
     const t = setTimeout(() => {
@@ -81,9 +87,33 @@ function useNumarCandidati(filtre: ReturnType<typeof filtreDin>) {
         });
     }, 250);
     return () => clearTimeout(t);
-  }, [cheie]);
+  }, [activ, cheie]);
 
   return { total, seIncarca };
+}
+
+function useTestePredefinite() {
+  const [teste, setTeste] = useState<TestPredefinitPublic[]>([]);
+  const [seIncarca, setSeIncarca] = useState(true);
+
+  useEffect(() => {
+    let viu = true;
+    void listaTestePredefinite()
+      .then((r) => {
+        if (viu) setTeste(r);
+      })
+      .catch(() => {
+        if (viu) setTeste([]);
+      })
+      .finally(() => {
+        if (viu) setSeIncarca(false);
+      });
+    return () => {
+      viu = false;
+    };
+  }, []);
+
+  return { teste, seIncarca };
 }
 
 /** Câte grile are fiecare mod, o singură dată la deschidere. */
@@ -93,7 +123,7 @@ function useNumarPeMod() {
   useEffect(() => {
     let viu = true;
     void Promise.all(
-      MODURI.map(async (m) => {
+      MODURI.filter((m) => m.id !== 'test_predefinit').map(async (m) => {
         try {
           const r = await numaraCandidati({ mod: m.id, filtre: { materii: [], capitole: [] } });
           return [m.id, r.total] as const;
@@ -138,7 +168,12 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
   // `continut` iese din listă. Atunci se cade pe primul pas real, nu pe gol.
   const pasCurent = pasi.includes(pas) ? pas : pasi[0]!;
 
-  const { total, seIncarca } = useNumarCandidati(filtreDin(stare));
+  const { teste, seIncarca: seIncarcaTeste } = useTestePredefinite();
+  const testAles = teste.find((t) => t.id === stare.testId) ?? null;
+  const ePredefinit = stare.mod === 'test_predefinit';
+  const contor = useNumarCandidati(filtreDin(stare), !ePredefinit);
+  const total = ePredefinit ? (testAles?.nr_grile ?? null) : contor.total;
+  const seIncarca = ePredefinit ? seIncarcaTeste : contor.seIncarca;
   const peMod = useNumarPeMod();
 
   const inainte = () => {
@@ -183,6 +218,8 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
             <PasulMod
               stare={stare}
               peMod={peMod}
+              nrTeste={teste.length}
+              seIncarcaTeste={seIncarcaTeste}
               onAlege={(m) => {
                 setStare((s) => cuModul(s, m));
                 const urmator = pasVecin(pasiVizibili(cuModul(stare, m), { capitoleCuGrile }), 'mod', 1);
@@ -190,11 +227,18 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
               }}
             />
           )}
+          {pasCurent === 'test' && (
+            <PasulTestPredefinit
+              teste={teste}
+              ales={stare.testId}
+              onAlege={(id) => setStare((s) => ({ ...s, testId: id }))}
+            />
+          )}
           {pasCurent === 'continut' && (
             <PasulContinut stare={stare} peCapitol={peCapitol} setStare={setStare} />
           )}
           {pasCurent === 'configurare' && <PasulConfigurare stare={stare} setStare={setStare} />}
-          {pasCurent === 'rezumat' && <PasulRezumat stare={stare} total={total} />}
+          {pasCurent === 'rezumat' && <PasulRezumat stare={stare} total={total} test={testAles} />}
         </div>
 
         <div
@@ -209,7 +253,13 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
           }}
         >
           <span style={{ font: `400 12.5px ${SANS}`, color: 'var(--fg3)' }}>
-            {seIncarca ? 'Se numără…' : total === null ? 'Numărul n-a putut fi aflat' : frazaDisponibile(total)}
+            {seIncarca
+              ? ePredefinit ? 'Se încarcă testele…' : 'Se numără…'
+              : ePredefinit && testAles === null
+                ? numar(teste.length, 'test disponibil', 'teste disponibile')
+                : total === null
+                  ? 'Numărul n-a putut fi aflat'
+                  : frazaDisponibile(total)}
           </span>
           {pasCurent !== 'mod' && (
             <button
@@ -226,18 +276,27 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
               type="button"
               className="btn-primary tinta-tactila"
               onClick={() => void genereaza()}
-              disabled={seGenereaza || total === 0 || !nrValid(stare.nr)}
+              disabled={
+                seGenereaza ||
+                total === 0 ||
+                (ePredefinit ? testAles === null || !testAles.disponibil : !nrValid(stare.nr))
+              }
               style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}
             >
               {seGenereaza
                 ? 'Se compune…'
-                : frazaIncepe(total === null ? stare.nr : Math.min(stare.nr, total))}
+                : frazaIncepe(
+                    ePredefinit
+                      ? (testAles?.nr_grile ?? 0)
+                      : total === null ? stare.nr : Math.min(stare.nr, total),
+                  )}
             </button>
           ) : (
             <button
               type="button"
               className="btn-primary tinta-tactila"
               onClick={inainte}
+              disabled={pasCurent === 'test' && testAles === null}
               style={{ marginLeft: 'auto', padding: '12px 20px', font: `600 14px ${SANS}` }}
             >
               Mai departe →
@@ -251,6 +310,7 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
 
 const NUME_PAS: Record<PasAsistent, string> = {
   mod: 'Fel',
+  test: 'Test',
   continut: 'Conținut',
   configurare: 'Configurare',
   rezumat: 'Rezumat',
@@ -282,17 +342,22 @@ function Indicator({ pasi, curent }: { pasi: PasAsistent[]; curent: PasAsistent 
 function PasulMod({
   stare,
   peMod,
+  nrTeste,
+  seIncarcaTeste,
   onAlege,
 }: {
   stare: StareAsistent;
   peMod: Partial<Record<ModAsistent, number>>;
+  nrTeste: number;
+  seIncarcaTeste: boolean;
   onAlege: (m: ModAsistent) => void;
 }) {
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       <div style={eyebrow(undefined, 11)}>Ce fel de test</div>
       {MODURI.map((m) => {
-        const n = peMod[m.id];
+        const ePredefinit = m.id === 'test_predefinit';
+        const n = ePredefinit ? (seIncarcaTeste ? undefined : nrTeste) : peMod[m.id];
         const gol = n === 0;
         const ales = stare.mod === m.id;
         return (
@@ -319,12 +384,80 @@ function PasulMod({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ font: `600 14px ${SANS}`, color: 'var(--fg)' }}>{m.titlu}</div>
               <div style={{ marginTop: 4, font: `400 12.5px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
-                {/* Un mod fără grile spune ce lipsește, nu arată un lacăt. */}
+                {/* Un mod gol spune ce lipsește, nu arată un lacăt. */}
                 {gol ? m.motivGol : m.detaliu}
               </div>
             </div>
             <span style={{ flex: '0 0 auto', font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
-              {n === undefined ? '' : numar(n, 'grilă', 'grile')}
+              {n === undefined
+                ? ''
+                : ePredefinit
+                  ? numar(n, 'test', 'teste')
+                  : numar(n, 'grilă', 'grile')}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PasulTestPredefinit({
+  teste,
+  ales,
+  onAlege,
+}: {
+  teste: TestPredefinitPublic[];
+  ales: string | null;
+  onAlege: (id: string) => void;
+}) {
+  if (teste.length === 0) {
+    return (
+      <EmptyState
+        title="Niciun test pregătit încă"
+        hint="Când echipa publică o lucrare oficială sau o simulare, apare aici automat."
+        padding="10px 0"
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      <div style={eyebrow(undefined, 11)}>Alege lucrarea</div>
+      {teste.map((t) => {
+        const activ = ales === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            className="row-btn tinta-tactila"
+            disabled={!t.disponibil}
+            aria-pressed={activ}
+            onClick={() => onAlege(t.id)}
+            style={{
+              padding: '13px 14px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              borderRadius: 11,
+              textAlign: 'left',
+              border: `1.5px solid ${activ ? 'var(--brand)' : 'var(--line)'}`,
+              background: activ ? 'var(--brandS)' : 'var(--surf)',
+              opacity: t.disponibil ? 1 : 0.6,
+              cursor: t.disponibil ? 'pointer' : 'not-allowed',
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', font: `600 14px ${SANS}` }}>{t.nume}</span>
+              <span style={{ display: 'block', marginTop: 4, font: `400 12.5px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
+                {!t.disponibil
+                  ? 'Necesită acces premium'
+                  : t.descriere || (t.mod_selectie === 'fix' ? 'Lucrare în ordine fixă' : 'Variantă nouă la fiecare pornire')}
+              </span>
+            </span>
+            <span style={{ flex: '0 0 auto', textAlign: 'right', font: `400 12px/1.5 ${SANS}`, color: 'var(--fg3)' }}>
+              {numar(t.nr_grile, 'grilă', 'grile')}
+              {t.durata_minute !== null && <><br />{numar(t.durata_minute, 'minut', 'minute')}</>}
             </span>
           </button>
         );
@@ -646,33 +779,53 @@ function Bifa({
   );
 }
 
-function PasulRezumat({ stare, total }: { stare: StareAsistent; total: number | null }) {
+function PasulRezumat({
+  stare,
+  total,
+  test,
+}: {
+  stare: StareAsistent;
+  total: number | null;
+  test: TestPredefinitPublic | null;
+}) {
   const { taxonomie } = useApp();
   const d = descriereMod(stare.mod);
-  const scurt = total !== null && total < stare.nr;
+  const scurt = stare.mod !== 'test_predefinit' && total !== null && total < stare.nr;
 
-  const randuri: [string, string][] = [
-    ['Fel', d.titlu],
-    [
-      'Din ce',
-      stare.capitole.length > 0
-        ? stare.capitole.map((c) => taxonomie.eticheta(c)).join(', ')
-        : stare.materii.length > 0
-          ? stare.materii.map((m) => taxonomie.materie(m)?.name ?? m).join(', ')
-          : 'Toată biblioteca',
-    ],
-    ['Câte grile', numar(stare.nr, 'grilă', 'grile')],
-    ['Timp', stare.durataMinute === null ? 'Fără limită' : numar(stare.durataMinute, 'minut', 'minute')],
-    [
-      'Ordine',
-      [stare.amestecaGrile ? 'grile amestecate' : 'grile în ordinea bibliotecii',
-       stare.amestecaOptiuni ? 'variante amestecate' : 'variante în ordinea lor'].join(' · '),
-    ],
-  ];
+  const randuri: [string, string][] =
+    stare.mod === 'test_predefinit' && test !== null
+      ? [
+          ['Fel', test.mod_selectie === 'fix' ? 'Lucrare cu ordine fixă' : 'Simulare cu variantă nouă'],
+          ['Test', test.nume],
+          ['Câte grile', numar(test.nr_grile, 'grilă', 'grile')],
+          ['Timp', test.durata_minute === null ? 'Fără limită' : numar(test.durata_minute, 'minut', 'minute')],
+          ['Acces', test.acces === 'premium' ? 'Premium' : 'Liber'],
+        ]
+      : [
+          ['Fel', d.titlu],
+          [
+            'Din ce',
+            stare.capitole.length > 0
+              ? stare.capitole.map((c) => taxonomie.eticheta(c)).join(', ')
+              : stare.materii.length > 0
+                ? stare.materii.map((m) => taxonomie.materie(m)?.name ?? m).join(', ')
+                : 'Toată biblioteca',
+          ],
+          ['Câte grile', numar(stare.nr, 'grilă', 'grile')],
+          ['Timp', stare.durataMinute === null ? 'Fără limită' : numar(stare.durataMinute, 'minut', 'minute')],
+          [
+            'Ordine',
+            [stare.amestecaGrile ? 'grile amestecate' : 'grile în ordinea bibliotecii',
+             stare.amestecaOptiuni ? 'variante amestecate' : 'variante în ordinea lor'].join(' · '),
+          ],
+        ];
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={eyebrow(undefined, 11)}>Cum arată testul</div>
+      {test?.descriere && stare.mod === 'test_predefinit' && (
+        <p style={{ margin: 0, font: `400 13px/1.55 ${SANS}`, color: 'var(--fg2)' }}>{test.descriere}</p>
+      )}
       <div style={{ display: 'grid', gap: 2 }}>
         {randuri.map(([eticheta, valoare]) => (
           <div

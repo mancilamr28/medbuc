@@ -345,6 +345,20 @@ Selection moved off the client. The global content load is now only `id` + `chap
 - **`greseli` means the most recent attempt is wrong**, not "was ever wrong" — otherwise a question you have since learned stays in the queue forever.
 - **No temp table.** `create temporary table` leaves session state and PostgREST reuses pooled sessions; two generations in one transaction would fail with "relation already exists", a fault that only shows up under load. The chosen ids live in a `text[]`.
 
+### Predefined papers — fixed exams and rule-based simulations
+
+`teste_predefinite` is the administrator-owned definition; `test_runs` remains the student-owned snapshot. A definition can be **fixed** (`test_predefinit_items` stores exact ids and positions) or **rule-based** (`regula` is a normal generator request). Both enter through the existing public `genereaza_test` RPC and end as ordinary immutable runs. Editing a definition therefore changes only future starts.
+
+The browser never reads either definition table directly. `lista_teste_predefinite` returns only published metadata and availability; it deliberately omits the fixed item list. `citeste_teste_predefinite_admin` and `salveaza_test_predefinit` check `private.is_admin()`. The client wrappers live in `src/lib/testePredefinite.ts`; do not add direct `.from('teste_predefinite')` reads.
+
+Three rules are enforced next to the data:
+
+- hiding a centre or collection also hides its tests;
+- a published fixed paper contains only published questions, has no duplicate ids, and a free paper cannot smuggle in premium questions;
+- a fixed paper is indivisible at generation time — if one item is withdrawn or inaccessible, generation raises `test_predefinit_indisponibil` instead of silently shortening an official exam.
+
+The wizard treats a predefined paper as an owned configuration: after choosing the mode, the student chooses one published definition and reviews it, but cannot override its count, duration, order or rules. Premium items remain visible with `disponibil: false`; the server repeats the access check, so a hand-written request cannot bypass the disabled button.
+
 ### Solving a paper — `citeste_test` / `raspunde` / `preda_test`
 
 **Grading moved to the server.** `src/lib/attempts.ts` computes `is_correct: chosen === question.correct` in the browser and POSTs the result, and `attempts_inserare_proprii` only checks `user_id = auth.uid()` — so anyone with the publishable key can insert unlimited correct answers, and every mastery figure in `progres.ts` rests on a boolean the client picks. `raspunde` compares against `questions.correct` itself.

@@ -43,6 +43,8 @@ export interface FiltreTest {
 
 export interface CerereTest {
   mod: ModTest;
+  /** Definiția aleasă; este singurul câmp configurabil de elev la un test predefinit. */
+  test_id?: string;
   filtre?: FiltreTest;
   /** Cote pe materie. Când sunt date, `nr` se ignoră — suma lor ține locul. */
   cote?: { materie_id: MaterieId; nr: number }[];
@@ -133,6 +135,9 @@ export const CODURI_LUCRARE = [
   'nr_invalid',
   'fara_candidati',
   'insuficient_strict',
+  'test_predefinit_inexistent',
+  'test_predefinit_indisponibil',
+  'acces_interzis',
   'lucrare_inexistenta',
   'lucrare_predata',
   'pozitie_inexistenta',

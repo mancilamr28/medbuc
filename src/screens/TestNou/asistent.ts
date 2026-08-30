@@ -15,9 +15,8 @@ import { numar } from '../../lib/text';
 
 /**
  * Modurile oferite azi. Sunt un subset al enum-ului `test_mod` din bază:
- * `recapitulare` și `test_predefinit` există în motor, dar unul are deja ecranul
- * lui, iar celălalt n-are încă testele pe care să le ruleze. Un mod în plus se
- * adaugă aici, nu în bază.
+ * `recapitulare` are deja ecranul lui. Testele predefinite intră aici, dar își
+ * aduc singure conținutul și configurarea din definiția scrisă de administrator.
  */
 export type ModAsistent = ModTestNou;
 
@@ -60,6 +59,15 @@ export const MODURI: DescriereMod[] = [
     cereContinut: true,
   },
   {
+    id: 'test_predefinit',
+    titlu: 'Teste oficiale și simulări',
+    detaliu: 'Alegi o lucrare pregătită de echipa de conținut, cu reguli și durată deja stabilite.',
+    motivGol: 'Nu este publicat încă niciun test pregătit.',
+    nrImplicit: 1,
+    durataImplicita: null,
+    cereContinut: false,
+  },
+  {
     id: 'greseli',
     titlu: 'Greșelile mele',
     detaliu: 'Doar grilele la care ultimul tău răspuns a fost greșit.',
@@ -94,10 +102,11 @@ export const descriereMod = (id: ModAsistent): DescriereMod =>
 /** `ModAsistent` e prin construcție un `ModTest`; conversia e explicită, nu un cast. */
 export const caModTest = (id: ModAsistent): ModTest => id;
 
-export type PasAsistent = 'mod' | 'continut' | 'configurare' | 'rezumat';
+export type PasAsistent = 'mod' | 'test' | 'continut' | 'configurare' | 'rezumat';
 
 export interface StareAsistent {
   mod: ModAsistent;
+  testId: string | null;
   materii: MaterieId[];
   capitole: ChapterId[];
   nr: number;
@@ -114,6 +123,7 @@ export const stareInitiala = (
   const d = descriereMod(mod);
   return {
     mod,
+    testId: null,
     materii: [],
     capitole,
     nr: d.nrImplicit,
@@ -132,7 +142,7 @@ export const stareInitiala = (
 export const cuModul = (stare: StareAsistent, mod: ModAsistent): StareAsistent => {
   if (stare.mod === mod) return stare;
   const d = descriereMod(mod);
-  return { ...stare, mod, nr: d.nrImplicit, durataMinute: d.durataImplicita };
+  return { ...stare, mod, testId: null, nr: d.nrImplicit, durataMinute: d.durataImplicita };
 };
 
 export interface ContextAsistent {
@@ -149,6 +159,7 @@ export interface ContextAsistent {
  * cu o singură bifă e o pagină în plus, nu o alegere.
  */
 export function pasiVizibili(stare: StareAsistent, ctx: ContextAsistent): PasAsistent[] {
+  if (stare.mod === 'test_predefinit') return ['mod', 'test', 'rezumat'];
   const continut = descriereMod(stare.mod).cereContinut && ctx.capitoleCuGrile >= 2;
   return continut ? ['mod', 'continut', 'configurare', 'rezumat'] : ['mod', 'configurare', 'rezumat'];
 }
@@ -176,6 +187,9 @@ export function pasVecin(
  * materie nebifată n-ar mai intra în selecție.
  */
 export function cerereDin(stare: StareAsistent): CerereTest {
+  if (stare.mod === 'test_predefinit') {
+    return { mod: 'test_predefinit', test_id: stare.testId ?? undefined };
+  }
   const cereContinut = descriereMod(stare.mod).cereContinut;
   const capitole = cereContinut ? stare.capitole : [];
   const materii = cereContinut && capitole.length === 0 ? stare.materii : [];

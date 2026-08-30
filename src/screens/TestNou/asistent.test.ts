@@ -43,6 +43,14 @@ describe('pașii asistentului', () => {
     expect(pasiVizibili(stare({ mod: 'nevazute' }), { capitoleCuGrile: 30 })).toContain('continut');
   });
 
+  it('cere doar alegerea testului când definiția deține restul configurării', () => {
+    expect(pasiVizibili(stare({ mod: 'test_predefinit' }), { capitoleCuGrile: 30 })).toEqual([
+      'mod',
+      'test',
+      'rezumat',
+    ]);
+  });
+
   it('nu trece dincolo de capetele listei', () => {
     const pasi = pasiVizibili(stare(), { capitoleCuGrile: 5 });
     expect(pasVecin(pasi, 'mod', -1)).toBeNull();
@@ -81,6 +89,11 @@ describe('schimbarea modului', () => {
     const dupa = cuModul(stare({ capitole: ['bio-nervos'] }), 'simulare');
     expect(dupa.capitole).toEqual(['bio-nervos']);
   });
+
+  it('uită testul exact când se schimbă felul', () => {
+    const dupa = cuModul(stare({ mod: 'test_predefinit', testId: 'admitere-2026' }), 'exersare');
+    expect(dupa.testId).toBeNull();
+  });
 });
 
 describe('cererea trimisă motorului', () => {
@@ -113,6 +126,13 @@ describe('cererea trimisă motorului', () => {
   it('duce ceasul doar unde există', () => {
     expect(cerereDin(cuModul(stare(), 'simulare')).durata_minute).toBe(180);
     expect(cerereDin(cuModul(stare(), 'greseli')).durata_minute).toBeNull();
+  });
+
+  it('trimite numai id-ul definiției pentru un test predefinit', () => {
+    expect(cerereDin(stare({ mod: 'test_predefinit', testId: 'admitere-2026' }))).toEqual({
+      mod: 'test_predefinit',
+      test_id: 'admitere-2026',
+    });
   });
 });
 

@@ -18,12 +18,18 @@ vi.mock('../../state/toastState', () => ({
 const motor = vi.hoisted(() => ({
   numara: vi.fn(),
   genereaza: vi.fn(),
+  listaTeste: vi.fn(),
 }));
 
 vi.mock('../../lib/lucrari', async (original) => ({
   ...(await original<typeof import('../../lib/lucrari')>()),
   numaraCandidati: motor.numara,
   genereazaTest: motor.genereaza,
+}));
+
+vi.mock('../../lib/testePredefinite', async (original) => ({
+  ...(await original<typeof import('../../lib/testePredefinite')>()),
+  listaTestePredefinite: motor.listaTeste,
 }));
 
 /** Contorul răspunde cu ce spune harta, altfel cu totalul implicit. */
@@ -44,6 +50,7 @@ beforeEach(() => {
   notificari.length = 0;
   motor.numara.mockReset();
   motor.genereaza.mockReset();
+  motor.listaTeste.mockReset().mockResolvedValue([]);
   window.location.hash = '#/test-nou';
 });
 
@@ -200,5 +207,68 @@ describe('asistentul de test nou', () => {
       text: 'Nicio grilă nu se potrivește cu ce ai ales.',
     });
     expect(screen.getByText('Cum arată testul')).toBeInTheDocument();
+  });
+
+  it('pornește un test oficial numai cu definiția aleasă', async () => {
+    const user = userEvent.setup();
+    contorul(6);
+    motor.listaTeste.mockResolvedValue([
+      {
+        id: 'admitere-2026',
+        centru_id: 'umfcd',
+        colectie_id: null,
+        nume: 'Admitere UMFCD 2026',
+        descriere: 'Lucrarea în ordinea oficială.',
+        mod_selectie: 'fix',
+        nr_grile: 3,
+        durata_minute: 180,
+        acces: 'liber',
+        disponibil: true,
+      },
+    ]);
+    motor.genereaza.mockResolvedValue({
+      run_id: '0f5b9c2e-1a3d-4e5f-8a9b-0c1d2e3f4a5b',
+      nr_cerut: 3,
+      nr_obtinut: 3,
+      insuficient: false,
+      lipsa: [],
+    });
+    deschide();
+
+    await user.click(await screen.findByRole('button', { name: /Teste oficiale și simulări/ }));
+    await user.click(await screen.findByRole('button', { name: /Admitere UMFCD 2026/ }));
+    await user.click(buton('Mai departe →'));
+    expect(screen.getByText('Lucrarea în ordinea oficială.')).toBeInTheDocument();
+    await user.click(buton(/Începe cu 3 grile/));
+
+    await waitFor(() => expect(motor.genereaza).toHaveBeenCalledWith({
+      mod: 'test_predefinit',
+      test_id: 'admitere-2026',
+    }));
+  });
+
+  it('arată un test premium, dar nu îl lasă pornit fără acces', async () => {
+    const user = userEvent.setup();
+    contorul(6);
+    motor.listaTeste.mockResolvedValue([
+      {
+        id: 'simulare-premium',
+        centru_id: 'umfcd',
+        colectie_id: null,
+        nume: 'Simulare premium',
+        descriere: '',
+        mod_selectie: 'dupa_regula',
+        nr_grile: 100,
+        durata_minute: 180,
+        acces: 'premium',
+        disponibil: false,
+      },
+    ]);
+    deschide();
+
+    await user.click(await screen.findByRole('button', { name: /Teste oficiale și simulări/ }));
+    const premium = await screen.findByRole('button', { name: /Simulare premium/ });
+    expect(premium).toBeDisabled();
+    expect(premium).toHaveTextContent('Necesită acces premium');
   });
 });
