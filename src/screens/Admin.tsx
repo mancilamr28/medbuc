@@ -18,6 +18,7 @@ import { PE_PAGINA, useBibliotecaAdmin } from './adminBiblioteca';
 import { AcoperireCapitole } from './AcoperireCapitole';
 import { AdminColectii } from './AdminColectii';
 import { AdminTaxonomie } from './AdminTaxonomie';
+import { AdminTestePredefinite } from './AdminTestePredefinite';
 import { useSectiuneAdmin } from '../lib/router';
 import { useIsDesktop } from '../lib/hooks';
 import { reportError } from '../lib/sentry';
@@ -244,6 +245,7 @@ function AdminPanel() {
             { id: 'acoperire' as const, label: 'Acoperire' },
             { id: 'taxonomie' as const, label: 'Materii' },
             { id: 'colectii' as const, label: 'Colecții' },
+            { id: 'teste' as const, label: 'Teste' },
           ]}
           value={sectiune}
           onChange={mergiLa}
@@ -259,6 +261,8 @@ function AdminPanel() {
         <AdminTaxonomie taxonomie={taxonomie} dupaSalvare={() => void reloadStructura()} />
       ) : sectiune === 'colectii' ? (
         <AdminColectii colectii={colectii} dupaSalvare={() => void reloadStructura()} />
+      ) : sectiune === 'teste' ? (
+        <AdminTestePredefinite taxonomie={taxonomie} colectii={colectii} />
       ) : (
       <div style={twoCol(isDesktop)}>
         {sectiune === 'import' ? (

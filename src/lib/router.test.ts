@@ -18,6 +18,13 @@ describe('intenția asistentului de test', () => {
     });
   });
 
+  it('recunoaște intrarea pentru testele oficiale', () => {
+    expect(intentieTestNouDin('test_predefinit', undefined)).toEqual({
+      mod: 'test_predefinit',
+      capitol: null,
+    });
+  });
+
   it('cade pe exersare și ignoră capitolul când felul nu există', () => {
     expect(intentieTestNouDin('inventat', 'bio-nervos')).toEqual({
       mod: 'exersare',
@@ -101,6 +108,7 @@ describe('secțiunile de administrare', () => {
     expect(sectiuneAdminPentru('')).toBe('grile');
     expect(sectiuneAdminPentru('inventat')).toBe('grile');
     expect(sectiuneAdminPentru('colectii')).toBe('colectii');
+    expect(sectiuneAdminPentru('teste')).toBe('teste');
   });
 
   it('nu se suprapun cu ecranele aplicației', () => {

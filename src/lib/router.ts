@@ -70,7 +70,7 @@ const readHash = (): Screen => screenFor(segmente()[0] ?? '');
 // cunoască un singur nivel.
 // ---------------------------------------------------------------------------
 
-export const SECTIUNI_ADMIN = ['grile', 'import', 'acoperire', 'taxonomie', 'colectii'] as const;
+export const SECTIUNI_ADMIN = ['grile', 'import', 'acoperire', 'taxonomie', 'colectii', 'teste'] as const;
 
 export type SectiuneAdmin = (typeof SECTIUNI_ADMIN)[number];
 
@@ -110,7 +110,14 @@ export function useSectiuneAdmin(): [SectiuneAdmin, (s: SectiuneAdmin) => void] 
 // stare globală ori localStorage (`#/test-nou/exersare/bio-nervos`).
 // ---------------------------------------------------------------------------
 
-export const MODURI_TEST_NOU = ['exersare', 'simulare', 'greseli', 'favorite', 'nevazute'] as const;
+export const MODURI_TEST_NOU = [
+  'exersare',
+  'simulare',
+  'test_predefinit',
+  'greseli',
+  'favorite',
+  'nevazute',
+] as const;
 export type ModTestNou = (typeof MODURI_TEST_NOU)[number];
 
 export interface IntentieTestNou {

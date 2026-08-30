@@ -44,6 +44,12 @@ export function mesajCodLucrare(cod: CodLucrare | null): string {
       return 'Grila a fost deja verificată, răspunsul nu se mai schimbă.';
     case 'pozitie_inexistenta':
       return 'Grila asta nu e în lucrare.';
+    case 'test_predefinit_inexistent':
+      return 'Testul nu mai este disponibil.';
+    case 'test_predefinit_indisponibil':
+      return 'Testul este temporar indisponibil deoarece una dintre grile trebuie verificată.';
+    case 'acces_interzis':
+      return 'Testul acesta necesită acces premium.';
     case 'fara_candidati':
     case 'insuficient_strict':
     case 'mod_necunoscut':

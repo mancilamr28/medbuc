@@ -221,9 +221,11 @@ describe('funcțiile', () => {
     'atribuie_colectia',
     'citeste_grila_admin',
     'citeste_test',
+    'citeste_teste_predefinite_admin',
     'exporta_grile_admin',
     'genereaza_test',
     'importa_simulare_veche',
+    'lista_teste_predefinite',
     'numara_candidati',
     'preda_test',
     'raspunde',
@@ -231,6 +233,7 @@ describe('funcțiile', () => {
     'salveaza_colectie',
     'salveaza_grila',
     'salveaza_materie',
+    'salveaza_test_predefinit',
     'schimba_starea_grilelor',
     'sterge_contul',
     'sterge_grila',
@@ -291,6 +294,8 @@ describe('funcțiile', () => {
       'are_acces',
       'candidati',
       'completeaza_materia',
+      'genereaza_test_din_regula',
+      'genereaza_test_predefinit',
       'handle_new_user',
       'ingheata_instantaneul',
       'is_admin',
@@ -1697,6 +1702,228 @@ describe('generarea testului', () => {
 
   it('refuză un număr fără sens', async () => {
     await expect(genereaza(ana, { mod: 'exersare', nr: 0 })).rejects.toThrow(/nr_invalid/i);
+  });
+});
+
+describe('testele predefinite', () => {
+  type TestPublic = {
+    id: string;
+    nume: string;
+    mod_selectie: 'fix' | 'dupa_regula';
+    nr_grile: number;
+    durata_minute: number | null;
+    acces: 'liber' | 'premium';
+    disponibil: boolean;
+  };
+
+  const fix = (schimbari: Record<string, unknown> = {}) => ({
+    id: 'admitere-2026',
+    centru_id: 'umfcd',
+    nume: 'Admitere UMFCD 2026',
+    descriere: 'Lucrarea oficială, în ordinea publicată.',
+    mod_selectie: 'fix',
+    durata_minute: 180,
+    acces: 'liber',
+    publicat: true,
+    grile: ['bio-osos-01', 'chim-alcooli-01', 'bio-nervos-01'],
+    ...schimbari,
+  });
+
+  const regula = (schimbari: Record<string, unknown> = {}) => ({
+    id: 'simulare-biologie',
+    centru_id: 'umfcd',
+    nume: 'Simulare de biologie',
+    descriere: 'Două grile de biologie, trase din nou la fiecare pornire.',
+    mod_selectie: 'dupa_regula',
+    durata_minute: 60,
+    acces: 'liber',
+    publicat: true,
+    regula: {
+      filtre: { materii: ['bio'] },
+      nr: 2,
+      amesteca_grile: true,
+      amesteca_optiuni: false,
+      strict: true,
+    },
+    ...schimbari,
+  });
+
+  const salveaza = async (userId: string, payload: object) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ id: string }>('select public.salveaza_test_predefinit($1::jsonb) as id', [
+        JSON.stringify(payload),
+      ]),
+    );
+    return r.rows[0]!.id;
+  };
+
+  const lista = async (userId: string) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ teste: TestPublic[] }>('select public.lista_teste_predefinite() as teste'),
+    );
+    return r.rows[0]!.teste;
+  };
+
+  const genereaza = async (userId: string, testId: string) => {
+    const r = await baza.caUtilizator(userId, () =>
+      baza.db.query<{ rezultat: { run_id: string; nr_obtinut: number } }>(
+        `select public.genereaza_test(
+           jsonb_build_object('mod', 'test_predefinit', 'test_id', $1::text)
+         ) as rezultat`,
+        [testId],
+      ),
+    );
+    return r.rows[0]!.rezultat;
+  };
+
+  const ordine = async (runId: string) => {
+    const r = await baza.db.query<{ question_id: string }>(
+      'select question_id from test_run_items where run_id = $1 order by position',
+      [runId],
+    );
+    return r.rows.map((x) => x.question_id);
+  };
+
+  const definitiaLucrarii = async (runId: string) => {
+    const r = await baza.db.query<{ test_predefinit_id: string | null }>(
+      'select test_predefinit_id from test_runs where id = $1',
+      [runId],
+    );
+    return r.rows[0]!.test_predefinit_id;
+  };
+
+  it('lasă numai administratorul să salveze o definiție', async () => {
+    await expect(salveaza(ana, fix())).rejects.toThrow(/administrator/i);
+
+    await baza.faAdmin(ana);
+    await expect(salveaza(ana, fix())).resolves.toBe('admitere-2026');
+  });
+
+  it('arată elevului numai testele publicate, fără lista secretă de poziții', async () => {
+    await baza.faAdmin(ana);
+    await salveaza(ana, fix());
+    await salveaza(ana, regula({ id: 'simulare-ciorna', publicat: false }));
+
+    const vazute = await lista(bogdan);
+    expect(vazute.map((x) => x.id)).toEqual(['admitere-2026']);
+    expect(vazute[0]).toMatchObject({ nr_grile: 3, durata_minute: 180, disponibil: true });
+    expect(vazute[0]).not.toHaveProperty('grile');
+
+    await expect(
+      baza.caUtilizator(bogdan, () => baza.db.query('select * from test_predefinit_items')),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it('ascunde testul dacă centrul sau colecția lui nu mai sunt publicate', async () => {
+    await baza.faAdmin(ana);
+    await baza.db.query(`
+      insert into colectii (id, centru_id, nume, tip)
+      values ('umfcd-2026-mg', 'umfcd', 'Admitere 2026', 'subiect_oficial')
+    `);
+    await salveaza(ana, fix({ colectie_id: 'umfcd-2026-mg' }));
+    expect((await lista(bogdan)).map((x) => x.id)).toEqual(['admitere-2026']);
+
+    await baza.db.query("update colectii set publicat = false where id = 'umfcd-2026-mg'");
+    expect(await lista(bogdan)).toEqual([]);
+
+    await baza.db.query("update colectii set publicat = true where id = 'umfcd-2026-mg'");
+    await baza.db.query("update centre_admitere set publicat = false where id = 'umfcd'");
+    expect(await lista(bogdan)).toEqual([]);
+  });
+
+  it('dă aceeași lucrare fixă, în aceeași ordine, oricărui elev', async () => {
+    await baza.faAdmin(ana);
+    await salveaza(ana, fix());
+
+    const a = await genereaza(ana, 'admitere-2026');
+    const b = await genereaza(bogdan, 'admitere-2026');
+    const asteptata = ['bio-osos-01', 'chim-alcooli-01', 'bio-nervos-01'];
+
+    expect(await ordine(a.run_id)).toEqual(asteptata);
+    expect(await ordine(b.run_id)).toEqual(asteptata);
+    expect(await definitiaLucrarii(a.run_id)).toBe('admitere-2026');
+  });
+
+  it('nu schimbă o lucrare deja pornită când definiția este editată', async () => {
+    await baza.faAdmin(ana);
+    await salveaza(ana, fix());
+    const pornita = await genereaza(bogdan, 'admitere-2026');
+
+    await salveaza(ana, fix({ grile: ['bio-nervos-01', 'chim-alcooli-01'] }));
+
+    expect(await ordine(pornita.run_id)).toEqual([
+      'bio-osos-01',
+      'chim-alcooli-01',
+      'bio-nervos-01',
+    ]);
+    const noua = await genereaza(bogdan, 'admitere-2026');
+    expect(await ordine(noua.run_id)).toEqual(['bio-nervos-01', 'chim-alcooli-01']);
+  });
+
+  it('trage din nou o simulare după reguli, fără să iasă din filtre', async () => {
+    await baza.faAdmin(ana);
+    await salveaza(ana, regula());
+
+    const variante = new Set<string>();
+    for (let i = 0; i < 8; i += 1) {
+      const r = await genereaza(i % 2 === 0 ? ana : bogdan, 'simulare-biologie');
+      const ids = await ordine(r.run_id);
+      expect(ids).toHaveLength(2);
+      expect(ids.every((id) => id.startsWith('bio-'))).toBe(true);
+      expect(await definitiaLucrarii(r.run_id)).toBe('simulare-biologie');
+      variante.add([...ids].sort().join(','));
+    }
+    expect(variante.size).toBeGreaterThan(1);
+  });
+
+  it('nu publică un test fix cu duplicate sau grile care nu sunt publicate', async () => {
+    await baza.faAdmin(ana);
+    await expect(
+      salveaza(ana, fix({ grile: ['bio-nervos-01', 'bio-nervos-01'] })),
+    ).rejects.toThrow(/duplicate/i);
+
+    await baza.db.query("update questions set status = 'ciorna' where id = 'bio-nervos-01'");
+    await expect(salveaza(ana, fix())).rejects.toThrow(/publicate/i);
+  });
+
+  it('nu publică drept liber un test fix care conține grile premium', async () => {
+    await baza.faAdmin(ana);
+    await baza.db.query("update questions set acces = 'premium' where id = 'bio-nervos-01'");
+
+    await expect(salveaza(ana, fix())).rejects.toThrow(/premium/i);
+    await expect(salveaza(ana, fix({ acces: 'premium' }))).resolves.toBe('admitere-2026');
+  });
+
+  it('spune că un test premium este închis și refuză generarea fără abonament', async () => {
+    await baza.faAdmin(ana);
+    await salveaza(ana, fix({ acces: 'premium' }));
+
+    expect((await lista(bogdan))[0]).toMatchObject({ acces: 'premium', disponibil: false });
+    await expect(genereaza(bogdan, 'admitere-2026')).rejects.toThrow(/acces_interzis/i);
+
+    await baza.db.query(
+      "update profiles set abonament_pana = now() + interval '30 days' where id = $1",
+      [bogdan],
+    );
+    await expect(genereaza(bogdan, 'admitere-2026')).resolves.toMatchObject({ nr_obtinut: 3 });
+  });
+
+  it('nu lasă elevul să citească inventarul complet de administrator', async () => {
+    await expect(
+      baza.caUtilizator(ana, () => baza.db.query('select public.citeste_teste_predefinite_admin()')),
+    ).rejects.toThrow(/administrator/i);
+
+    await baza.faAdmin(ana);
+    await salveaza(ana, fix());
+    const r = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ teste: { id: string; grile: string[] }[] }>(
+        'select public.citeste_teste_predefinite_admin() as teste',
+      ),
+    );
+    expect(r.rows[0]!.teste[0]).toMatchObject({
+      id: 'admitere-2026',
+      grile: ['bio-osos-01', 'chim-alcooli-01', 'bio-nervos-01'],
+    });
   });
 });
 
