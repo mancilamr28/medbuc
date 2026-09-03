@@ -109,6 +109,8 @@ export interface StareAsistent {
   testId: string | null;
   materii: MaterieId[];
   capitole: ChapterId[];
+  /** Loturile de proveniență alese; gol înseamnă orice sursă. */
+  colectii: string[];
   nr: number;
   /** Minute; null înseamnă fără limită de timp. */
   durataMinute: number | null;
@@ -126,6 +128,7 @@ export const stareInitiala = (
     testId: null,
     materii: [],
     capitole,
+    colectii: [],
     nr: d.nrImplicit,
     durataMinute: d.durataImplicita,
     amestecaGrile: true,
@@ -148,6 +151,8 @@ export const cuModul = (stare: StareAsistent, mod: ModAsistent): StareAsistent =
 export interface ContextAsistent {
   /** Câte capitole au măcar o grilă publicată. Sub două, n-ai ce alege. */
   capitoleCuGrile: number;
+  /** Chiar și o singură colecție oferă alegerea utilă „sursa asta sau toate". */
+  colectii?: number;
 }
 
 /**
@@ -160,7 +165,9 @@ export interface ContextAsistent {
  */
 export function pasiVizibili(stare: StareAsistent, ctx: ContextAsistent): PasAsistent[] {
   if (stare.mod === 'test_predefinit') return ['mod', 'test', 'rezumat'];
-  const continut = descriereMod(stare.mod).cereContinut && ctx.capitoleCuGrile >= 2;
+  const continut =
+    descriereMod(stare.mod).cereContinut &&
+    (ctx.capitoleCuGrile >= 2 || (ctx.colectii ?? 0) > 0);
   return continut ? ['mod', 'continut', 'configurare', 'rezumat'] : ['mod', 'configurare', 'rezumat'];
 }
 
@@ -196,7 +203,7 @@ export function cerereDin(stare: StareAsistent): CerereTest {
 
   return {
     mod: caModTest(stare.mod),
-    filtre: { materii, capitole },
+    filtre: { materii, capitole, colectii: stare.colectii },
     nr: stare.nr,
     durata_minute: stare.durataMinute,
     amesteca_grile: stare.amestecaGrile,
@@ -248,3 +255,13 @@ export const frazaCapitoleAlese = (n: number): string =>
  * ea e informația utilă.
  */
 export const nrValid = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= 300;
+
+/**
+ * Indiciu numai pentru interfață. Motorul verifică din nou în bază; data din
+ * profil nu este și nu trebuie să devină vreodată poarta de securitate.
+ */
+export const areAccesPremium = (
+  rol: 'elev' | 'admin',
+  abonamentPana: string | null | undefined,
+  acum = Date.now(),
+): boolean => rol === 'admin' || (abonamentPana !== null && abonamentPana !== undefined && Date.parse(abonamentPana) > acum);

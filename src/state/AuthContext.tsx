@@ -19,11 +19,16 @@ const laPaginaPublica = (): void => {
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, role')
+    .select('id, full_name, role, abonament_pana')
     .eq('id', userId)
     .single();
   if (error || !data) return null;
-  return { id: data.id, fullName: data.full_name, role: data.role };
+  return {
+    id: data.id,
+    fullName: data.full_name,
+    role: data.role,
+    abonamentPana: data.abonament_pana,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

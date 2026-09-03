@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  areAccesPremium,
   cerereDin,
   cuModul,
   descriereMod,
@@ -99,7 +100,7 @@ describe('schimbarea modului', () => {
 describe('cererea trimisă motorului', () => {
   it('trimite listele goale, nu le omite', () => {
     const c = cerereDin(stare());
-    expect(c.filtre).toEqual({ materii: [], capitole: [] });
+    expect(c.filtre).toEqual({ materii: [], capitole: [], colectii: [] });
   });
 
   /**
@@ -109,17 +110,30 @@ describe('cererea trimisă motorului', () => {
    */
   it('lasă materiile deoparte când sunt alese capitole anume', () => {
     const c = cerereDin(stare({ materii: ['bio'], capitole: ['chim-alcooli'] }));
-    expect(c.filtre).toEqual({ materii: [], capitole: ['chim-alcooli'] });
+    expect(c.filtre).toEqual({ materii: [], capitole: ['chim-alcooli'], colectii: [] });
   });
 
   it('trimite materiile când nu e ales niciun capitol', () => {
-    expect(cerereDin(stare({ materii: ['bio'] })).filtre).toEqual({ materii: ['bio'], capitole: [] });
+    expect(cerereDin(stare({ materii: ['bio'] })).filtre).toEqual({
+      materii: ['bio'],
+      capitole: [],
+      colectii: [],
+    });
+  });
+
+  it('trimite colecțiile alese motorului', () => {
+    const cuColectie = stare({ colectii: ['corint-nervos'] });
+    expect(cerereDin(cuColectie).filtre).toEqual({
+      materii: [],
+      capitole: [],
+      colectii: ['corint-nervos'],
+    });
   });
 
   /** Un mod fără pas de conținut n-are voie să care filtre rămase din alt mod. */
   it('nu duce filtre de conținut într-un mod care nu le cere', () => {
     const c = cerereDin(stare({ mod: 'favorite', materii: ['bio'], capitole: ['bio-nervos'] }));
-    expect(c.filtre).toEqual({ materii: [], capitole: [] });
+    expect(c.filtre).toEqual({ materii: [], capitole: [], colectii: [] });
   });
 
   /** Prin `cuModul`, singurul drum pe care ecranul schimbă modul. */
@@ -182,5 +196,19 @@ describe('numărul cerut', () => {
     expect(nrValid(2.5)).toBe(false);
     expect(nrValid(301)).toBe(false);
     expect(nrValid(Number.NaN)).toBe(false);
+  });
+});
+
+describe('indiciul de acces din interfață', () => {
+  const acum = Date.parse('2026-09-04T12:00:00Z');
+
+  it('arată premiumul unui abonament valabil și administratorului', () => {
+    expect(areAccesPremium('elev', '2026-09-05T12:00:00Z', acum)).toBe(true);
+    expect(areAccesPremium('admin', null, acum)).toBe(true);
+  });
+
+  it('nu tratează un abonament expirat ca valabil', () => {
+    expect(areAccesPremium('elev', '2026-09-03T12:00:00Z', acum)).toBe(false);
+    expect(areAccesPremium('elev', null, acum)).toBe(false);
   });
 });

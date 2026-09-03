@@ -5,6 +5,7 @@ import type { GrilaCatalog } from '../lib/continut';
 import type { Screen } from '../lib/router';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
+import type { Colectii } from '../lib/colectii';
 import type { Session } from './useSession';
 import type { Simulare } from './useSimulare';
 import type { CoadaRecapitulare } from './useCoadaRecapitulare';
@@ -26,6 +27,8 @@ export interface AppValue {
   taxonomie: Taxonomie;
   /** Formatele de grilă, din bază. */
   tipuri: TipuriGrile;
+  /** Sursele organizate ale grilelor, cu nivelul lor de acces. */
+  colectii: Colectii;
   session: Session;
   recapitulare: CoadaRecapitulare;
   sim: Simulare;

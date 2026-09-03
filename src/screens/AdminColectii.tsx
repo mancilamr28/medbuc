@@ -90,7 +90,14 @@ function FormularColectie({
   inLucru: boolean;
   onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => void;
 }) {
-  const gol = { id: '', nume: '', tip: 'subiect_oficial', an: '', sursa: '' };
+  const gol: {
+    id: string;
+    nume: string;
+    tip: string;
+    an: string;
+    sursa: string;
+    acces: 'liber' | 'premium';
+  } = { id: '', nume: '', tip: 'subiect_oficial', an: '', sursa: '', acces: 'liber' };
   const [c, setC] = useState(gol);
 
   const poate = c.id.trim() !== '' && c.nume.trim() !== '';
@@ -147,6 +154,19 @@ function FormularColectie({
             style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
           />
         </label>
+        <label style={{ display: 'block' }}>
+          <span style={label}>Acces</span>
+          <select
+            className="field"
+            value={c.acces}
+            onChange={(e) => setC((p) => ({ ...p, acces: e.target.value as 'liber' | 'premium' }))}
+            aria-label="Accesul colecției"
+            style={{ padding: '9px 11px', font: `400 13px ${SANS}`, cursor: 'pointer' }}
+          >
+            <option value="liber">Liber</option>
+            <option value="premium">Premium</option>
+          </select>
+        </label>
       </div>
 
       <label style={{ display: 'block', marginTop: 12 }}>
@@ -178,6 +198,7 @@ function FormularColectie({
             centruId: eCulegere ? null : 'umfcd',
             an: c.an.trim() === '' ? null : Number(c.an.trim()),
             sursaBibliografica: c.sursa.trim(),
+            acces: c.acces,
           });
           setC(gol);
         }}
@@ -228,6 +249,15 @@ function RandColectie({
       )}
 
       <span style={statusChip('var(--surf3)', 'var(--fg3)')}>{etichetaFelului(colectie.tip)}</span>
+      <span
+        style={
+          colectie.acces === 'premium'
+            ? statusChip('var(--accS)', 'var(--acc)')
+            : statusChip('var(--okS)', 'var(--ok)')
+        }
+      >
+        {colectie.acces === 'premium' ? 'Premium' : 'Liber'}
+      </span>
       {colectie.an !== null && (
         <span className="tabular" style={{ font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
           {colectie.an}
@@ -242,7 +272,12 @@ function RandColectie({
           onClick={() => {
             // Doar numele. Anul, cartea, centrul și poziția rămân ce erau —
             // formularul ăsta nu le arată, deci n-are ce să spună despre ele.
-            onSalveaza({ id: colectie.id, nume: nume.trim(), tip: colectie.tip });
+            onSalveaza({
+              id: colectie.id,
+              nume: nume.trim(),
+              tip: colectie.tip,
+              acces: colectie.acces,
+            });
             setEditez(false);
           }}
           style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
@@ -250,14 +285,32 @@ function RandColectie({
           Salvează
         </button>
       ) : (
-        <button
-          type="button"
-          className="btn-quiet"
-          onClick={() => setEditez(true)}
-          style={{ font: `500 12px ${SANS}` }}
-        >
-          Redenumește
-        </button>
+        <>
+          <button
+            type="button"
+            className="btn-quiet"
+            disabled={inLucru}
+            onClick={() =>
+              onSalveaza({
+                id: colectie.id,
+                nume: colectie.nume,
+                tip: colectie.tip,
+                acces: colectie.acces === 'premium' ? 'liber' : 'premium',
+              })
+            }
+            style={{ font: `500 12px ${SANS}` }}
+          >
+            {colectie.acces === 'premium' ? 'Fă liberă' : 'Fă premium'}
+          </button>
+          <button
+            type="button"
+            className="btn-quiet"
+            onClick={() => setEditez(true)}
+            style={{ font: `500 12px ${SANS}` }}
+          >
+            Redenumește
+          </button>
+        </>
       )}
     </div>
   );

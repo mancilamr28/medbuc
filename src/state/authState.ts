@@ -7,6 +7,8 @@ export interface Profile {
   id: string;
   fullName: string | null;
   role: AppRole;
+  /** Null sau o dată trecută înseamnă cont liber. */
+  abonamentPana: string | null;
 }
 
 interface AuthResult {

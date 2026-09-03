@@ -63,6 +63,8 @@ vi.mock('../lib/continut', async (original) => ({
         tip: 'subiect_oficial',
         an: 2026,
         sursa_bibliografica: '',
+        acces: 'liber',
+        publicat: true,
         position: 0,
       },
     ]),
