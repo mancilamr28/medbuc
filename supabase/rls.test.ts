@@ -1091,6 +1091,25 @@ describe('scrierea taxonomiei', () => {
     ).rejects.toThrow(/Fel de colecție necunoscut/i);
   });
 
+  it('scrie accesul colecției și îl păstrează la o simplă redenumire', async () => {
+    await baza.faAdmin(ana);
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint","tip":"culegere","acces":"premium"}'::jsonb)`,
+      ),
+    );
+    await baza.caUtilizator(ana, () =>
+      baza.db.query(
+        `select public.salveaza_colectie('{"id":"corint-nervos","nume":"Corint · Biologie","tip":"culegere"}'::jsonb)`,
+      ),
+    );
+
+    const r = await baza.db.query<{ acces: string; nume: string }>(
+      "select acces::text, nume from colectii where id = 'corint-nervos'",
+    );
+    expect(r.rows[0]).toEqual({ acces: 'premium', nume: 'Corint · Biologie' });
+  });
+
   /**
    * O redenumire nu e o reordonare.
    *
@@ -1685,6 +1704,60 @@ describe('generarea testului', () => {
     expect(await pozitii(ana, cu.run_id)).toHaveLength(6);
   });
 
+  /**
+   * Accesul colecției se aplică tuturor grilelor din ea. Altfel administratorul
+   * ar trebui să marcheze manual fiecare grilă dintr-o culegere, iar prima
+   * grilă uitată ar ocoli abonamentul întregului lot.
+   */
+  it('nu trage grilele unei colecții premium pentru un cont fără abonament', async () => {
+    await baza.db.query(`
+      insert into colectii (id, nume, tip, acces)
+      values ('corint-nervos', 'Corint – Sistemul nervos', 'culegere', 'premium')
+    `);
+    await baza.db.query("update questions set colectie_id = 'corint-nervos' where materie_id = 'bio'");
+
+    const fara = await genereaza(ana, { mod: 'exersare', nr: 10 });
+    expect(await pozitii(ana, fara.run_id)).toHaveLength(2);
+
+    await baza.db.query("update profiles set abonament_pana = now() + interval '30 days' where id = $1", [ana]);
+    const cu = await genereaza(ana, { mod: 'exersare', nr: 10 });
+    expect(await pozitii(ana, cu.run_id)).toHaveLength(6);
+  });
+
+  it('nu lasă catalogul să numere grilele premium ca disponibile unui cont liber', async () => {
+    await baza.db.query(`
+      insert into colectii (id, nume, tip, acces)
+      values ('corint-nervos', 'Corint – Sistemul nervos', 'culegere', 'premium')
+    `);
+    await baza.db.query("update questions set colectie_id = 'corint-nervos' where id = 'bio-nervos-01'");
+
+    const fara = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string }>("select id from questions where id = 'bio-nervos-01'"),
+    );
+    expect(fara.rows).toEqual([]);
+
+    await baza.db.query("update profiles set abonament_pana = now() + interval '30 days' where id = $1", [ana]);
+    const cu = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string }>("select id from questions where id = 'bio-nervos-01'"),
+    );
+    expect(cu.rows).toEqual([{ id: 'bio-nervos-01' }]);
+  });
+
+  it('nu lasă catalogul să citească nici o grilă marcată direct premium', async () => {
+    await baza.db.query("update questions set acces = 'premium' where id = 'bio-nervos-01'");
+
+    const fara = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string }>("select id from questions where id = 'bio-nervos-01'"),
+    );
+    expect(fara.rows).toEqual([]);
+
+    await baza.faAdmin(ana);
+    const admin = await baza.caUtilizator(ana, () =>
+      baza.db.query<{ id: string }>("select id from questions where id = 'bio-nervos-01'"),
+    );
+    expect(admin.rows).toEqual([{ id: 'bio-nervos-01' }]);
+  });
+
   it('nu pune în lucrare nicio ciornă și nicio grilă retrasă', async () => {
     await baza.db.query("update questions set status = 'ciorna' where id = 'bio-nervos-01'");
     await baza.db.query("update questions set status = 'retrasa' where id = 'bio-osos-01'");
@@ -1906,6 +1979,25 @@ describe('testele predefinite', () => {
       [bogdan],
     );
     await expect(genereaza(bogdan, 'admitere-2026')).resolves.toMatchObject({ nr_obtinut: 3 });
+  });
+
+  it('închide un test liber când colecția lui devine premium', async () => {
+    await baza.faAdmin(ana);
+    await baza.db.query(`
+      insert into colectii (id, centru_id, nume, tip)
+      values ('umfcd-2026-mg', 'umfcd', 'Admitere 2026', 'subiect_oficial')
+    `);
+    await salveaza(ana, fix({ colectie_id: 'umfcd-2026-mg' }));
+    await baza.db.query("update colectii set acces = 'premium' where id = 'umfcd-2026-mg'");
+
+    expect((await lista(bogdan))[0]).toMatchObject({ acces: 'liber', disponibil: false });
+    await expect(genereaza(bogdan, 'admitere-2026'))
+      .rejects.toThrow(/acces_interzis/i);
+
+    await baza.db.query("update profiles set abonament_pana = now() + interval '30 days' where id = $1", [bogdan]);
+    expect((await lista(bogdan))[0]).toMatchObject({ disponibil: true });
+    await expect(genereaza(bogdan, 'admitere-2026'))
+      .resolves.toMatchObject({ nr_obtinut: 3 });
   });
 
   it('nu lasă elevul să citească inventarul complet de administrator', async () => {

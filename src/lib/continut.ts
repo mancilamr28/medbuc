@@ -350,7 +350,7 @@ export async function incarcaColectii(): Promise<Colectii> {
   const randuri = await citesteTot<RandColectie>(async (de, la) => {
     const r = await supabase
       .from('colectii')
-      .select('id,centru_id,nume,tip,an,sursa_bibliografica,position', { count: 'exact' })
+      .select('id,centru_id,nume,tip,an,sursa_bibliografica,acces,publicat,position', { count: 'exact' })
       .order('position')
       .range(de, la);
     return { data: r.data as RandColectie[] | null, error: r.error, count: r.count };
@@ -603,6 +603,7 @@ export interface ColectieDeSalvat {
   sursaBibliografica?: string;
   position?: number;
   publicat?: boolean;
+  acces?: 'liber' | 'premium';
 }
 
 const cheamaRpc = async (nume: string, payload: unknown): Promise<void> => {

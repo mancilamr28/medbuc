@@ -29,6 +29,9 @@ export interface Colectie {
   an: number | null;
   /** Cartea și ediția — pentru întrebarea de drepturi, care vine înaintea plății. */
   sursaBibliografica: string;
+  /** Cine poate folosi grilele colecției într-o lucrare. */
+  acces: 'liber' | 'premium';
+  publicat: boolean;
 }
 
 export interface Colectii {
@@ -45,6 +48,8 @@ export interface RandColectie {
   tip: string;
   an: number | null;
   sursa_bibliografica: string;
+  acces: 'liber' | 'premium';
+  publicat: boolean;
   position: number;
 }
 
@@ -58,6 +63,8 @@ export function construiesteColectii(randuri: readonly RandColectie[]): Colectii
       tip: r.tip,
       an: r.an,
       sursaBibliografica: r.sursa_bibliografica,
+      acces: r.acces,
+      publicat: r.publicat,
     }));
 
   const dupaId = new Map(lista.map((c) => [c.id, c]));

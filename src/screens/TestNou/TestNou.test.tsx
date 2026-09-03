@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QUESTIONS } from '../../data/questions';
 import { TAXONOMIE_SEED } from '../../data/taxonomieSeed';
+import { COLECTII_GOALE, construiesteColectii, type Colectii } from '../../lib/colectii';
 import { AppProvider } from '../../state/AppState';
 import { TestNou } from './TestNou';
 
@@ -39,9 +40,9 @@ const contorul = (implicit: number, peMod: Record<string, number> = {}) =>
     pe_materie: [],
   }));
 
-const deschide = () =>
+const deschide = (colectii: Colectii = COLECTII_GOALE) =>
   render(
-    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED}>
+    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED} colectii={colectii}>
       <TestNou />
     </AppProvider>,
   );
@@ -114,6 +115,42 @@ describe('asistentul de test nou', () => {
     expect(screen.getByText('Capitole')).toBeInTheDocument();
   });
 
+  it('arată colecțiile premium cu motivul și lasă sursele libere de ales', async () => {
+    const user = userEvent.setup();
+    contorul(6);
+    const colectii = construiesteColectii([
+      {
+        id: 'umfcd-2026',
+        centru_id: 'umfcd',
+        nume: 'Admitere UMFCD 2026',
+        tip: 'subiect_oficial',
+        an: 2026,
+        sursa_bibliografica: '',
+        acces: 'liber',
+        publicat: true,
+        position: 0,
+      },
+      {
+        id: 'corint-nervos',
+        centru_id: null,
+        nume: 'Corint – Sistemul nervos',
+        tip: 'culegere',
+        an: null,
+        sursa_bibliografica: 'Corint',
+        acces: 'premium',
+        publicat: true,
+        position: 1,
+      },
+    ]);
+    deschide(colectii);
+
+    await user.click(buton(/Exersare/));
+    expect(buton(/Corint – Sistemul nervos/)).toBeDisabled();
+    expect(buton(/Corint – Sistemul nervos/)).toHaveTextContent('Necesită acces premium');
+    await user.click(buton(/Admitere UMFCD 2026/));
+    expect(buton(/Admitere UMFCD 2026/)).toHaveAttribute('aria-pressed', 'true');
+  });
+
   /**
    * Modurile care își aleg singure grilele n-au ce restrânge pe capitol, deci
    * pasul de conținut dispare cu totul — nu se afișează gol.
@@ -180,7 +217,7 @@ describe('asistentul de test nou', () => {
     expect(motor.genereaza.mock.calls[0]![0]).toEqual({
       mod: 'exersare',
       // Lista goală de materii se trimite goală: „fără restricție pe axa asta".
-      filtre: { materii: [], capitole: ['bio-nervos'] },
+      filtre: { materii: [], capitole: ['bio-nervos'], colectii: [] },
       nr: 20,
       durata_minute: null,
       amesteca_grile: true,

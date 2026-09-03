@@ -5,6 +5,7 @@ import type { GrilaCatalog } from '../lib/continut';
 import type { AttemptRow } from '../lib/progres';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
 import { TIPURI_GOALE, type TipuriGrile } from '../lib/tipuriGrile';
+import { COLECTII_GOALE, type Colectii } from '../lib/colectii';
 import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute } from '../lib/router';
 import { AppContext, type AppValue, type Theme } from './appContextValue';
@@ -31,6 +32,7 @@ export function AppProvider({
   attempts = [],
   taxonomie = TAXONOMIE_GOALA,
   tipuri = TIPURI_GOALE,
+  colectii = COLECTII_GOALE,
   children,
 }: {
   /** Banca completă mai există numai în testele drumului vechi. */
@@ -40,6 +42,7 @@ export function AppProvider({
   attempts?: readonly AttemptRow[];
   taxonomie?: Taxonomie;
   tipuri?: TipuriGrile;
+  colectii?: Colectii;
   children: ReactNode;
 }) {
   const [screen, go] = useHashRoute();
@@ -76,11 +79,12 @@ export function AppProvider({
       catalog,
       taxonomie,
       tipuri,
+      colectii,
       session,
       recapitulare,
       sim,
     }),
-    [catalog, go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, tipuri, toggleTheme],
+    [catalog, colectii, go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, tipuri, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

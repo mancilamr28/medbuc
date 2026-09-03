@@ -5,16 +5,19 @@ import { Icon } from '../../components/Icon';
 import { PoartaContinut } from '../../components/PoartaContinut';
 import { chapterLabel, type ChapterId, type MaterieId } from '../../data/chapters';
 import { numaraGrile } from '../../lib/continut';
+import type { Colectii } from '../../lib/colectii';
 import { codEroare, genereazaTest, numaraCandidati } from '../../lib/lucrari';
 import { listaTestePredefinite, type TestPredefinitPublic } from '../../lib/testePredefinite';
 import { goLucrare, useIntentieTestNou, type IntentieTestNou } from '../../lib/router';
 import { numar } from '../../lib/text';
 import { SANS, eyebrow, pageLead, pageTitle } from '../../lib/ui';
 import { useApp } from '../../state/appContextValue';
+import { useAuthOptional } from '../../state/authState';
 import { useToast } from '../../state/toastState';
 import { mesajCodLucrare } from '../lucrareText';
 import {
   MODURI,
+  areAccesPremium,
   cerereDin,
   cuModul,
   descriereMod,
@@ -146,7 +149,8 @@ function useNumarPeMod() {
 }
 
 function Asistent({ intentie }: { intentie: IntentieTestNou }) {
-  const { catalog, taxonomie } = useApp();
+  const { catalog, taxonomie, colectii } = useApp();
+  const auth = useAuthOptional();
   const { notify } = useToast();
   const [stare, setStare] = useState<StareAsistent>(() =>
     stareInitiala(
@@ -163,7 +167,12 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
     [peCapitol, taxonomie.capitole],
   );
 
-  const pasi = pasiVizibili(stare, { capitoleCuGrile });
+  const colectiiPublice = useMemo(
+    () => ({ ...colectii, lista: colectii.lista.filter((c) => c.publicat) }),
+    [colectii],
+  );
+  const pasi = pasiVizibili(stare, { capitoleCuGrile, colectii: colectiiPublice.lista.length });
+  const poatePremium = areAccesPremium(auth?.role ?? 'elev', auth?.profile?.abonamentPana);
   // Pasul curent poate dispărea sub picioare — se schimbă modul din rezumat și
   // `continut` iese din listă. Atunci se cade pe primul pas real, nu pe gol.
   const pasCurent = pasi.includes(pas) ? pas : pasi[0]!;
@@ -222,7 +231,11 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
               seIncarcaTeste={seIncarcaTeste}
               onAlege={(m) => {
                 setStare((s) => cuModul(s, m));
-                const urmator = pasVecin(pasiVizibili(cuModul(stare, m), { capitoleCuGrile }), 'mod', 1);
+                const urmator = pasVecin(
+                  pasiVizibili(cuModul(stare, m), { capitoleCuGrile, colectii: colectiiPublice.lista.length }),
+                  'mod',
+                  1,
+                );
                 if (urmator !== null) setPas(urmator);
               }}
             />
@@ -235,7 +248,13 @@ function Asistent({ intentie }: { intentie: IntentieTestNou }) {
             />
           )}
           {pasCurent === 'continut' && (
-            <PasulContinut stare={stare} peCapitol={peCapitol} setStare={setStare} />
+            <PasulContinut
+              stare={stare}
+              peCapitol={peCapitol}
+              colectii={colectiiPublice}
+              poatePremium={poatePremium}
+              setStare={setStare}
+            />
           )}
           {pasCurent === 'configurare' && <PasulConfigurare stare={stare} setStare={setStare} />}
           {pasCurent === 'rezumat' && <PasulRezumat stare={stare} total={total} test={testAles} />}
@@ -469,10 +488,14 @@ function PasulTestPredefinit({
 function PasulContinut({
   stare,
   peCapitol,
+  colectii,
+  poatePremium,
   setStare,
 }: {
   stare: StareAsistent;
   peCapitol: ReadonlyMap<ChapterId, number>;
+  colectii: Colectii;
+  poatePremium: boolean;
   setStare: (f: (s: StareAsistent) => StareAsistent) => void;
 }) {
   const { taxonomie } = useApp();
@@ -487,6 +510,14 @@ function PasulContinut({
     setStare((s) => ({
       ...s,
       materii: s.materii.includes(id) ? s.materii.filter((m) => m !== id) : [...s.materii, id],
+    }));
+
+  const comutaColectie = (id: string) =>
+    setStare((s) => ({
+      ...s,
+      colectii: s.colectii.includes(id)
+        ? s.colectii.filter((c) => c !== id)
+        : [...s.colectii, id],
     }));
 
   const cuCapitole = taxonomie.materii.filter((m) =>
@@ -505,6 +536,68 @@ function PasulContinut({
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
+      {colectii.lista.length > 0 && (
+        <div>
+          <div style={eyebrow(undefined, 11)}>Proveniență</div>
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {colectii.lista.map((c) => {
+              const ales = stare.colectii.includes(c.id);
+              const inchisa = c.acces === 'premium' && !poatePremium;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="row-btn tinta-tactila"
+                  onClick={() => comutaColectie(c.id)}
+                  disabled={inchisa}
+                  aria-pressed={ales}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 8px',
+                    borderRadius: 9,
+                    cursor: inchisa ? 'not-allowed' : 'pointer',
+                    opacity: inchisa ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 20,
+                      height: 20,
+                      flex: '0 0 auto',
+                      borderRadius: 6,
+                      display: 'grid',
+                      placeItems: 'center',
+                      border: `1px solid ${ales ? 'var(--brand)' : 'var(--line2)'}`,
+                      background: ales ? 'var(--brand)' : 'transparent',
+                      color: 'var(--onBrand)',
+                    }}
+                  >
+                    {ales && <Icon icon={faCheck} size={11} />}
+                  </span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>
+                    <span style={{ display: 'block', font: `500 13.5px ${SANS}` }}>{c.nume}</span>
+                    {inchisa && (
+                      <span style={{ display: 'block', marginTop: 3, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+                        Necesită acces premium
+                      </span>
+                    )}
+                  </span>
+                  {c.an !== null && (
+                    <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>{c.an}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 8, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
+            Nicio proveniență bifată înseamnă toate sursele la care ai acces.
+          </div>
+        </div>
+      )}
+
       <div>
         <div style={eyebrow(undefined, 11)}>Materii</div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -788,7 +881,7 @@ function PasulRezumat({
   total: number | null;
   test: TestPredefinitPublic | null;
 }) {
-  const { taxonomie } = useApp();
+  const { taxonomie, colectii } = useApp();
   const d = descriereMod(stare.mod);
   const scurt = stare.mod !== 'test_predefinit' && total !== null && total < stare.nr;
 
@@ -805,11 +898,16 @@ function PasulRezumat({
           ['Fel', d.titlu],
           [
             'Din ce',
-            stare.capitole.length > 0
-              ? stare.capitole.map((c) => taxonomie.eticheta(c)).join(', ')
-              : stare.materii.length > 0
-                ? stare.materii.map((m) => taxonomie.materie(m)?.name ?? m).join(', ')
-                : 'Toată biblioteca',
+            [
+              stare.colectii.length > 0
+                ? stare.colectii.map((c) => colectii.eticheta(c)).join(', ')
+                : null,
+              stare.capitole.length > 0
+                ? stare.capitole.map((c) => taxonomie.eticheta(c)).join(', ')
+                : stare.materii.length > 0
+                  ? stare.materii.map((m) => taxonomie.materie(m)?.name ?? m).join(', ')
+                  : null,
+            ].filter((x): x is string => x !== null).join(' · ') || 'Toată biblioteca',
           ],
           ['Câte grile', numar(stare.nr, 'grilă', 'grile')],
           ['Timp', stare.durataMinute === null ? 'Fără limită' : numar(stare.durataMinute, 'minut', 'minute')],
