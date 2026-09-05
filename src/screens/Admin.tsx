@@ -114,6 +114,7 @@ function AdminPanel({ userId }: { userId: string }) {
   const [aratatProbleme, setAratatProbleme] = useState(false);
   const [materieFiltrata, setMaterieFiltrata] = useState('');
   const [capitolImport, setCapitolImport] = useState<{ id: string; cerere: number } | null>(null);
+  const [colectieImport, setColectieImport] = useState<{ id: string; cerere: number } | null>(null);
 
   const probleme = [...valideaza(ciorna, taxonomie, tipuri), ...(!raspunsAles ? ['Alege explicit răspunsul corect.'] : [])];
   const scrise = variantScrise(ciorna);
@@ -319,7 +320,29 @@ function AdminPanel({ userId }: { userId: string }) {
       ) : sectiune === 'taxonomie' ? (
         <AdminTaxonomie taxonomie={taxonomie} dupaSalvare={() => void reloadStructura()} />
       ) : sectiune === 'colectii' ? (
-        <AdminColectii colectii={colectii} dupaSalvare={() => void reloadStructura()} />
+        <AdminColectii colectii={colectii} dupaSalvare={() => void reloadStructura()} onContinut={(colectie, actiune) => {
+          if (actiune === 'vezi') {
+            setFiltre({ ...FILTRE_GOALE, colectieId: colectie.id });
+            mergiLa('grile');
+          } else if (actiune === 'import') {
+            setColectieImport((c) => ({ id: colectie.id, cerere: (c?.cerere ?? 0) + 1 }));
+            mergiLa('import');
+          } else {
+            if (seSalveaza) return;
+            if (modificata) {
+              notify('info', 'Ai o grilă nesalvată. Salveaz-o sau golește formularul înainte să începi alta.');
+              mergiLa('adauga');
+              return;
+            }
+            reseteaza();
+            setCiorna((c) => ({ ...c, capId: '', colectie: colectie.id,
+              sursa: colectie.tip === 'culegere' ? 'culegere' : colectie.tip === 'autor' ? 'materie' : 'subiect_oficial',
+              an: colectie.an === null ? '' : String(colectie.an) }));
+            setMaterieFiltrata('');
+            setModificata(true);
+            mergiLa('adauga');
+          }
+        }} />
       ) : sectiune === 'teste' ? (
         <AdminTestePredefinite taxonomie={taxonomie} colectii={colectii} />
       ) : (
@@ -1019,7 +1042,7 @@ function AdminPanel({ userId }: { userId: string }) {
       </div>
       )}
       <div hidden={sectiune !== 'import'}>
-        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} capitolCerut={capitolImport} />
+        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} capitolCerut={capitolImport} colectieCeruta={colectieImport} />
       </div>
     </div>
   );
