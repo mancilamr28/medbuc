@@ -83,56 +83,66 @@ export const variantScrise = (c: Ciorna): OptionKey[] =>
  * Lista goală înseamnă că se poate salva. Mesajele sunt în aceeași ordine în care
  * apar câmpurile, ca ochiul să meargă de sus în jos.
  */
-export function valideaza(
+export type CampProblema = 'id' | 'capId' | 'text' | 'enunturi' | 'opts' | 'correct' | 'expl' | 'an';
+export interface ProblemaCiorna { camp: CampProblema; mesaj: string }
+export const pasulCampului = (camp: CampProblema): number => ['id', 'capId', 'an'].includes(camp) ? 0 : 1;
+
+export function valideazaCampuri(
   c: Ciorna,
   taxonomie: Taxonomie = TAXONOMIE_GOALA,
   tipuri: TipuriGrile = TIPURI_GOALE,
-): string[] {
-  const probleme: string[] = [];
+): ProblemaCiorna[] {
+  const probleme: ProblemaCiorna[] = [];
+  const adauga = (camp: CampProblema, mesaj: string) => probleme.push({ camp, mesaj });
   const scrise = variantScrise(c);
   const tip = tipuri.tip(c.tip);
 
-  if (c.id.trim() === '') probleme.push('Grila are nevoie de un identificator.');
+  if (c.id.trim() === '') adauga('id', 'Grila are nevoie de un identificator.');
   else if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.id.trim())) {
-    probleme.push('Identificatorul poate conține doar litere mici, cifre și cratime.');
+    adauga('id', 'Identificatorul poate conține doar litere mici, cifre și cratime.');
   }
 
-  if (c.capId.trim() === '') probleme.push('Alege un capitol.');
+  if (c.capId.trim() === '') adauga('capId', 'Alege un capitol.');
   else if (taxonomie.capitole.length > 0 && !taxonomie.capitol(c.capId)) {
-    probleme.push('Alege un capitol.');
+    adauga('capId', 'Alege un capitol.');
   }
-  if (c.text.trim() === '') probleme.push('Enunțul nu poate fi gol.');
+  if (c.text.trim() === '') adauga('text', 'Enunțul nu poate fi gol.');
 
   // Regulile de format vin din tip, nu dintr-un `if` pe „grupat": un format nou
   // e un rând în `question_types`, iar validarea trebuie să-l urmeze de la sine.
   if (tip?.cereEnunturi && tip.nrEnunturi !== null) {
     const scrieri = c.enunturi.filter((e) => e.trim() !== '').length;
     if (scrieri !== tip.nrEnunturi) {
-      probleme.push(`${tip.nume} are nevoie de exact ${numar(tip.nrEnunturi, 'afirmație', 'afirmații')}.`);
+      adauga('enunturi', `${tip.nume} are nevoie de exact ${numar(tip.nrEnunturi, 'afirmație', 'afirmații')}.`);
     }
   }
 
   const minim = tip?.nrOptiuniMin ?? 2;
   if (scrise.length < minim) {
-    probleme.push(`Scrie cel puțin ${numar(minim, 'variantă', 'variante')}.`);
+    adauga('opts', `Scrie cel puțin ${numar(minim, 'variantă', 'variante')}.`);
   }
   if (tip && scrise.length > tip.nrOptiuniMax) {
-    probleme.push(`${tip.nume} are cel mult ${numar(tip.nrOptiuniMax, 'variantă', 'variante')}.`);
+    adauga('opts', `${tip.nume} are cel mult ${numar(tip.nrOptiuniMax, 'variantă', 'variante')}.`);
   }
   if (!scrise.includes(c.correct)) {
-    probleme.push('Răspunsul corect trebuie să fie una dintre variantele scrise.');
+    adauga('correct', 'Răspunsul corect trebuie să fie una dintre variantele scrise.');
   }
 
-  if (c.expl.trim() === '') probleme.push('Explicația generală nu poate fi goală.');
+  if (c.expl.trim() === '') adauga('expl', 'Explicația generală nu poate fi goală.');
 
   if (c.an.trim() !== '') {
     const an = Number(c.an.trim());
     if (!Number.isInteger(an) || an < 2015 || an > 2100) {
-      probleme.push('Anul subiectului trebuie să fie un an valid.');
+      adauga('an', 'Anul subiectului trebuie să fie un an valid.');
     }
   }
 
   return probleme;
+}
+
+/** Importul și apelanții existenți primesc aceleași mesaje ca înainte. */
+export function valideaza(c: Ciorna, taxonomie = TAXONOMIE_GOALA, tipuri = TIPURI_GOALE): string[] {
+  return valideazaCampuri(c, taxonomie, tipuri).map((p) => p.mesaj);
 }
 
 /** Ciorna, pregătită pentru `salveaza_grila`. Variantele goale nu pleacă spre bază. */
