@@ -36,6 +36,7 @@ import {
 } from './adminCiorna';
 import { OrigineGrile } from './OrigineGrile';
 import { ImportGrile } from './ImportGrile';
+import { useCiornaAdmin } from './useCiornaAdmin';
 
 /** Ce vede un cont fără drepturi de administrare. */
 export function AdminBlocat() {
@@ -65,8 +66,8 @@ export function AdminBlocat() {
 }
 
 export function Admin() {
-  const { role } = useAuth();
-  return role === 'admin' ? <AdminPanel /> : <AdminBlocat />;
+  const { role, user } = useAuth();
+  return role === 'admin' && user ? <AdminPanel key={user.id} userId={user.id} /> : <AdminBlocat />;
 }
 
 const STARI: { id: QuestionStatus; eticheta: string; culoare: [string, string] }[] = [
@@ -84,25 +85,22 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
  * și două butoane fără handler, sub un mesaj care promitea că „fiecare modificare
  * este înregistrată pe contul tău". Acum scrie în bază, prin `salveaza_grila`.
  *
- * Ciorna nu se ține în `localStorage`: schema are `status = 'ciorna'`, deci locul
- * ei e în bibliotecă, vizibilă doar administratorilor, nu pe un singur dispozitiv.
+ * Formularul incomplet se recuperează local, separat pe cont. Salvarea explicită
+ * în bibliotecă rămâne validată de server; recuperarea nu publică nimic.
  */
-function AdminPanel() {
+function AdminPanel({ userId }: { userId: string }) {
   const { catalog, taxonomie, tipuri, colectii, reload, reloadStructura } = useContent();
   const { notify } = useToast();
 
   const [sectiune, mergiLa] = useSectiuneAdmin();
-  const [ciorna, setCiorna] = useState<Ciorna>(() => ({ ...ciornaGoala(''), id: `grila-${crypto.randomUUID()}` }));
-  const [pas, setPas] = useState(0);
-  const [raspunsAles, setRaspunsAles] = useState(false);
-  const [modificata, setModificata] = useState(false);
+  const { ciorna, setCiorna, pas, setPas, raspunsAles, setRaspunsAles,
+    modificata, setModificata, editez, setEditez } = useCiornaAdmin(userId);
   useEffect(() => {
     if (!modificata) return;
     const avertizeaza = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', avertizeaza);
     return () => window.removeEventListener('beforeunload', avertizeaza);
   }, [modificata]);
-  const [editez, setEditez] = useState<string | null>(null);
   const [filtre, setFiltre] = useState<FiltreGrile>(FILTRE_GOALE);
   const biblioteca = useBibliotecaAdmin(filtre);
   const filtruCamp = <K extends keyof FiltreGrile>(key: K, value: FiltreGrile[K]) =>
@@ -113,6 +111,7 @@ function AdminPanel() {
   const [alese, setAlese] = useState<Set<string>>(() => new Set());
   const [inLucru, setInLucru] = useState(false);
   const [aratatProbleme, setAratatProbleme] = useState(false);
+  const [materieFiltrata, setMaterieFiltrata] = useState('');
 
   const probleme = [...valideaza(ciorna, taxonomie, tipuri), ...(!raspunsAles ? ['Alege explicit răspunsul corect.'] : [])];
   const scrise = variantScrise(ciorna);
@@ -128,7 +127,11 @@ function AdminPanel() {
   };
 
   const reseteaza = () => {
-    setCiorna({ ...ciornaGoala(ciorna.capId), id: `grila-${crypto.randomUUID()}`, sursa: ciorna.sursa, colectie: ciorna.colectie, an: ciorna.an });
+    const tip = tipuri.tip(ciorna.tip);
+    setCiorna({ ...ciornaGoala(ciorna.capId), id: `grila-${crypto.randomUUID()}`, sursa: ciorna.sursa, colectie: ciorna.colectie, an: ciorna.an,
+      tip: ciorna.tip, enunturi: Array.from({ length: tip?.nrEnunturi ?? 0 }, () => ''),
+      opts: Object.fromEntries(OPTION_KEYS.map((k, i) => [k, { text: tip?.sablonOptiuni?.[i] ?? '', why: '' }])) as Ciorna['opts'],
+    });
     setPas(0);
     setRaspunsAles(false);
     setModificata(false);
@@ -175,6 +178,7 @@ function AdminPanel() {
     try {
       const completa = await citesteGrilaAdmin(g.id);
       setCiorna(dinGrila(completa));
+      setMaterieFiltrata('');
       setEditez(g.id);
       setPas(1);
       setRaspunsAles(true);
@@ -187,7 +191,7 @@ function AdminPanel() {
     }
   };
 
-  const salveaza = async (status: QuestionStatus) => {
+  const salveaza = async (status: QuestionStatus, continua = false) => {
     if (seSalveaza) return;
     if (probleme.length > 0) {
       setAratatProbleme(true);
@@ -206,7 +210,8 @@ function AdminPanel() {
       biblioteca.reincarca();
       notify('succes', status === 'publicata' ? 'Grila e publicată.' : 'Ciorna a fost salvată.');
       reseteaza();
-      mergiLa('grile');
+      mergiLa(continua ? 'adauga' : 'grile');
+      if (continua) setPas(1);
     } catch (e: unknown) {
       notify('eroare', e instanceof Error ? e.message : 'Nu am putut salva grila.');
     } finally {
@@ -290,7 +295,10 @@ function AdminPanel() {
       {/* Acoperirea e un ecran întreg, nu o coloană: e o hartă a programei, iar
           lângă ea lista de grile n-ar avea ce adăuga. */}
       {sectiune === 'acoperire' ? (
-        <AcoperireCapitole taxonomie={taxonomie} />
+        <AcoperireCapitole taxonomie={taxonomie} onDeschide={(capitol) => {
+          setFiltre({ ...FILTRE_GOALE, capitole: [capitol] });
+          mergiLa('grile');
+        }} />
       ) : sectiune === 'taxonomie' ? (
         <AdminTaxonomie taxonomie={taxonomie} dupaSalvare={() => void reloadStructura()} />
       ) : sectiune === 'colectii' ? (
@@ -326,19 +334,30 @@ function AdminPanel() {
               <button key={nume} type="button" aria-current={pas === i ? 'step' : undefined} onClick={() => setPas(i)}>{i + 1}. {nume}</button>
             )}
           </nav>
-          <p className="admin-ajutor">{modificata ? 'Ai modificări nesalvate. Poți schimba secțiunea și reveni, dar salvează înainte să închizi pagina.' : 'Completează pe rând. La final verifici grila și alegi dacă rămâne ciornă sau devine publică.'}</p>
+          <p className="admin-ajutor">{modificata ? 'Formularul se recuperează în acest browser, pe contul tău, dacă stocarea locală este disponibilă. Nu este încă salvat în bibliotecă și nu apare pe alte dispozitive.' : 'Completează pe rând. La final verifici grila și alegi dacă rămâne ciornă sau devine publică.'}</p>
+          {pas === 1 && <p className="admin-ajutor">Lucrezi în: {taxonomie.eticheta(ciorna.capId) || 'Alege capitolul'} · {tipuri.tip(ciorna.tip)?.nume} · {colectii.eticheta(ciorna.colectie) || 'Fără colecție'}. Schimbă încadrarea din pasul 1.</p>}
           <div hidden={pas !== 0}>
           <div style={{ marginTop: 18, ...autoGrid(200, 14) }}>
+            <label><span style={label}>Materie</span>
+              <select className="field" value={materieFiltrata} onChange={(e) => {
+                setMaterieFiltrata(e.target.value);
+                if (e.target.value && !taxonomie.materii.find((m) => m.id === e.target.value)?.list.some((c) => c.id === ciorna.capId)) camp('capId', '');
+              }}>
+                <option value="">Toate materiile</option>
+                {taxonomie.materii.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </label>
             <label style={{ display: 'block' }}>
               <span style={label}>Capitol</span>
               <select
                 className="field"
                 value={ciorna.capId}
+                aria-label="Capitol"
                 onChange={(e) => camp('capId', e.target.value as ChapterId)}
                 style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
               >
                 <option value="">Alege capitolul…</option>
-                {taxonomie.materii.map((m) => (
+                {taxonomie.materii.filter((m) => !materieFiltrata || m.id === materieFiltrata).map((m) => (
                   <optgroup key={m.id} label={m.name}>
                     {m.list.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -348,6 +367,7 @@ function AdminPanel() {
                   </optgroup>
                 ))}
               </select>
+              {!ciorna.capId && <span className="admin-ajutor">Alege materia pentru o listă mai scurtă, apoi capitolul întrebării.</span>}
             </label>
 
             <label style={{ display: 'block' }}>
@@ -591,6 +611,8 @@ function AdminPanel() {
             >
               Salvează ca ciornă
             </button>
+            <button type="button" className="btn-ghost" disabled={seSalveaza}
+              onClick={() => void salveaza('ciorna', true)}>Salvează ciorna și adaugă alta</button>
             <button
               type="button"
               className="btn-primary"

@@ -142,6 +142,35 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('salvează și continuă cu altă grilă fără să reutilizeze răspunsul corect', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await formular(user, 'prima-din-lot');
+    await user.type(screen.getByLabelText('Enunțul grilei'), 'Întrebare');
+    await user.type(screen.getByLabelText('Varianta A'), 'Prima');
+    await user.type(screen.getByLabelText('Varianta B'), 'A doua');
+    await user.click(screen.getByRole('button', { name: 'Varianta B e răspunsul corect' }));
+    await user.type(screen.getByLabelText('Explicația generală'), 'Explicație');
+    await revizuire(user);
+    await user.click(screen.getByRole('button', { name: 'Salvează ciorna și adaugă alta' }));
+    await waitFor(() => expect(screen.getByLabelText('Enunțul grilei')).toHaveValue(''));
+    expect(salveaza).toHaveBeenCalledWith(expect.objectContaining({ id: 'prima-din-lot', status: 'ciorna' }));
+    expect(screen.getByRole('button', { name: 'Varianta B e răspunsul corect' })).toHaveAttribute('aria-pressed', 'false');
+    await user.click(screen.getByRole('button', { name: '1. Încadrare și sursă' }));
+    expect(screen.getByLabelText('Capitol', { exact: true })).toHaveValue('bio-nervos');
+  });
+  it('recuperează întrebarea incompletă după închiderea administrării', async () => {
+    const user = userEvent.setup();
+    const vedere = monteaza();
+    await formular(user, 'ciorna-recuperata');
+    await user.type(screen.getByLabelText('Enunțul grilei'), 'Întrebare neterminată');
+    vedere.unmount();
+    window.location.hash = '#/admin';
+    monteaza();
+    await user.click(await screen.findByRole('button', { name: 'Continuă grila nesalvată' }));
+    expect(screen.getByLabelText('Enunțul grilei')).toHaveValue('Întrebare neterminată');
+    expect(salveaza).not.toHaveBeenCalled();
+  });
   it('păstrează grila nesalvată când schimbi secțiunea și completează cheia grupată', async () => {
     const user = userEvent.setup();
     monteaza();
