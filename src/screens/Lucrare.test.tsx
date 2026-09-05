@@ -65,7 +65,7 @@ const lucrarea = (mod: ModTest, grile: GrilaDinLucrare[], predata = false): Lucr
 
 const deschide = () =>
   render(
-    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED} tipuri={TIPURI_SEED}>
+    <AppProvider catalog={QUESTIONS} taxonomie={TAXONOMIE_SEED} tipuri={TIPURI_SEED}>
       <Lucrare />
     </AppProvider>,
   );

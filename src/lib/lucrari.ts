@@ -1,6 +1,6 @@
 import type { ChapterId, MaterieId } from '../data/chapters';
 import type { OptionKey, QuestionId } from '../data/questions';
-import type { SimRun } from '../state/useSimulare';
+import type { SimRun } from '../state/useSimulareVeche';
 
 /**
  * Poarta către motorul de generare din bază.

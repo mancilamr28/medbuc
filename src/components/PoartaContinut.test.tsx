@@ -43,7 +43,7 @@ function monteaza(banca = QUESTIONS) {
   return render(
     <AuthProvider>
       <ContentProvider>
-        <AppProvider questions={banca}>
+        <AppProvider catalog={banca}>
           <PoartaContinut>
             <div>grilele sunt aici</div>
           </PoartaContinut>

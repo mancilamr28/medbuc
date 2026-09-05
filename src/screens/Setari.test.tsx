@@ -38,6 +38,7 @@ vi.mock('../lib/supabase', () => ({
     rpc: (...a: unknown[]) => rpc(...(a as [])),
     from: () => ({
       select: () => ({
+        order: () => ({ range: async () => ({ data: [], error: null, count: 0 }), order: () => ({ range: async () => ({ data: [], error: null, count: 0 }) }) }),
         eq: () => ({
           single: async () => ({ data: PROFIL, error: null }),
           maybeSingle: async () => ({ data: PROFIL, error: null }),
@@ -53,7 +54,7 @@ function monteaza() {
   return render(
     <ToastProvider>
       <AuthProvider>
-        <AppProvider questions={QUESTIONS}>
+        <AppProvider catalog={QUESTIONS}>
           <Setari />
         </AppProvider>
       </AuthProvider>

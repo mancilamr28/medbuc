@@ -24,7 +24,7 @@ const stare = vi.hoisted(() => ({
 vi.mock('../lib/lucrari', () => ({ importaSimulareVeche: (...args: unknown[]) => stare.importa(...args) }));
 vi.mock('../lib/sentry', () => ({ reportError: (...args: unknown[]) => stare.raporteaza(...args) }));
 vi.mock('../state/appContextValue', () => ({
-  useApp: () => ({ sim: stare.sim }),
+  useApp: () => ({ simulareVeche: { run: stare.sim.run, sterge: stare.sim.reset } }),
 }));
 
 beforeEach(() => {

@@ -8,7 +8,6 @@ import { BUILT_SCREENS, goTestNou, isPublicRouteHash, usePublicView, type Public
 import { Acasa } from './screens/Acasa';
 import { Admin } from './screens/Admin';
 import { Autentificare, type ModAutentificare } from './screens/Autentificare';
-import { Grile } from './screens/Grile';
 import { InLucru } from './screens/InLucru';
 import { Lucrare } from './screens/Lucrare';
 import { MigrareSimulareVeche } from './screens/MigrareSimulareVeche';
@@ -60,13 +59,13 @@ const GOL_LANDING = (
 );
 
 function Content() {
-  const { screen, session } = useApp();
+  const { screen } = useApp();
 
   if (!BUILT_SCREENS.includes(screen)) return <InLucru screen={screen} />;
 
   switch (screen) {
     case 'grile':
-      return session.hasStarted ? <Grile /> : <TrimiteLaTestNou />;
+      return <TrimiteLaTestNou />;
     case 'test-nou':
       return <TestNou />;
     case 'lucrare':

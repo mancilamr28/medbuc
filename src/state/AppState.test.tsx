@@ -17,7 +17,7 @@ function ComutatorTema() {
 
 const deschide = () =>
   render(
-    <AppProvider questions={QUESTIONS}>
+    <AppProvider catalog={QUESTIONS}>
       <ComutatorTema />
     </AppProvider>,
   );

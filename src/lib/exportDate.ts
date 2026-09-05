@@ -1,3 +1,5 @@
+import { citesteTot } from './paginare';
+
 /**
  * Exportul datelor personale — dreptul GDPR de acces.
  *
@@ -13,8 +15,9 @@ export interface DateExportate {
   exportatLa: string;
   cont: { id: string; email: string | null };
   profil: unknown;
-  sesiuni: unknown[];
-  simulari: unknown[];
+  lucrari: unknown[];
+  grileLucrari: unknown[];
+  favorite: unknown[];
   raspunsuri: unknown[];
   notite: unknown[];
   /** Ce a rămas doar în browser: tema, setările, lucrarea în curs, notițele nesincronizate. */
@@ -61,22 +64,28 @@ export const cheiLocale = (storage: Storage): Record<string, string> => {
 export async function adunaDatele(userId: string, email: string | null): Promise<DateExportate> {
   const { supabase } = await import('./supabase');
 
-  const [profil, sesiuni, simulari, raspunsuri, notite] = await Promise.all([
+  const citesteLista = async (tabel: string, ordine: string) => {
+    try {
+      return await citesteTot<unknown>(async (de, la) => {
+        let query = supabase.from(tabel).select('*', { count: 'exact' });
+        for (const coloana of ordine.split(',')) query = query.order(coloana);
+        const r = await query.range(de, la);
+        return { data: r.data, error: r.error, count: r.count };
+      });
+    } catch (e) {
+      const mesaj = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Citire eșuată';
+      throw new Error(tabel + ': ' + mesaj, { cause: e });
+    }
+  };
+  const [profil, lucrari, grileLucrari, raspunsuri, notite, favorite] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-    supabase.from('sessions').select('*'),
-    supabase.from('sim_runs').select('*'),
-    supabase.from('attempts').select('*'),
-    supabase.from('notes').select('*'),
+    citesteLista('test_runs', 'id'),
+    citesteLista('test_run_items', 'run_id,position'),
+    citesteLista('attempts', 'id'),
+    citesteLista('notes', 'chapter_id'),
+    citesteLista('favorite', 'question_id'),
   ]);
-
-  // Clientul Supabase nu respinge promisiunea la erorile raportate de server —
-  // întoarce `{ data: null, error }`. Fără verificarea asta, un timeout sau o
-  // politică RLS schimbată devenea tăcut o listă goală, iar exportul pleca cu
-  // toast de succes și fără datele pe care tocmai le promitea. Un buton care
-  // minte că dreptul a fost onorat e mai rău decât unul mort.
-  for (const [nume, r] of Object.entries({ profil, sesiuni, simulari, raspunsuri, notite })) {
-    if (r.error) throw new Error(`${nume}: ${r.error.message}`);
-  }
+  if (profil.error) throw new Error('profil: ' + profil.error.message);
 
   let local: Record<string, string> = {};
   try {
@@ -89,10 +98,11 @@ export async function adunaDatele(userId: string, email: string | null): Promise
     exportatLa: new Date().toISOString(),
     cont: { id: userId, email },
     profil: profil.data ?? null,
-    sesiuni: sesiuni.data ?? [],
-    simulari: simulari.data ?? [],
-    raspunsuri: raspunsuri.data ?? [],
-    notite: notite.data ?? [],
+    lucrari,
+    grileLucrari,
+    favorite,
+    raspunsuri,
+    notite,
     peAcestDispozitiv: local,
   };
 }

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { MaterieId } from '../data/chapters';
-import type { Question } from '../data/questions';
 import type { GrilaCatalog } from '../lib/continut';
 import type { AttemptRow } from '../lib/progres';
 import { TAXONOMIE_GOALA, type Taxonomie } from '../lib/taxonomie';
@@ -9,9 +8,8 @@ import { COLECTII_GOALE, type Colectii } from '../lib/colectii';
 import { useNow, usePersistentState } from '../lib/hooks';
 import { useHashRoute } from '../lib/router';
 import { AppContext, type AppValue, type Theme } from './appContextValue';
-import { useSession } from './useSession';
 import { useCoadaRecapitulare } from './useCoadaRecapitulare';
-import { useSimulare } from './useSimulare';
+import { useSimulareVeche } from './useSimulareVeche';
 
 const readInitialTheme = (): Theme => {
   if (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark') return 'dark';
@@ -23,20 +21,16 @@ const readInitialTheme = (): Theme => {
  *
  * `AppProvider` nu are voie să depindă de un provider care face rețea: e ce ține
  * `AppState.test.tsx` capabil să-l randeze singur, fără `AuthProvider` și fără
- * `ContentProvider`. Aplicația îi dă doar catalogul sigur; testele vechi pot da
- * încă o bancă-fixtură pentru hook-urile de compatibilitate.
+ * `ContentProvider`. Aplicația și testele îi dau doar catalogul sigur.
  */
 export function AppProvider({
-  questions = [],
-  catalog = questions.map((q) => ({ id: q.id, capId: q.capId })),
+  catalog = [],
   attempts = [],
   taxonomie = TAXONOMIE_GOALA,
   tipuri = TIPURI_GOALE,
   colectii = COLECTII_GOALE,
   children,
 }: {
-  /** Banca completă mai există numai în testele drumului vechi. */
-  questions?: Question[];
   /** Indexul sigur folosit în aplicația reală. */
   catalog?: GrilaCatalog[];
   attempts?: readonly AttemptRow[];
@@ -49,13 +43,10 @@ export function AppProvider({
   const [theme, setTheme] = usePersistentState<Theme>('medbuc.theme', readInitialTheme());
   const [materie, setMaterie] = useState<MaterieId>('bio');
 
-  const session = useSession(questions);
   // Recalculează scadențele rar și numai cât timp ecranul lor este deschis.
   const recapNow = useNow(screen === 'recapitulare' || screen === 'acasa', 60_000);
   const recapitulare = useCoadaRecapitulare(recapNow, catalog, attempts);
-  // Ceasul simulării bate doar cât timp ecranul de simulare este deschis.
-  const now = useNow(screen === 'simulari');
-  const sim = useSimulare(now, questions, taxonomie);
+  const simulareVeche = useSimulareVeche();
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
@@ -75,16 +66,14 @@ export function AppProvider({
       go,
       materie,
       setMaterie,
-      questions,
       catalog,
       taxonomie,
       tipuri,
       colectii,
-      session,
       recapitulare,
-      sim,
+      simulareVeche,
     }),
-    [catalog, colectii, go, materie, questions, recapitulare, screen, session, sim, taxonomie, theme, tipuri, toggleTheme],
+    [catalog, colectii, go, materie, recapitulare, screen, simulareVeche, taxonomie, theme, tipuri, toggleTheme],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

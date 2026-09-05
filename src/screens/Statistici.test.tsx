@@ -17,7 +17,7 @@ const stare = vi.hoisted(() => ({
 
 vi.mock('../state/progressState', () => ({ useProgressOptional: () => stare }));
 
-const deschide = () => render(<AppProvider questions={QUESTIONS}><Statistici /></AppProvider>);
+const deschide = () => render(<AppProvider catalog={QUESTIONS}><Statistici /></AppProvider>);
 
 beforeEach(() => {
   stare.attempts = [];

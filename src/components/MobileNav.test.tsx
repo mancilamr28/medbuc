@@ -16,7 +16,7 @@ vi.mock('../state/appContextValue', () => ({
     screen: stare.ecran,
     go: stare.go,
     session: { hasStarted: stare.sesiuneInCurs, finished: false },
-    sim: { phase: stare.simulareInCurs ? 'rulare' : 'config' },
+    simulareVeche: { run: stare.simulareInCurs ? {} : null },
   }),
 }));
 
@@ -58,7 +58,7 @@ describe('Navigarea mobilă', () => {
 
     await user.click(screen.getByRole('button', { name: 'Mai multe' }));
     const meniu = screen.getByRole('dialog', { name: 'Mai multe' });
-    expect(within(meniu).getByRole('button', { name: 'Continuă sesiunea' })).toBeInTheDocument();
+    expect(within(meniu).queryByRole('button', { name: 'Continuă sesiunea' })).not.toBeInTheDocument();
     expect(within(meniu).getByRole('button', { name: 'Continuă simularea' })).toBeInTheDocument();
   });
 
