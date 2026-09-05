@@ -2,7 +2,7 @@ import { OPTION_KEYS } from '../data/questions';
 import type { TipGrila } from '../lib/tipuriGrile';
 
 /** TSV copiat dintr-un tabel; celulele citate pot avea taburi și rânduri noi. */
-function celuleDin(text: string): string[][] {
+export function celuleDin(text: string): string[][] {
   const randuri: string[][] = [];
   let rand: string[] = [], celula = '', citat = false;
   const brut = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
@@ -19,6 +19,25 @@ function celuleDin(text: string): string[][] {
   if (citat) throw new Error('Există o celulă cu ghilimele neînchise. Copiază din nou tabelul complet.');
   rand.push(celula); randuri.push(rand);
   return randuri.filter((r) => r.some((c) => c.trim() !== ''));
+}
+
+/** Serializarea simetrică păstrează inclusiv taburile și rândurile din celule. */
+export function scrieCelule(randuri: string[][]): string {
+  return randuri.map((r) => r.map((c) => /[\t\n\r"]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join('\t')).join('\n');
+}
+
+/** Indici de date (fără antet); avertizare, nu eliminare automată. */
+export function randuriRepetate(text: string): number[][] {
+  const [antet = [], ...randuri] = celuleDin(text);
+  const normal = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+  const col = antet.findIndex((c) => normal(c) === 'enunt');
+  if (col < 0) return [];
+  const grupuri = new Map<string, number[]>();
+  randuri.forEach((r, i) => {
+    const cheie = normal(r[col] ?? '');
+    if (cheie) grupuri.set(cheie, [...(grupuri.get(cheie) ?? []), i + 1]);
+  });
+  return [...grupuri.values()].filter((r) => r.length > 1);
 }
 
 export const antetTabel = (tip: TipGrila): string => [

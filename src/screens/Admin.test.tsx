@@ -142,6 +142,24 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('corectează un import invalid direct în editor și cere o nouă verificare', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('button', { name: 'Importă un lot' }));
+    await user.selectOptions(screen.getByLabelText('Capitolul lotului'), 'bio-nervos');
+    await user.click(screen.getByLabelText('Lipește tabelul aici'));
+    await user.paste('Enunț\tA\tB\tCorect\tExplicație\nDe reparat\tPrima\tA doua\tZ\tExplicație');
+    await user.click(screen.getByRole('button', { name: 'Corectează tabelul aici' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Rândul 1: Corect' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rândul 1: Corect' }), 'B');
+    expect(screen.getByRole('button', { name: 'Importă 1 grilă' })).toBeDisabled();
+    await user.click(screen.getByLabelText('Am verificat întrebările și răspunsurile corecte.'));
+    await user.type(screen.getByRole('textbox', { name: 'Rândul 1: Enunț' }), ' corectat');
+    expect(screen.getByRole('button', { name: 'Importă 1 grilă' })).toBeDisabled();
+    await user.click(screen.getByLabelText('Am verificat întrebările și răspunsurile corecte.'));
+    await user.click(screen.getByRole('button', { name: 'Importă 1 grilă' }));
+    await waitFor(() => expect(salveaza).toHaveBeenCalledWith(expect.objectContaining({ text: 'De reparat corectat', correct: 'B', id: expect.stringMatching(/^lot-.*-1$/) })));
+  });
   it('salvează și continuă cu altă grilă fără să reutilizeze răspunsul corect', async () => {
     const user = userEvent.setup();
     monteaza();

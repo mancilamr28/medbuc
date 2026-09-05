@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { tabelCatreJson, tabelCuIdentitati } from './importTabel';
+import { tabelCatreJson, tabelCuIdentitati, randuriRepetate, celuleDin, scrieCelule } from './importTabel';
 import { TIPURI_SEED } from '../data/tipuriSeed';
 
 const citeste = (text: string) => JSON.parse(tabelCatreJson(text, 'bio-nervos', TIPURI_SEED.tip('simplu')!, 'lot-test'));
 describe('importul din tabel', () => {
+  it('semnalează enunțurile repetate fără să considere celulele goale duplicate', () => {
+    expect(randuriRepetate('Enunț\tA\nȚesut\ta\n tesut \tb\n\tc\n\td')).toEqual([[1, 2]]);
+  });
+  it('editarea păstrează taburile, ghilimelele și rândurile noi', () => {
+    const celule = [['Enunț', 'A'], ['O "întrebare"\npe două rânduri', 'un\ttab']];
+    expect(celuleDin(scrieCelule(celule))).toEqual(celule);
+  });
   it('păstrează codul unui rând la reîncercare chiar după eliminarea celui dinainte', () => {
     const cuCod = tabelCuIdentitati('Enunț\tA\tB\tCorect\tExplicație\nPrima\ta\tb\tB\te\nA doua\ta\tb\tB\te', 'lot-test');
     const [antet, , alDoilea] = cuCod.split('\n');
