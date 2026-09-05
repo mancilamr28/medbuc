@@ -39,7 +39,12 @@ const pastila = (areGrile: boolean): SX => ({
   background: areGrile ? 'var(--okS)' : 'var(--surf2)',
 });
 
-export function AcoperireCapitole({ taxonomie, onDeschide }: { taxonomie: Taxonomie; onDeschide?: (capitol: string) => void }) {
+export function AcoperireCapitole({ taxonomie, onDeschide, onAdauga, onImporta }: {
+  taxonomie: Taxonomie;
+  onDeschide?: (capitol: string) => void;
+  onAdauga?: (capitol: string) => void;
+  onImporta?: (capitol: string) => void;
+}) {
   const [randuri, setRanduri] = useState<AcoperireCapitol[] | null>(null);
   const [eroare, setEroare] = useState<string | null>(null);
   const [incercare, setIncercare] = useState(0);
@@ -155,6 +160,7 @@ export function AcoperireCapitole({ taxonomie, onDeschide }: { taxonomie: Taxono
                       display: 'flex',
                       alignItems: 'center',
                       gap: 10,
+                      flexWrap: 'wrap',
                     }}
                   >
                     <span style={{ flex: 1, minWidth: 0, font: `400 12.5px ${SANS}` }} className="truncate">
@@ -162,7 +168,7 @@ export function AcoperireCapitole({ taxonomie, onDeschide }: { taxonomie: Taxono
                     </span>
                     {(a?.ciorna ?? 0) > 0 && (
                       <span style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
-                        {a!.ciorna} ciornă
+                        {numar(a!.ciorna, 'ciornă', 'ciorne')}
                       </span>
                     )}
                     <span
@@ -176,6 +182,10 @@ export function AcoperireCapitole({ taxonomie, onDeschide }: { taxonomie: Taxono
                       {(a?.publicata ?? 0) > 0 ? a!.publicata : '—'}
                     </span>
                     {onDeschide && <button className="btn-quiet" aria-label={`Vezi grilele: ${chapterLabel(c)}`} onClick={() => onDeschide(c.id)}>Vezi grilele</button>}
+                    <div className="admin-butoane" style={{ width: '100%' }}>
+                      {onAdauga && <button className="btn-quiet" aria-label={`Adaugă o grilă: ${chapterLabel(c)}`} onClick={() => onAdauga(c.id)}>Adaugă aici</button>}
+                      {onImporta && <button className="btn-quiet" aria-label={`Importă grile: ${chapterLabel(c)}`} onClick={() => onImporta(c.id)}>Importă aici</button>}
+                    </div>
                   </div>
                 );
               })}

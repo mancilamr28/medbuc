@@ -54,6 +54,7 @@ vi.mock('../lib/continut', async (original) => ({
   // le dă pe cele reale, ca selectoarele ecranului să aibă ce afișa.
   incarcaTaxonomie: async () => TAXONOMIE_SEED,
   incarcaTipuri: async () => TIPURI_SEED,
+  citesteAcoperirea: async () => [],
   incarcaColectii: async () =>
     construiesteColectii([
       {
@@ -142,6 +143,37 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('pornește scrierea și importul din capitolul ales în acoperire', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+    await user.click(screen.getByRole('tab', { name: 'Acoperirea programei' }));
+    await user.click(await screen.findByRole('button', { name: 'Adaugă o grilă: 03. Sistemul nervos' }));
+    expect(screen.getByLabelText('Capitol', { exact: true })).toHaveValue('bio-nervos');
+    await user.click(screen.getByRole('tab', { name: 'Acoperirea programei' }));
+    await user.click(await screen.findByRole('button', { name: 'Importă grile: 04. Glandele endocrine' }));
+    await waitFor(() => expect(screen.getByLabelText('Capitolul lotului')).toHaveValue('bio-endocrin'));
+    await user.click(screen.getByLabelText('Lipește tabelul aici'));
+    await user.paste('Enunț\tA\tB\tCorect\tExplicație\nQ\ta\tb\tA\te');
+    await user.click(screen.getByRole('tab', { name: 'Acoperirea programei' }));
+    await user.click(await screen.findByRole('button', { name: 'Importă grile: 03. Sistemul nervos' }));
+    expect(screen.getByLabelText('Capitolul lotului')).toHaveValue('bio-endocrin');
+    await user.click(screen.getByRole('button', { name: 'Aplică acest capitol lotului' }));
+    expect(screen.getByLabelText('Capitolul lotului')).toHaveValue('bio-nervos');
+    expect(screen.getByLabelText('Lipește tabelul aici')).toHaveValue('Enunț\tA\tB\tCorect\tExplicație\nQ\ta\tb\tA\te');
+    expect(salveaza).not.toHaveBeenCalled();
+  });
+  it('nu înlocuiește grila nesalvată când adaugi din alt capitol', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await formular(user, 'in-curs');
+    await user.type(screen.getByLabelText('Enunțul grilei'), 'Nu pierde textul');
+    await user.click(screen.getByRole('tab', { name: 'Acoperirea programei' }));
+    await user.click(await screen.findByRole('button', { name: 'Adaugă o grilă: 04. Glandele endocrine' }));
+    expect(screen.getByLabelText('Enunțul grilei')).toHaveValue('Nu pierde textul');
+    await user.click(screen.getByRole('button', { name: '1. Încadrare și sursă' }));
+    expect(screen.getByLabelText('Capitol', { exact: true })).toHaveValue('bio-nervos');
+  });
   it('previzualizează fără să înlocuiască formularul nesalvat', async () => {
     const user = userEvent.setup();
     monteaza();

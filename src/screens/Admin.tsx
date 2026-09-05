@@ -113,6 +113,7 @@ function AdminPanel({ userId }: { userId: string }) {
   const [inLucru, setInLucru] = useState(false);
   const [aratatProbleme, setAratatProbleme] = useState(false);
   const [materieFiltrata, setMaterieFiltrata] = useState('');
+  const [capitolImport, setCapitolImport] = useState<{ id: string; cerere: number } | null>(null);
 
   const probleme = [...valideaza(ciorna, taxonomie, tipuri), ...(!raspunsAles ? ['Alege explicit răspunsul corect.'] : [])];
   const scrise = variantScrise(ciorna);
@@ -299,6 +300,21 @@ function AdminPanel({ userId }: { userId: string }) {
         <AcoperireCapitole taxonomie={taxonomie} onDeschide={(capitol) => {
           setFiltre({ ...FILTRE_GOALE, capitole: [capitol] });
           mergiLa('grile');
+        }} onAdauga={(capitol) => {
+          if (seSalveaza) return;
+          if (modificata) {
+            notify('info', 'Ai o grilă nesalvată. Salveaz-o sau golește formularul înainte să începi alta.');
+            mergiLa('adauga');
+            return;
+          }
+          reseteaza();
+          setCiorna((c) => ({ ...c, capId: capitol }));
+          setMaterieFiltrata('');
+          setModificata(true);
+          mergiLa('adauga');
+        }} onImporta={(capitol) => {
+          setCapitolImport((c) => ({ id: capitol, cerere: (c?.cerere ?? 0) + 1 }));
+          mergiLa('import');
         }} />
       ) : sectiune === 'taxonomie' ? (
         <AdminTaxonomie taxonomie={taxonomie} dupaSalvare={() => void reloadStructura()} />
@@ -1003,7 +1019,7 @@ function AdminPanel({ userId }: { userId: string }) {
       </div>
       )}
       <div hidden={sectiune !== 'import'}>
-        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} />
+        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} capitolCerut={capitolImport} />
       </div>
     </div>
   );
