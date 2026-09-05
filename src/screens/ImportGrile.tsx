@@ -15,8 +15,9 @@ import { type QuestionSursa } from '../data/questions';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
 import { OrigineGrile } from './OrigineGrile';
-import { antetTabel, tabelCatreJson, tabelCuIdentitati } from './importTabel';
+import { antetTabel, tabelCatreJson, tabelCuIdentitati, randuriRepetate } from './importTabel';
 import type { Colectii } from '../lib/colectii';
+import { EditorTabelImport } from './EditorTabelImport';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -70,6 +71,7 @@ export function ImportGrile({
   const [lotId, setLotId] = useState(() => `lot-${crypto.randomUUID()}`);
   const [confirmat, setConfirmat] = useState(false);
   const [revizuit, setRevizuit] = useState(false);
+  const [editezTabel, setEditezTabel] = useState(false);
   const tip = tipuri.tip(tipId);
   const [implicit, setImplicit] = useState<QuestionStatus>('ciorna');
   // Proveniența lotului: se scrie o dată, nu pe fiecare din cele cincizeci de rânduri.
@@ -98,6 +100,10 @@ export function ImportGrile({
   const valide = citire.randuri.filter((r) => r.grila !== null);
   const cuProbleme = citire.randuri.filter((r) => r.grila === null);
   const rescrise = valide.filter((r) => r.suprascrie);
+  const repetate = useMemo(() => {
+    try { return format === 'tabel' ? randuriRepetate(brut) : []; }
+    catch { return []; }
+  }, [format, brut]);
 
   const cereConfirmare = rescrise.length > 0 || cuProbleme.length > 0 || valide.some((r) => r.grila?.status === 'publicata');
 
@@ -121,6 +127,7 @@ export function ImportGrile({
       // Golit doar la reușită deplină: dacă ceva a picat, textul trebuie să
       // rămână ca să poată fi corectat rândul vinovat și lotul reluat.
       setBrut('');
+      setEditezTabel(false);
       setLotId(`lot-${crypto.randomUUID()}`);
     } else {
       if (format === 'tabel') setBrut(tabelCuIdentitati(brut, lotId));
@@ -164,7 +171,7 @@ export function ImportGrile({
       <h3>1. Alege formatul și conținutul</h3>
       <Segmented items={[{ id: 'tabel' as const, label: 'Din tabel (Excel)' }, { id: 'json' as const, label: 'JSON (avansat)' }]} value={format} onChange={(f) => {
         if (brut.trim() && !window.confirm('Schimbarea formatului va goli textul lipit. Continui?')) return;
-        setBrut(''); setFormat(f);
+        setBrut(''); setEditezTabel(false); setFormat(f);
       }} ariaLabel="Formatul importului" />
       {format === 'tabel' && <>
         <p className="admin-ajutor">Copiază celulele din Excel sau Google Sheets, inclusiv primul rând cu numele coloanelor. Un lot are același capitol și format de întrebare.</p>
@@ -212,7 +219,7 @@ export function ImportGrile({
         </ul>
       </details>
 
-      <label style={{ display: 'block', marginTop: 16 }}>
+      <label hidden={editezTabel} style={{ display: 'block', marginTop: 16 }}>
         <span style={label}>{format === 'json' ? 'Grilele, în JSON' : 'Lipește tabelul aici'}</span>
         <textarea
           className="field"
@@ -242,6 +249,18 @@ export function ImportGrile({
 
       <h3>2. Verifică lotul</h3>
       <p className="admin-ajutor">Verificările apar mai jos. Grilele cu probleme nu se salvează.</p>
+      {repetate.length > 0 && <div className="admin-ajutor" role="status">
+        <strong>Verifică posibilele duplicate din acest lot.</strong>
+        <ul>{repetate.map((r) => <li key={r[0]}>Rândurile {r.join(', ')} au același enunț.</li>)}</ul>
+        Răspunsurile pot fi diferite. Nu ștergem nimic automat; această verificare nu caută în biblioteca existentă.
+      </div>}
+      {format === 'tabel' && !citire.eroare && citire.randuri.length > 0 && <>
+        <button type="button" className="btn-ghost" onClick={() => {
+          if (!editezTabel) setBrut(tabelCuIdentitati(brut, lotId));
+          setEditezTabel(!editezTabel);
+        }}>{editezTabel ? 'Înapoi la textul lipit' : 'Corectează tabelul aici'}</button>
+        {editezTabel && <EditorTabelImport text={brut} onChange={setBrut} probleme={cuProbleme} />}
+      </>}
       {citire.eroare && (
         <div
           role="alert"
