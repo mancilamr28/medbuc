@@ -51,8 +51,7 @@ export function useRecapitulare(
   /**
    * Golurile se păstrează: compactarea ar muta răspunsurile pe alte grile.
    *
-   * `answers` și `revealed` sunt cheiate pe poziție, iar `attemptsFromRecapitulare`
-   * citește `banca[pozitie]` ca să afle id-ul grilei. Un `flatMap` care sare
+   * `answers` și `revealed` sunt cheiate pe poziție. Un `flatMap` care sare
    * peste grilele lipsă scurtează banca, iar tot ce urmează alunecă cu o poziție
    * — răspunsul elevului ar intra în jurnalul imutabil pe altă grilă. Ecranul
    * știe deja să arate „Grila nu mai este disponibilă" pentru un gol.

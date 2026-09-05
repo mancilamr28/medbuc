@@ -166,8 +166,7 @@ export interface Simulare {
   expired: boolean;
   /**
    * Ora predării, cu expirarea inclusă — `null` cât timp lucrarea e în curs.
-   * Expusă ca `AttemptSync` să nu rescrie regula: dedusă a doua oară acolo, ar
-   * fi ajuns să difere de cea după care ecranul decide că lucrarea s-a încheiat.
+   * Aceeași valoare este folosită de ecran și de calculul rezultatului.
    */
   finishedAt: number | null;
   /** Bilanțul lucrării; zerouri cât timp nu există o lucrare. */

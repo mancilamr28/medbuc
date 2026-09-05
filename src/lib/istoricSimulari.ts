@@ -50,10 +50,8 @@ const textSau = (valoare: unknown, implicit: string): string =>
 /**
  * Rezumă lucrările predate.
  *
- * O lucrare fără `finished_at` e una în curs, nu istorie: ea trăiește în
- * `localStorage` până la predare sau expirare. Cele nesincronizate lipsesc din
- * listă exact cât timp lipsesc din bază — cardul de eșec din `AttemptSync` e
- * cel care spune că n-au ajuns acolo.
+ * Compatibilitate cu istoricul vechi din `sim_runs`: numai rândurile cu
+ * `finished_at` intră în rezultat. Lucrările noi sunt citite din `test_runs`.
  */
 export function rezumaLucrari(
   runs: readonly SimRunRow[],
