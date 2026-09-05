@@ -60,7 +60,7 @@ Which layer owns what:
 | Answers (`attempts`) | Supabase | An immutable journal. Progress, statistics and the review queue are all *derived* from it — nothing stores a `pct` |
 | Notes, theme, settings, one legacy simulation | `localStorage` | `medbuc.*`, via `usePersistentState`. New work lives in `test_runs`; `medbuc.sim.run` is read only by the one-time migration bridge |
 
-**Every new practice, simulation and review run is a server-side `test_run`.** The old `useSession` and `useSimulare` hooks remain temporarily only so an already-open old session can render and a simulation left in `medbuc.sim.run` can be imported without losing answers. `AttemptSync` is no longer mounted by the application; it remains as compatibility code until those old paths are deleted.
+**Every new practice, simulation and review run is a server-side `test_run`.** The old `useSession` and `useSimulare` hooks remain temporarily only so an already-open old session can render and a simulation left in `medbuc.sim.run` can be imported without losing answers. The unused `AttemptSync`, client-side answer journal builders and three legacy sync helpers have been removed. New answers are saved and graded by `raspunde` / `preda_test`; saved legacy simulations still go through `MigrareSimulareVeche` and `importa_simulare_veche`. This cleanup does not delete database rows or local storage.
 
 Until PR #49 a simulation was *not* persisted at all: a finished exam contributed nothing to progress, its mistakes never reached Recapitulare, and Statistici's "Simulări" row was structurally zero. That is fixed and the row is populated — do not repeat the old description, which survived in this file long after it stopped being true.
 
@@ -141,7 +141,7 @@ No new work starts through these hooks. `#/grile` redirects to the wizard unless
 
 The simulation clock only ticks while its screen is open — `AppState.tsx` passes `useNow(screen === 'simulari')`.
 
-**A session is scoped to chapters, and the scope lives in `useSession`, not in the bank it is given.** The hook takes the *whole* library and narrows it itself through the pure `filtreazaCapitole()`; `session.capitole` is the chosen scope and an **empty list means the whole library** — the same convention as the `sessions.chapter_ids` column it is written to, so there is only one meaning for empty. `start(capitole)` opens a new session over a scope, `restart()` reopens the same scope, and `syncFinishedSession` writes `session.capitole` (it used to hardcode `[]`, so a chapter session was indistinguishable from a full-library one).
+**The legacy session is scoped to chapters inside `useSession`.** The hook narrows its library through `filtreazaCapitole()`; `session.capitole` is the chosen scope and an **empty list means the whole library**. `start(capitole)` opens that scope and `restart()` reopens it. Its former synchronization helper has been removed; new runs persist their scope through the server generation request.
 
 The consequence to watch: **`session.banca` is the narrowed pool, so nothing that counts the library may read it.** `useApp().questions` is the full one, and that is what `Acasa` reports as the library size and what `GrileConfig` counts per chapter — with the session's own pool there, starting a session on one chapter emptied every other chapter in the list and disabled its button. The two are named differently on purpose: they are both `Question[]` and sit one destructuring line apart, so a shared name made that miscount compile.
 
@@ -283,7 +283,7 @@ The counterpart to `EmptyState`: `EmptyState` says a screen has nothing yet, `us
 
 It is wired now — roughly twenty `notify()` calls across Admin, ImportGrile, Autentificare, ResetareParolaFinalizare and Setari.
 
-**Reach for it instead of inventing a fourth mechanism.** There are already four ways a failure reaches the user, with no rule choosing between them: toasts, local inline error state (`Autentificare` uses *both* — inline for sign-in failure, toast for success), `EmptyState` with a retry action, and a bespoke fixed-position alert card in `AttemptSync.tsx` that reimplements the toast container at a higher `z-index`. Prefer `notify()`; converging the rest is a worthwhile cleanup, not a reason to add a fifth.
+**Reuse the existing feedback components.** Use `notify()` for transient feedback, inline errors for forms, and `EmptyState` with a retry action when a screen cannot load. The unused fixed-position alert from the old answer synchronizer has been removed.
 
 Separately, **`reportError` from `src/lib/sentry.ts` has exactly one caller** (`ErrorBoundary.componentDidCatch`), so Sentry sees render crashes and nothing else — every failed save, RLS rejection and dropped sync is invisible in production. It is documented as safe to call unconditionally, so adding it to a `catch` block costs one line.
 
