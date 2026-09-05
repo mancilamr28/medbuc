@@ -493,3 +493,30 @@ select {
     grid-column: 1 / -1;
   }
 }
+/* Administrare: o sarcină principală, cu detaliile la cerere. */
+.admin-actiuni { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin:24px 0; }
+.admin-actiuni h2 { margin:0; font-size:20px; }
+.admin-actiuni p, .admin-ajutor { color:var(--fg2); font-size:13px; line-height:1.6; }
+.admin-actiuni p { margin:6px 0 0; }
+.admin-butoane { display:flex; flex-wrap:wrap; gap:10px; }
+.admin-butoane button { padding:11px 16px; font-size:13px; }
+.admin-pasi { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0; }
+.admin-pasi button { flex:1 1 180px; padding:13px; border:1px solid var(--line); border-radius:10px; color:var(--fg2); background:var(--surf2); text-align:left; cursor:pointer; }
+.admin-pasi button[aria-current="step"] { color:var(--brand); background:var(--brandS); border-color:var(--brand); }
+.admin-detalii { margin:12px 0; font-size:13px; }
+.admin-detalii summary { cursor:pointer; color:var(--fg2); padding:8px 0; }
+.admin-previzualizare { list-style:none; padding:0; }
+.admin-previzualizare li { padding:12px; border:1px solid var(--line); border-radius:10px; margin:8px 0; white-space:pre-wrap; }
+.admin-formular { max-width:880px; margin:0 auto; }
+.admin-panou > div > [role="tablist"] { flex-wrap:wrap; }
+.admin-panou .field { padding:10px 12px; font-size:13px; }
+.admin-panou .btn-quiet, .admin-panou .btn-ghost { padding:8px 12px; font-size:13px; min-height:36px; }
+.admin-panou [hidden] { display:none !important; }
+.admin-panou label { line-height:1.6; font-size:13px; }
+.admin-panou h3 { font-size:16px; margin:22px 0 12px; }
+.admin-panou :focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+.admin-lista-compacta { max-height:420px; overflow:auto; }
+@media (max-width: 959px) {
+  .admin-pasi button { flex:1 1 0; min-width:0; font-size:12px; padding:10px 6px; }
+  .admin-actiuni { margin:16px 0; }
+}

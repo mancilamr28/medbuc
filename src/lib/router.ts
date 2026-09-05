@@ -70,7 +70,7 @@ const readHash = (): Screen => screenFor(segmente()[0] ?? '');
 // cunoască un singur nivel.
 // ---------------------------------------------------------------------------
 
-export const SECTIUNI_ADMIN = ['grile', 'import', 'acoperire', 'taxonomie', 'colectii', 'teste'] as const;
+export const SECTIUNI_ADMIN = ['grile', 'adauga', 'import', 'acoperire', 'taxonomie', 'colectii', 'teste'] as const;
 
 export type SectiuneAdmin = (typeof SECTIUNI_ADMIN)[number];
 

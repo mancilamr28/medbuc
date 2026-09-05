@@ -116,7 +116,18 @@ function monteaza() {
 }
 
 /** Formularul apare abia după ce rolul a fost citit din `profiles`. */
-const gata = () => screen.findByLabelText('Enunțul grilei');
+const gata = () => screen.findByRole('button', { name: 'Adaugă o grilă' });
+const formular = async (user: ReturnType<typeof userEvent.setup>, id: string) => {
+  await user.click(await gata());
+  await user.selectOptions(screen.getByLabelText('Capitol', { exact: true }), 'bio-nervos');
+  await user.click(screen.getByText('Cod intern (completat automat)'));
+  await user.clear(screen.getByPlaceholderText('bio-nervos-07'));
+  await user.type(screen.getByPlaceholderText('bio-nervos-07'), id);
+  await user.click(screen.getByRole('button', { name: 'Continuă' }));
+};
+const revizuire = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole('button', { name: '3. Verificare și salvare' }));
+};
 
 const GRILE_INITIALE = [...GRILE];
 
@@ -131,6 +142,45 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('păstrează grila nesalvată când schimbi secțiunea și completează cheia grupată', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await gata());
+    await user.selectOptions(screen.getByLabelText('Tipul întrebării'), 'grupat');
+    await user.click(screen.getByRole('button', { name: 'Continuă' }));
+    expect(screen.getByLabelText('Varianta A')).toHaveValue(TIPURI_SEED.tip('grupat')!.sablonOptiuni![0]);
+    expect(screen.getByLabelText('Varianta A')).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Varianta A e răspunsul corect' })).toHaveAttribute('aria-pressed', 'false');
+    await user.type(screen.getByLabelText('Enunțul grilei'), 'Text păstrat');
+    await user.click(screen.getByRole('tab', { name: 'Surse și colecții' }));
+    await user.click(screen.getByRole('button', { name: 'Continuă grila nesalvată' }));
+    expect(screen.getByLabelText('Enunțul grilei')).toHaveValue('Text păstrat');
+  });
+  it('nu presupune că A este corect și salvează fără cod scris de administrator', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await gata());
+    await user.selectOptions(screen.getByLabelText('Capitol', { exact: true }), 'bio-nervos');
+    await user.click(screen.getByRole('button', { name: 'Continuă' }));
+    await user.type(screen.getByLabelText('Enunțul grilei'), 'Întrebare');
+    await user.type(screen.getByLabelText('Varianta A'), 'Prima');
+    await user.type(screen.getByLabelText('Varianta B'), 'A doua');
+    await user.type(screen.getByLabelText('Explicația generală'), 'Explicație');
+    await revizuire(user);
+    await user.click(screen.getByRole('button', { name: 'Salvează ca ciornă' }));
+    expect(salveaza).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '2. Întrebare și răspuns' }));
+    await user.click(screen.getByRole('button', { name: 'Varianta B e răspunsul corect' }));
+    await revizuire(user);
+    await user.click(screen.getByRole('button', { name: 'Salvează ca ciornă' }));
+    await waitFor(() => expect(salveaza).toHaveBeenCalledWith(expect.objectContaining({ id: expect.stringMatching(/^grila-/), correct: 'B', status: 'ciorna' })));
+  });
+  it('deschide biblioteca fără formularul de adăugare lângă ea', async () => {
+    monteaza();
+    await screen.findByText('bio-nervos-ciorna');
+    expect(screen.queryByRole('textbox', { name: 'Enunțul grilei' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adaugă o grilă' })).toBeInTheDocument();
+  });
   it('nu se deschide pentru un elev', async () => {
     rol = 'elev';
     monteaza();
@@ -144,13 +194,14 @@ describe('Administrare', () => {
     monteaza();
     await gata();
 
-    await user.type(screen.getByPlaceholderText('bio-nervos-07'), 'bio-nervos-42');
+    await formular(user, 'bio-nervos-42');
     await user.type(screen.getByLabelText('Enunțul grilei'), 'Care este rolul nervului vag?');
     await user.type(screen.getByLabelText('Varianta A'), 'prima');
     await user.type(screen.getByLabelText('Varianta B'), 'a doua');
     await user.click(screen.getByRole('button', { name: 'Varianta B e răspunsul corect' }));
     await user.type(screen.getByLabelText('Explicația generală'), 'Fiindcă da.');
 
+    await revizuire(user);
     await user.click(screen.getByRole('button', { name: 'Publică grila' }));
 
     await waitFor(() => expect(salveaza).toHaveBeenCalledTimes(1));
@@ -175,13 +226,14 @@ describe('Administrare', () => {
     monteaza();
     await gata();
 
-    await user.type(screen.getByPlaceholderText('bio-nervos-07'), 'bio-nervos-42');
+    await formular(user, 'bio-nervos-42');
     await user.type(screen.getByLabelText('Enunțul grilei'), 'Enunț');
     await user.type(screen.getByLabelText('Varianta A'), 'prima');
     await user.type(screen.getByLabelText('Varianta B'), 'a doua');
     await user.type(screen.getByLabelText('Explicația generală'), 'Explicație');
     // `correct` a rămas pe A… care e scrisă. Se golește ca să nu mai fie.
     await user.clear(screen.getByLabelText('Varianta A'));
+    await revizuire(user);
 
     await user.click(screen.getByRole('button', { name: 'Publică grila' }));
 
@@ -198,12 +250,14 @@ describe('Administrare', () => {
     monteaza();
     await gata();
 
-    await user.type(screen.getByPlaceholderText('bio-nervos-07'), 'bio-nervos-43');
+    await formular(user, 'bio-nervos-43');
     await user.type(screen.getByLabelText('Enunțul grilei'), 'Enunț');
     await user.type(screen.getByLabelText('Varianta A'), 'prima');
     await user.type(screen.getByLabelText('Varianta B'), 'a doua');
     await user.type(screen.getByLabelText('Explicația generală'), 'Explicație');
 
+    await user.click(screen.getByRole('button', { name: 'Varianta A e răspunsul corect' }));
+    await revizuire(user);
     await user.click(screen.getByRole('button', { name: 'Salvează ca ciornă' }));
 
     await waitFor(() => expect(salveaza).toHaveBeenCalledTimes(1));
@@ -227,6 +281,7 @@ describe('Administrare', () => {
     monteaza();
     await gata();
 
+    await user.click((await screen.findAllByText('Mai multe acțiuni'))[0]!);
     await user.click((await screen.findAllByRole('button', { name: 'Șterge' }))[0]!);
 
     expect(sterge).not.toHaveBeenCalled();
@@ -259,6 +314,22 @@ describe('Administrare', () => {
  * te lasă blocat în modul greșit.
  */
 describe('Administrare · import în masă', () => {
+  it('importă din tabel numai după verificare și păstrează textul la schimbarea secțiunii', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('button', { name: 'Importă un lot' }));
+    await user.selectOptions(screen.getByLabelText('Capitolul lotului'), 'bio-nervos');
+    const text = 'Enunț\tA\tB\tCorect\tExplicație\nDin tabel\tPrima\tA doua\tB\tExplicație';
+    await user.click(screen.getByLabelText('Lipește tabelul aici'));
+    await user.paste(text);
+    expect(screen.getByRole('button', { name: 'Importă 1 grilă' })).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: 'Surse și colecții' }));
+    await user.click(screen.getByRole('button', { name: 'Importă un lot' }));
+    expect(screen.getByLabelText('Lipește tabelul aici')).toHaveValue(text);
+    await user.click(screen.getByLabelText('Am verificat întrebările și răspunsurile corecte.'));
+    await user.click(screen.getByRole('button', { name: 'Importă 1 grilă' }));
+    await waitFor(() => expect(salveaza).toHaveBeenCalledWith(expect.objectContaining({ text: 'Din tabel', correct: 'B', status: 'ciorna', id: expect.stringMatching(/^lot-/) })));
+  });
   const grilaJson = (peste: Record<string, unknown> = {}) => ({
     id: 'bio-nervos-90',
     capId: 'bio-nervos',
@@ -275,7 +346,8 @@ describe('Administrare · import în masă', () => {
   });
 
   const lipeste = async (user: ReturnType<typeof userEvent.setup>, lot: unknown) => {
-    await user.click(await screen.findByRole('tab', { name: 'Import în masă' }));
+    await user.click(await screen.findByRole('button', { name: 'Importă un lot' }));
+    await user.click(screen.getByRole('tab', { name: 'JSON (avansat)' }));
     const camp = await screen.findByLabelText('Grilele, în JSON');
     await user.click(camp);
     await user.paste(JSON.stringify(lot, null, 2));
@@ -287,6 +359,7 @@ describe('Administrare · import în masă', () => {
     await gata();
 
     await lipeste(user, [grilaJson(), grilaJson({ id: 'bio-nervos-91' })]);
+    await user.click(screen.getByLabelText('Am verificat întrebările și răspunsurile corecte.'));
     await user.click(screen.getByRole('button', { name: 'Importă 2 grile' }));
 
     await waitFor(() => expect(salveaza).toHaveBeenCalledTimes(2));
@@ -309,6 +382,8 @@ describe('Administrare · import în masă', () => {
     expect(await screen.findByText(/Rândul 2 · bio-nervos-91/)).toBeInTheDocument();
     expect(screen.getByText(/Răspunsul corect trebuie să fie una dintre variantele scrise/)).toBeInTheDocument();
 
+    await user.click(screen.getByLabelText('Am verificat întrebările și răspunsurile corecte.'));
+    await user.click(screen.getByLabelText(/Confirm modificarea/));
     await user.click(screen.getByRole('button', { name: 'Importă 1 grilă' }));
 
     await waitFor(() => expect(salveaza).toHaveBeenCalledTimes(1));
@@ -333,7 +408,7 @@ describe('Administrare · import în masă', () => {
     monteaza();
     await gata();
 
-    await user.click(await screen.findByRole('tab', { name: 'Import în masă' }));
+    await user.click(await screen.findByRole('button', { name: 'Importă un lot' }));
 
     expect(screen.getByRole('button', { name: 'Importă' })).toBeDisabled();
   });
@@ -347,9 +422,9 @@ describe('Administrare · import în masă', () => {
     monteaza();
     await gata();
 
-    await user.click(await screen.findByRole('tab', { name: 'Import în masă' }));
+    await user.click(await screen.findByRole('button', { name: 'Importă un lot' }));
     expect(screen.queryByLabelText('Enunțul grilei')).not.toBeInTheDocument();
-
+    await user.click(screen.getByRole('button', { name: 'Înapoi la bibliotecă' }));
     await user.click((await screen.findAllByRole('button', { name: 'Editează' }))[0]!);
 
     expect(await screen.findByLabelText('Enunțul grilei')).toHaveValue(GRILE[0]!.text);
@@ -444,8 +519,12 @@ describe('Administrare · materii și capitole', () => {
   it('adaugă un capitol în materia lui, cu poziția următoare', async () => {
     const user = userEvent.setup();
     monteaza();
-    await user.click(await screen.findByRole('tab', { name: 'Materii' }));
+    await user.click(await screen.findByRole('tab', { name: 'Materii și capitole' }));
+    await user.click(screen.getByText(/Biologie · 12 capitole/));
 
+    await user.click(screen.getByText('Adaugă un capitol în Biologie'));
+    await user.click(screen.getAllByText('Cod intern al capitolului (automat)')[0]!);
+    await user.clear(screen.getByLabelText('Identificatorul capitolului nou din Biologie'));
     await user.type(await screen.findByLabelText('Identificatorul capitolului nou din Biologie'), 'bio-nou');
     await user.type(screen.getByLabelText('Numele capitolului nou din Biologie'), 'Capitol nou');
     await user.type(screen.getByLabelText('Numărul capitolului nou din Biologie'), '13');
@@ -461,7 +540,8 @@ describe('Administrare · materii și capitole', () => {
   it('redenumește un capitol fără să-i schimbe materia', async () => {
     const user = userEvent.setup();
     monteaza();
-    await user.click(await screen.findByRole('tab', { name: 'Materii' }));
+    await user.click(await screen.findByRole('tab', { name: 'Materii și capitole' }));
+    await user.click(screen.getByText(/Biologie · 12 capitole/));
 
     await user.click(await screen.findByRole('button', { name: /Redenumește 01. Celula/ }));
     const camp = screen.getByLabelText('Numele capitolului bio-celula');
@@ -485,8 +565,11 @@ describe('Administrare · colecții', () => {
   it('creează o culegere fără centru și cu sursa ei bibliografică', async () => {
     const user = userEvent.setup();
     monteaza();
-    await user.click(await screen.findByRole('tab', { name: 'Colecții' }));
+    await user.click(await screen.findByRole('tab', { name: 'Surse și colecții' }));
 
+    await user.click(screen.getByText('Adaugă o sursă / colecție'));
+    await user.click(screen.getByText('Cod intern (automat)'));
+    await user.clear(screen.getByLabelText('Identificator'));
     await user.type(await screen.findByLabelText('Identificator'), 'corint-nervos');
     await user.type(screen.getByLabelText('Nume'), 'Corint – Sistemul nervos');
     await user.selectOptions(screen.getByLabelText('Fel'), 'culegere');
@@ -508,8 +591,11 @@ describe('Administrare · colecții', () => {
   it('leagă o lucrare de admitere de centru', async () => {
     const user = userEvent.setup();
     monteaza();
-    await user.click(await screen.findByRole('tab', { name: 'Colecții' }));
+    await user.click(await screen.findByRole('tab', { name: 'Surse și colecții' }));
 
+    await user.click(screen.getByText('Adaugă o sursă / colecție'));
+    await user.click(screen.getByText('Cod intern (automat)'));
+    await user.clear(screen.getByLabelText('Identificator'));
     await user.type(await screen.findByLabelText('Identificator'), 'umfcd-2027-mg');
     await user.type(screen.getByLabelText('Nume'), 'Admitere 2027');
     await user.type(screen.getByLabelText('Anul'), '2027');

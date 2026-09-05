@@ -1,3 +1,4 @@
+import { AlegeGrileTest } from './AlegeGrileTest';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChapterId, MaterieId } from '../data/chapters';
 import type { Colectii } from '../lib/colectii';
@@ -31,7 +32,7 @@ interface CiornaTest {
 }
 
 const goala = (): CiornaTest => ({
-  id: '',
+  id: `test-${crypto.randomUUID()}`,
   nume: '',
   descriere: '',
   mod: 'fix',
@@ -83,6 +84,7 @@ export function AdminTestePredefinite({
   const [ciorna, setCiorna] = useState<CiornaTest>(goala);
   const [seIncarca, setSeIncarca] = useState(true);
   const [seSalveaza, setSeSalveaza] = useState(false);
+  const [deschis, setDeschis] = useState(false);
   const [editez, setEditez] = useState<string | null>(null);
 
   const reincarca = useCallback(async () => {
@@ -124,6 +126,7 @@ export function AdminTestePredefinite({
   const reseteaza = () => {
     setCiorna(goala());
     setEditez(null);
+    setDeschis(false);
   };
 
   const salveaza = async () => {
@@ -167,10 +170,12 @@ export function AdminTestePredefinite({
     <div style={{ display: 'grid', gap: 18 }}>
       <p style={pageLead}>
         Creezi lucrări oficiale cu ordine fixă sau simulări care trag o variantă nouă după reguli.
-        Orice elev care pornește un test primește o copie stabilă, chiar dacă definiția se schimbă după aceea.
+        O colecție arată proveniența grilelor; un test stabilește întrebările, ordinea și timpul de rezolvare.
       </p>
 
-      <div className="card" style={{ padding: 18 }}>
+      <button className="btn-primary" style={{ justifySelf: 'start', padding: '11px 16px' }} onClick={() => setDeschis(!deschis)} aria-expanded={deschis}>{deschis ? 'Ascunde formularul' : 'Creează un test'}</button>
+      <div hidden={!deschis} className="card" style={{ padding: 18 }}>
+        <fieldset disabled={seSalveaza} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
           <div style={eyebrow(undefined, 11)}>{editez ? 'Editezi testul' : 'Test nou'}</div>
           {editez && (
@@ -181,7 +186,7 @@ export function AdminTestePredefinite({
         </div>
 
         <div style={{ marginTop: 12, ...autoGrid(180, 12) }}>
-          <Camp eticheta="Identificator">
+          <details className="admin-detalii"><summary>Cod intern al testului (automat)</summary><Camp eticheta="Identificator">
             <input
               className="field"
               aria-label="Identificatorul testului"
@@ -190,7 +195,7 @@ export function AdminTestePredefinite({
               onChange={(e) => camp('id', e.target.value)}
               placeholder="admitere-umfcd-2027"
             />
-          </Camp>
+          </Camp></details>
           <Camp eticheta="Nume">
             <input
               className="field"
@@ -259,6 +264,9 @@ export function AdminTestePredefinite({
         </Camp>
 
         {ciorna.mod === 'fix' ? (
+          <>
+          <AlegeGrileTest alese={grile} onChange={(ids) => camp('grile', ids.join('\n'))} taxonomie={taxonomie} colectii={colectii} />
+          <details className="admin-detalii"><summary>Introdu codurile manual (avansat)</summary>
           <Camp eticheta="Grilele în ordinea testului" sus>
             <textarea
               className="field tabular"
@@ -269,7 +277,8 @@ export function AdminTestePredefinite({
               style={{ minHeight: 150, resize: 'vertical' }}
             />
             <Ajutor>{numar(grile.length, 'grilă în listă', 'grile în listă')}. Un id pe rând; ordinea se păstrează.</Ajutor>
-          </Camp>
+          </Camp></details>
+          </>
         ) : (
           <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
             <div>
@@ -329,6 +338,7 @@ export function AdminTestePredefinite({
           </button>
         </div>
         {centruId === '' && <Ajutor>Adaugă întâi o colecție legată de un centru de admitere.</Ajutor>}
+        </fieldset>
       </div>
 
       <div className="card" style={{ overflow: 'hidden' }}>
@@ -347,7 +357,7 @@ export function AdminTestePredefinite({
               <span style={statusChip(t.publicat ? 'var(--okS)' : 'var(--surf3)', t.publicat ? 'var(--ok)' : 'var(--fg3)')}>
                 {t.publicat ? 'Publicat' : 'Ciornă'}
               </span>
-              <button type="button" className="btn-quiet" onClick={() => { setCiorna(dinTest(t)); setEditez(t.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+              <button type="button" className="btn-quiet" onClick={() => { setCiorna(dinTest(t)); setEditez(t.id); setDeschis(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                 Editează
               </button>
             </div>

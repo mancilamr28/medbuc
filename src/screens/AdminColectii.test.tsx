@@ -23,9 +23,22 @@ const colectii = construiesteColectii([
   },
 ]);
 
-beforeEach(() => salveaza.mockReset().mockResolvedValue(undefined));
+beforeEach(() => { salveaza.mockReset().mockResolvedValue(undefined); });
 
 describe('accesul colecțiilor în Administrare', () => {
+  it('păstrează numele și codul automat dacă salvarea eșuează', async () => {
+    salveaza.mockRejectedValue(new Error('Conexiune întreruptă'));
+    const user = userEvent.setup();
+    render(<ToastProvider><AdminColectii colectii={colectii} dupaSalvare={vi.fn()} /></ToastProvider>);
+    await user.click(screen.getByText('Adaugă o sursă / colecție'));
+    await user.type(screen.getByLabelText('Nume'), 'Colecție nouă');
+    const cod = (screen.getByLabelText('Identificator') as HTMLInputElement).value;
+    await user.click(screen.getByRole('button', { name: 'Adaugă colecția' }));
+    expect(await screen.findByText('Conexiune întreruptă')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nume')).toHaveValue('Colecție nouă');
+    expect(screen.getByLabelText('Identificator')).toHaveValue(cod);
+    expect(salveaza).toHaveBeenCalledWith(expect.objectContaining({ id: cod, nume: 'Colecție nouă' }));
+  });
   it('salvează nivelul ales pentru o colecție nouă', async () => {
     const user = userEvent.setup();
     render(
@@ -34,6 +47,9 @@ describe('accesul colecțiilor în Administrare', () => {
       </ToastProvider>,
     );
 
+    await user.click(screen.getByText('Adaugă o sursă / colecție'));
+    await user.click(screen.getByText('Cod intern (automat)'));
+    await user.clear(screen.getByLabelText('Identificator'));
     await user.type(screen.getByLabelText('Identificator'), 'corint-endocrin');
     await user.type(screen.getByLabelText('Nume'), 'Corint – Sistemul endocrin');
     await user.selectOptions(screen.getByLabelText('Accesul colecției'), 'premium');
