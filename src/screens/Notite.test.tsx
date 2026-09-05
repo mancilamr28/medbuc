@@ -40,7 +40,7 @@ const CAPITOL = '03. Sistemul nervos';
  */
 const monteaza = () =>
   render(
-    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED}>
+    <AppProvider catalog={QUESTIONS} taxonomie={TAXONOMIE_SEED}>
       <Notite />
     </AppProvider>,
   );

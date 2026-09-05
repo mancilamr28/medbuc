@@ -19,7 +19,7 @@ npm run seed       # regenerate supabase/seed.sql from src/data/
 Run one test file, or one case by name:
 
 ```bash
-npx vitest run src/state/useSession.test.ts     # one file
+npx vitest run src/state/useLucrare.test.ts     # one file
 npx vitest run -t "predarea lucrării"           # one test/describe, by name
 ```
 
@@ -35,7 +35,7 @@ There is ESLint, tests, and CI. `.github/workflows/ci.yml` runs lint → typeche
 
 Tests live next to their subject, and **the extension picks the runner** (`vitest.config.ts` defines two projects):
 
-- **`*.test.ts` — pure functions, `node` environment.** No DOM, no renderer; these stay in the millisecond range. Keep logic testable by extracting it as a pure function over its inputs (as `scoreOf` in `useSession.ts` does) rather than reading `Date.now()`, `Math.random()` or hook state directly.
+- **`*.test.ts` — pure functions, `node` environment.** No DOM, no renderer; these stay in the millisecond range. Keep logic testable by extracting it as a pure function over its inputs (as `calculeazaProgres` does) rather than reading `Date.now()`, `Math.random()` or hook state directly.
 - **`*.test.tsx` — components, `jsdom` + Testing Library.** `src/test/setup.ts` runs first: it clears `localStorage` and the theme attribute between tests, and supplies the `matchMedia` that jsdom lacks but `useIsDesktop()` calls on nearly every screen (it reads `window.innerWidth`, so a test can render the phone layout by setting it).
 
 Both are inside `include`, so `npm run typecheck` checks them, and neither is imported by the app, so they stay out of the bundle.
@@ -60,7 +60,7 @@ Which layer owns what:
 | Answers (`attempts`) | Supabase | An immutable journal. Progress, statistics and the review queue are all *derived* from it — nothing stores a `pct` |
 | Notes, theme, settings, one legacy simulation | `localStorage` | `medbuc.*`, via `usePersistentState`. New work lives in `test_runs`; `medbuc.sim.run` is read only by the one-time migration bridge |
 
-**Every new practice, simulation and review run is a server-side `test_run`.** The old `useSession` and `useSimulare` hooks remain temporarily only so an already-open old session can render and a simulation left in `medbuc.sim.run` can be imported without losing answers. The unused `AttemptSync`, client-side answer journal builders and three legacy sync helpers have been removed. New answers are saved and graded by `raspunde` / `preda_test`; saved legacy simulations still go through `MigrareSimulareVeche` and `importa_simulare_veche`. This cleanup does not delete database rows or local storage.
+**Every practice, simulation and review run is a server-side `test_run`.** The old screens, engines and synchronization helpers have been removed. `#/grile` redirects to the wizard; `#/simulari` retains only `MigrareSimulareVeche`. The small `useSimulareVeche` reader preserves a device snapshot until its import succeeds, including snapshots without an id. It does not create tests or calculate scores.
 
 Until PR #49 a simulation was *not* persisted at all: a finished exam contributed nothing to progress, its mistakes never reached Recapitulare, and Statistici's "Simulări" row was structurally zero. That is fixed and the row is populated — do not repeat the old description, which survived in this file long after it stopped being true.
 
@@ -81,13 +81,13 @@ The same module also carries a second, disjoint route space for visitors without
 
 ### Global state — `src/state/AppState.tsx`
 
-One React context provides everything: theme, screen, selected `materie`, the admin draft, plus the two quiz engines. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
+The app context provides theme, navigation, the safe catalogue, taxonomy, the review queue and the legacy simulation recovery reader. Each active server run is owned by `useLucrare`. Components reach it via `useApp()`. There is no other state library and no prop-drilling of app state.
 
 Provider modules are component-only Fast Refresh boundaries. Each PascalCase `*Context.tsx`/`AppState.tsx` file exports its provider; the context, public types and consumer hook live in a distinct camelCase module (`appContextValue.ts`, `authState.ts`, `contentState.ts`, `progressState.ts`, `toastState.ts`). Import providers from the component module and hooks from the state module. Do not re-export a hook from the provider file: that recreates the `react-refresh/only-export-components` warning this split removed. `Sidebar.tsx` follows the same rule, with `useNavGroups` in its own module.
 
 Account identity and role are deliberately **not** here — see the next section. `AppProvider` has no dependency on being logged in; it mounts and works the same whether `AuthContext` reports a user or not, the same way `ToastProvider` stays independent so transient notifications don't share a context with session/exam data.
 
-**`useSession()` and `useSimulare()` memoize their returned object.** `AppProvider`'s own `value` is wrapped in `useMemo`, but that only skips work when every dependency keeps its identity — and `session`/`sim` are two of those dependencies. Returning a fresh object literal from either hook on every render (as both used to) made the outer memo recompute unconditionally, defeating it. Preserve this when touching either hook: any new field returned from `useSession`/`useSimulare` needs a matching entry in that hook's own `useMemo` dependency array, or the fix regresses silently. `react-hooks/exhaustive-deps` (see below) catches a missing dependency but not a memo that's pointless because its inputs are never stable — that part has to be checked by eye, or by measuring, as it was here: instrumenting `addEventListener`/`removeEventListener` for 13 seconds is what showed a related plan claim — that a `Grile` keyboard listener was re-subscribing every second — didn't actually reproduce, since `AppProvider`'s clock is gated per-screen and doesn't tick on that screen at all.
+**Memoize values returned by context-owned hooks.** `useSimulareVeche` and `useCoadaRecapitulare` preserve their identities so the provider memo remains useful.
 
 ### Authentication — `src/state/AuthContext.tsx`
 
@@ -129,25 +129,11 @@ The global `prefers-reduced-motion` block in `styles.css` only kills `.screen`/`
 
 **The honesty rule applies hardest here.** A landing page is exactly where "1000+ grile" and student counts want to appear. Every figure shown is derived: days from `EXAM_DATE`, chapters and past sessions counted from `MATERII`, per-chapter counts from `chapterQuestionCount()`. The bank's size is deliberately *not* used as a selling point, and only shipped features are promoted. **`plan` is the only screen still `InLucru`** — `statistici`, `recapitulare` and `notite` all ship now, so the landing copy is free to name them, and a promise of anything else is a bug. The interactive question in the mockup is a real one out of `QUESTIONS`, with its real explanation. Counted nouns still go through `numar()`: "1 grilă", not "1 grile".
 
-### The two legacy quiz engines (compatibility only)
+### Recovery of saved simulations
 
-No new work starts through these hooks. `#/grile` redirects to the wizard unless an in-memory session is already active; `#/simulari` runs `MigrareSimulareVeche`, which sends the saved snapshot to `importa_simulare_veche`, clears local storage only after success, then opens the resulting `#/lucrare/<id>`.
+Only `useSimulareVeche` reads `medbuc.sim.run`. It validates the historical shape and persists a missing id once. The recovery screen sends the snapshot to `importa_simulare_veche` and removes the key only after success. Both mobile and desktop navigation keep recovery reachable for a saved result as well as an unfinished simulation.
 
-- **`useSession`** (`src/state/useSession.ts`) — the free practice session. Purely in-memory (lost on reload, results included). Navigation is clamped at both ends, so the last question stays last. Once a question is revealed the answer is locked; `primary()` implements Enter = "check, then advance if already checked, then *finish* on the last question". A session has two phases, derived from `finishedAt` and exposed as `finished`: `Grile.tsx` renders `GrileRun` while it is false and the `GrileRezultat` score panel once true. `finish()` is idempotent (it freezes `durataMs`) and `restart()` clears everything including `startedAt`. Two aggregates, deliberately different: `tally` counts only *revealed* questions (the in-run legend), while `score` counts every *answered* one and reports `pct` against `total`, so unanswered questions count against you.
-
-- **`useSimulare`** (`src/state/useSimulare.ts`) — the timed exam simulation. Persisted to `localStorage` as a `SimRun`. The countdown is **derived from an absolute `endsAt` timestamp** (`endsAt - now`), never decremented by a tick — this is deliberate, so time keeps running while the tab is closed. Preserve this design when editing: storing a "seconds remaining" counter would break the closed-tab guarantee.
-
-  `phase` is derived, never stored: `!run ? 'config' : finishedAt !== null ? 'rezultat' : 'rulare'`. The effective `finishedAt` is `run.finishedAt ?? (expired ? run.endsAt : null)`, so **expiry ends the paper without losing it** and produces the same result after a reload. `finish()` records the submission time and is idempotent — it must never null the run, which is what used to delete the whole exam on "Predă lucrarea"; `reset()` is the one that discards it and returns to config. Scoring (`scoreOf`) is a pure function over `order`, and `answers`/`marks` are keyed by **position in `order`**, not by bank index — unlike `useSession`, which keys by bank index.
-
-The simulation clock only ticks while its screen is open — `AppState.tsx` passes `useNow(screen === 'simulari')`.
-
-**The legacy session is scoped to chapters inside `useSession`.** The hook narrows its library through `filtreazaCapitole()`; `session.capitole` is the chosen scope and an **empty list means the whole library**. `start(capitole)` opens that scope and `restart()` reopens it. Its former synchronization helper has been removed; new runs persist their scope through the server generation request.
-
-The consequence to watch: **`session.banca` is the narrowed pool, so nothing that counts the library may read it.** `useApp().questions` is the full one, and that is what `Acasa` reports as the library size and what `GrileConfig` counts per chapter — with the session's own pool there, starting a session on one chapter emptied every other chapter in the list and disabled its button. The two are named differently on purpose: they are both `Question[]` and sit one destructuring line apart, so a shared name made that miscount compile.
-
-**`PoartaContinut` gates on the library, never on the session.** The gate is shared with `Simulari`, so a session-shaped condition in it reaches a screen that has nothing to do with practice sessions — a chapter session left without questions would have blocked an exam in progress. An empty *scope* is `Grile`'s own state (`CapitolGol`), an empty *library* is the gate's.
-
-`QUESTIONS` contains only ~6 entries, so `buildOrder()` repeats the bank to reach the configured question count.
+The removed in-memory practice engine had no persisted session to recover. The `grile` route now always opens the wizard.
 
 ### Progress — `src/state/ProgressContext.tsx`, `src/state/progressState.ts` and `src/lib/progres.ts`
 
@@ -164,7 +150,7 @@ The only way state should touch `localStorage`. Keys are namespaced `medbuc.*` (
 Two behaviours to preserve:
 
 - **The key may change while mounted** (`medbuc.note.${capId}` does exactly that). The hook stores `{ key, value }` together and re-reads synchronously when the key changes. Without this, the previous chapter's note stays on screen and the first keystroke overwrites the new chapter's saved note.
-- **An optional third argument is a type guard** (`Validator<T>`). Anything stored that fails it — an older shape, a hand-edited value — is dropped *and removed from storage*, so a bad value cannot break the app on every reload. `useSimulare` passes `isSimRun` for `medbuc.sim.run`, the one payload complex enough to crash rendering. Add a validator whenever a persisted shape is more than a primitive.
+- **An optional third argument is a type guard** (`Validator<T>`). Anything stored that fails it — an older shape, a hand-edited value — is dropped *and removed from storage*, so a bad value cannot break the app on every reload. `useSimulareVeche` passes `isSimRun` for `medbuc.sim.run`, the one payload complex enough to crash rendering. Add a validator whenever a persisted shape is more than a primitive.
 
 `ErrorBoundary` (`src/components/ErrorBoundary.tsx`) wraps the whole app in `main.tsx` and offers "Șterge datele locale", which clears every `medbuc.*` key — the escape hatch for any persisted state that still manages to break rendering.
 
@@ -362,7 +348,7 @@ The wizard treats a predefined paper as an owned configuration: after choosing t
 
 ### Solving a paper — `citeste_test` / `raspunde` / `preda_test`
 
-**Grading moved to the server.** `src/lib/attempts.ts` computes `is_correct: chosen === question.correct` in the browser and POSTs the result, and `attempts_inserare_proprii` only checks `user_id = auth.uid()` — so anyone with the publishable key can insert unlimited correct answers, and every mastery figure in `progres.ts` rests on a boolean the client picks. `raspunde` compares against `questions.correct` itself.
+**Grading is server-owned.** `raspunde` compares against `questions.correct`. The old client journal builders have been removed.
 
 **Correct answers are no longer sent up front.** `citeste_test` includes `correct`/`expl`/`why` **only** for items already revealed, or once the run is finished. One rule, no per-mode branches: in practice you check question by question so you get them one at a time; in a simulation you check nothing until submission so you get nothing.
 
@@ -383,9 +369,9 @@ Errors from the database are **codes**, and `codEroare()` extracts them against 
 
 ### Moving the old runs across — migration 0019
 
-The 23 pre-engine runs are **copied, not moved**: `sessions` and `sim_runs` keep their rows and the deployed client keeps writing to them, so switching the client can be rolled back without losing anything. The migration is idempotent for that reason — it runs now, and runs again the day the client switches, to catch sessions created in between.
+The 23 pre-engine runs were **copied, not moved**. The old tables are retained until the cleanup client is deployed and cached clients have had a soak period. The migration is idempotent for that reason — it runs now, and runs again the day the client switches, to catch sessions created in between.
 
-- **Simulations rebuild completely.** `sim_runs.question_ids` *is* the paper's order, so it becomes `test_run_items` position by position, numbered **from 0** — `attempts.client_key` is `'<run>:<index>'`, so an off-by-one here would unstick every old answer from its question. `option_order` stays null because nothing was ever shuffled; that is the true value, not a placeholder.
+- **Simulation order is reconstructed by migration 0019; choices require the follow-up recovery migration `20260905114309`.** `sim_runs.question_ids` *is* the paper's order, so it becomes `test_run_items` position by position, numbered **from 0** — `attempts.client_key` is `'<run>:<index>'`, so an off-by-one here would unstick every old answer from its question. `option_order` stays null because nothing was ever shuffled; that is the true value, not a placeholder.
 - **Practice sessions do not rebuild.** Their order lived only in `localStorage` (`SessionRun.order`), never in the database. The row moves without items and `nr_cerut` stays null. A count could have been invented from the number of answers, but it would then be the score's denominator, and a session where questions were skipped would read 100% — precisely the hand-written figure this project spent a phase removing. `nr_cerut` is nullable now, and `preda_test` returns `pct: null` rather than a fabricated zero.
 - **Mode is derived from the journal, not assumed.** Recapitulare also writes a `sessions` row, so `attempts.source` is the only thing that distinguishes it.
 
@@ -444,3 +430,8 @@ Pushing to `master` triggers `.github/workflows/deploy.yml`, which builds and pu
 ## Known placeholder
 
 `public/logo-kitty.svg` is a stand-in mark. The intended PNG was never downloaded; to swap it, drop the file in `public/` and update the path in `src/components/Logo.tsx`.
+
+
+### Retiring the legacy client
+
+Progress loads only the answer journal; it no longer fetches `sim_runs`. Personal exports page through `test_runs`, `test_run_items`, `attempts`, `notes` and `favorite`. The old simulation history components and engines have been deleted. `docs/retragere-sistem-vechi.md` records the live audit and the remaining deployment gate before physical table removal.

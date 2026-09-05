@@ -60,7 +60,7 @@ function monteaza() {
   return render(
     <ToastProvider>
       <AuthProvider>
-        <AppProvider questions={QUESTIONS}>
+        <AppProvider catalog={QUESTIONS}>
           <App />
         </AppProvider>
       </AuthProvider>

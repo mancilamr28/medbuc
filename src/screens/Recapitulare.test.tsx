@@ -42,7 +42,7 @@ const greseala = (question_id = QUESTIONS[0]!.id): AttemptRow => ({
 const deschide = (attempts: readonly AttemptRow[] = []) =>
   render(
     <ToastProvider>
-      <AppProvider questions={QUESTIONS} attempts={attempts}>
+      <AppProvider catalog={QUESTIONS} attempts={attempts}>
         <Recapitulare />
       </AppProvider>
     </ToastProvider>,

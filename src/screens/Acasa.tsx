@@ -33,7 +33,7 @@ const DATA = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'long' })
  * curentă. Restul spune deschis că nu are încă date.
  */
 export function Acasa() {
-  const { go, catalog, session, recapitulare, taxonomie } = useApp();
+  const { go, catalog, recapitulare, taxonomie } = useApp();
   const { user, profile } = useAuth();
   const loading = useContentOptional()?.loading ?? false;
   const progressContext = useProgressOptional();
@@ -46,8 +46,6 @@ export function Acasa() {
   const [chart, setChart] = usePersistentState<Variant>('medbuc.chart', 'a');
 
   const daysLeft = daysUntil(EXAM_DATE);
-  const raspunse = Object.keys(session.answers).length;
-  const inSesiune = raspunse > 0 && !session.finished;
   const prenume = primulNume(profile?.fullName ?? null, user?.email ?? '');
   // Cardul de aici arată doar primele patru — spațiul cardului e limita, nu
   // logica ce înseamnă „slab"; aceeași funcție, nelimitată, alimentează
@@ -63,16 +61,7 @@ export function Acasa() {
   const evolutieGrafic = progress.evolutie.slice(-12);
   const urmatoareaRecapitulare = urmatoareaScadenta(recapitulare.items);
 
-  /**
-   * O sesiune încheiată nu se poate „continua": ecranul de grile ar arăta iar
-   * panoul de rezultat, deși butonul de aici scrie „Începe o sesiune". Una
-   * neîncheiată se reia pe drumul vechi ca să nu se piardă. Orice început nou
-   * intră prin asistentul comun, unde elevul își alege felul și conținutul.
-   */
-  const deschideGrile = () => {
-    if (inSesiune) go('grile');
-    else goTestNou('exersare');
-  };
+  const deschideGrile = () => goTestNou('exersare');
 
   return (
     <div className="screen">
@@ -91,14 +80,12 @@ export function Acasa() {
       <div style={autoGrid(290)}>
         <div style={{ gridColumn: '1/-1', ...autoGrid(280) }}>
           <div className="card hero-card" style={{ padding: 24 }}>
-            <div style={eyebrow('var(--acc)', 11)}>{inSesiune ? 'Continuă' : 'Începe'}</div>
+            <div style={eyebrow('var(--acc)', 11)}>Începe</div>
             <div style={{ marginTop: 12, font: `400 23px/1.25 ${SERIF}` }}>
-              {inSesiune ? 'Sesiunea ta de grile' : 'O sesiune de grile'}
+              O sesiune de grile
             </div>
             <div style={{ marginTop: 6, font: `400 13.5px/1.5 ${SANS}`, color: 'var(--fg2)' }}>
-              {inSesiune
-                ? `Ai răspuns la ${numar(raspunse, 'grilă', 'grile')} din ${session.total}.`
-                : 'Fără limită de timp, cu explicații după fiecare răspuns.'}
+              Fără limită de timp, cu explicații după fiecare răspuns.
             </div>
             <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
@@ -107,7 +94,7 @@ export function Acasa() {
                 onClick={deschideGrile}
                 style={{ padding: '12px 18px', font: `600 14px ${SANS}` }}
               >
-                {inSesiune ? 'Reia sesiunea →' : 'Începe o sesiune →'}
+                Începe o sesiune →
               </button>
               <button
                 type="button"

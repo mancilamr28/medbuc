@@ -3,20 +3,30 @@ import { adunaDatele, cheiLocale, numeFisier } from './exportDate';
 
 /** Se schimbă per test, ca să se poată simula o interogare picată. */
 let raspuns: { data: unknown; error: { message: string } | null } = { data: [], error: null };
+const tabele = vi.hoisted(() => vi.fn());
 
 vi.mock('./supabase', () => ({
   supabase: {
-    from: () => ({
-      select: () => ({
+    from: (tabel: string) => {
+      tabele(tabel);
+      const query = {
+        select: () => query,
+        order: () => query,
+        range: async (de: number, la: number) => ({
+          ...raspuns,
+          data: Array.isArray(raspuns.data) ? raspuns.data.slice(de, Math.min(la + 1, de + 2)) : null,
+          count: Array.isArray(raspuns.data) ? raspuns.data.length : 0,
+        }),
         eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
-        then: (r: (v: unknown) => unknown) => r(raspuns),
-      }),
-    }),
+      };
+      return query;
+    },
   },
 }));
 
 beforeEach(() => {
   raspuns = { data: [], error: null };
+  tabele.mockClear();
 });
 
 /** Un `localStorage` de mână — `cheiLocale` ia depozitul ca parametru tocmai ca să meargă asta. */
@@ -74,6 +84,22 @@ describe('cheiLocale', () => {
  * mai rău decât unul mort.
  */
 describe('adunaDatele', () => {
+  it('include toate paginile chiar dacă serverul limitează fiecare răspuns', async () => {
+    const date = Array.from({ length: 5 }, (_, id) => ({ id }));
+    raspuns = { data: date, error: null };
+    const exportate = await adunaDatele('u1', null);
+    expect(exportate.lucrari).toEqual(date);
+    expect(exportate.grileLucrari).toEqual(date);
+    expect(exportate.raspunsuri).toEqual(date);
+  });
+  it('exportă lucrările și răspunsurile lor din sistemul nou', async () => {
+    await adunaDatele('u1', null);
+    const citite = tabele.mock.calls.map(([tabel]) => tabel);
+    expect(citite).toContain('test_runs');
+    expect(citite).toContain('test_run_items');
+    expect(citite).not.toContain('sessions');
+    expect(citite).not.toContain('sim_runs');
+  });
   it('aruncă în loc să livreze un export incomplet', async () => {
     raspuns = { data: null, error: { message: 'canceling statement due to statement timeout' } };
 
@@ -83,7 +109,7 @@ describe('adunaDatele', () => {
   it('spune care parte a picat', async () => {
     raspuns = { data: null, error: { message: 'permission denied' } };
 
-    await expect(adunaDatele('u1', null)).rejects.toThrow(/sesiuni|simulari|raspunsuri|notite/);
+    await expect(adunaDatele('u1', null)).rejects.toThrow(/test_runs|test_run_items|attempts|notes|favorite/);
   });
 
   it('întoarce datele când totul reușește', async () => {

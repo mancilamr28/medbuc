@@ -13,11 +13,11 @@ import { useApp } from '../state/appContextValue';
  * alegerile și marcajele — iar serverul îl transformă într-o lucrare normală.
  */
 export function MigrareSimulareVeche() {
-  const { sim } = useApp();
+  const { simulareVeche } = useApp();
   const [eroare, setEroare] = useState(false);
   const [incercare, setIncercare] = useState(0);
   const pornita = useRef<string | null>(null);
-  const run = sim.run;
+  const { run, sterge } = simulareVeche;
 
   useEffect(() => {
     if (!run) {
@@ -31,7 +31,7 @@ export function MigrareSimulareVeche() {
     setEroare(false);
     void importaSimulareVeche(run)
       .then(({ run_id }) => {
-        sim.reset();
+        sterge();
         goLucrare(run_id);
       })
       .catch((error: unknown) => {
@@ -39,7 +39,7 @@ export function MigrareSimulareVeche() {
         setEroare(true);
         reportError(error, 'Migrare simulare veche');
       });
-  }, [incercare, run, sim]);
+  }, [incercare, run, sterge]);
 
   return (
     <div className="screen">

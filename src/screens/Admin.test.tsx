@@ -106,7 +106,7 @@ function monteaza() {
     <ToastProvider>
       <AuthProvider>
         <ContentProvider>
-          <AppProvider questions={QUESTIONS}>
+          <AppProvider catalog={QUESTIONS}>
             <Admin />
           </AppProvider>
         </ContentProvider>

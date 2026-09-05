@@ -4,7 +4,6 @@ import {
   faEllipsis,
   faGear,
   faHouse,
-  faListCheck,
   faNoteSticky,
   faRotateLeft,
   faShieldHalved,
@@ -39,7 +38,7 @@ const MENU_ID = 'navigare-mobila-mai-multe';
 
 /** Navigația de jos, pe telefon, plus destinațiile secundare într-un meniu familiar. */
 export function MobileNav() {
-  const { screen, go, session, sim } = useApp();
+  const { screen, go, simulareVeche } = useApp();
   const { role } = useAuth();
   const [deschis, setDeschis] = useState(false);
   const butonMaiMulte = useRef<HTMLButtonElement>(null);
@@ -168,9 +167,7 @@ export function MobileNav() {
             </div>
 
             <div style={{ display: 'grid', gap: 3 }}>
-              {session.hasStarted && !session.finished &&
-                randMeniu({ id: 'grile', label: 'Continuă sesiunea', icon: faListCheck })}
-              {sim.phase === 'rulare' &&
+              {simulareVeche.run &&
                 randMeniu({ id: 'simulari', label: 'Continuă simularea', icon: faStopwatch })}
               {randMeniu({ id: 'notite', label: 'Notițe', icon: faNoteSticky })}
               {randMeniu({ id: 'setari', label: 'Profil și setări', icon: faGear })}

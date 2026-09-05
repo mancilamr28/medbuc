@@ -42,7 +42,7 @@ const contorul = (implicit: number, peMod: Record<string, number> = {}) =>
 
 const deschide = (colectii: Colectii = COLECTII_GOALE) =>
   render(
-    <AppProvider questions={QUESTIONS} taxonomie={TAXONOMIE_SEED} colectii={colectii}>
+    <AppProvider catalog={QUESTIONS} taxonomie={TAXONOMIE_SEED} colectii={colectii}>
       <TestNou />
     </AppProvider>,
   );
