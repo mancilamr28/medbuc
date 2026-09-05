@@ -53,6 +53,7 @@ export function ImportGrile({
   colectii,
   reload,
   dupaImport,
+  capitolCerut,
 }: {
   catalog: GrilaCatalog[];
   taxonomie: Taxonomie;
@@ -61,6 +62,7 @@ export function ImportGrile({
   reload: () => Promise<void>;
   /** Lista din Administrare e o interogare separată; are nevoie de un semnal. */
   dupaImport?: () => void;
+  capitolCerut?: { id: string; cerere: number } | null;
 }) {
   const { notify } = useToast();
 
@@ -79,6 +81,14 @@ export function ImportGrile({
   const [colectie, setColectie] = useState('');
   const [progres, setProgres] = useState<{ facut: number; total: number } | null>(null);
   const [bilant, setBilant] = useState<BilantImport | null>(null);
+  const [cerereTratata, setCerereTratata] = useState(0);
+  const capitolInAsteptare = capitolCerut && capitolCerut.cerere !== cerereTratata ? capitolCerut.id : null;
+  useEffect(() => {
+    if (!capitolInAsteptare || brut.trim() || progres !== null) return;
+    setCapitol(capitolInAsteptare);
+    setFormat('tabel');
+    setCerereTratata(capitolCerut!.cerere);
+  }, [capitolInAsteptare, capitolCerut, brut, progres]);
 
   useEffect(() => { setConfirmat(false); setRevizuit(false); }, [brut, format, capitol, tipId, sursa, colectie, implicit]);
   useEffect(() => {
@@ -169,6 +179,14 @@ export function ImportGrile({
       </p>
 
       <h3>1. Alege formatul și conținutul</h3>
+      {capitolInAsteptare && brut.trim() && <div role="status" className="admin-previzualizare">
+        <p>Ai deja un lot în lucru. Ai ales capitolul „{taxonomie.eticheta(capitolInAsteptare)}”. Textul nu a fost schimbat.</p>
+        {format === 'tabel' && <button type="button" className="btn-ghost" onClick={() => {
+          setCapitol(capitolInAsteptare); setCerereTratata(capitolCerut!.cerere);
+        }}>Aplică acest capitol lotului</button>}
+        {format === 'json' && <p>Lotul JSON păstrează capitolele scrise pe fiecare grilă. Pentru un lot nou pe capitol, schimbă formatul după terminarea celui curent.</p>}
+        <button type="button" className="btn-quiet" onClick={() => setCerereTratata(capitolCerut!.cerere)}>Păstrează lotul curent</button>
+      </div>}
       <Segmented items={[{ id: 'tabel' as const, label: 'Din tabel (Excel)' }, { id: 'json' as const, label: 'JSON (avansat)' }]} value={format} onChange={(f) => {
         if (brut.trim() && !window.confirm('Schimbarea formatului va goli textul lipit. Continui?')) return;
         setBrut(''); setEditezTabel(false); setFormat(f);
