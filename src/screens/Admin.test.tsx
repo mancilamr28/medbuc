@@ -142,6 +142,18 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('previzualizează fără să înlocuiască formularul nesalvat', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await formular(user, 'lucru-in-curs');
+    await user.type(screen.getByLabelText('Enunțul grilei'), 'Textul meu neterminat');
+    await user.click(screen.getByRole('button', { name: 'Înapoi la bibliotecă' }));
+    await user.click((await screen.findAllByRole('button', { name: 'Previzualizează' }))[0]!);
+    expect(await screen.findByRole('article', { name: 'Previzualizarea grilei' })).toHaveTextContent(GRILE[0]!.expl);
+    expect(salveaza).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Continuă grila nesalvată' }));
+    expect(screen.getByLabelText('Enunțul grilei')).toHaveValue('Textul meu neterminat');
+  });
   it('corectează un import invalid direct în editor și cere o nouă verificare', async () => {
     const user = userEvent.setup();
     monteaza();

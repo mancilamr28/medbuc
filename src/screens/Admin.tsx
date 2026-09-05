@@ -37,6 +37,7 @@ import {
 import { OrigineGrile } from './OrigineGrile';
 import { ImportGrile } from './ImportGrile';
 import { useCiornaAdmin } from './useCiornaAdmin';
+import { PrevizualizareGrila } from './PrevizualizareGrila';
 
 /** Ce vede un cont fără drepturi de administrare. */
 export function AdminBlocat() {
@@ -872,18 +873,16 @@ function AdminPanel({ userId }: { userId: string }) {
                           style={{ width: 15, height: 15, accentColor: 'var(--brand)', cursor: 'pointer' }}
                         />
                         <span style={statusChip(stare.culoare[0], stare.culoare[1])}>{stare.eticheta}</span>
-                        <span className="tabular" style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
-                          {g.id}
-                        </span>
+                        <span className="admin-ajutor">{tipuri.tip(g.tip)?.nume}</span>
                       </div>
-                      <div style={{ font: `400 13px/1.45 ${SANS}`, color: 'var(--fg)' }}>
-                        {g.text.length > 110 ? `${g.text.slice(0, 110)}…` : g.text}
+                      <div style={{ font: `500 14px/1.55 ${SANS}`, color: 'var(--fg)', overflowWrap: 'anywhere' }}>
+                        {g.text.length > 240 ? `${g.text.slice(0, 240)}…` : g.text}
                       </div>
                       <div style={{ font: `400 11px ${SANS}`, color: 'var(--fg3)' }}>
                         {taxonomie.numeMaterie(g.capId)} · {taxonomie.eticheta(g.capId)}
                         {g.colectieId !== '' && <> · {colectii.eticheta(g.colectieId)}</>}
                       </div>
-
+                      <PrevizualizareGrila id={g.id} />
                       {deSters === g.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ font: `500 12px ${SANS}`, color: 'var(--bad)' }}>Ștergi definitiv?</span>
@@ -922,6 +921,7 @@ function AdminPanel({ userId }: { userId: string }) {
                             Editează
                           </button>
                           <details className="admin-detalii" style={{ margin: 0 }}><summary>Mai multe acțiuni</summary>
+                          <p className="admin-ajutor">Cod intern: <span className="tabular">{g.id}</span></p>
                           {g.status !== 'retrasa' && (
                             <button
                               type="button"
