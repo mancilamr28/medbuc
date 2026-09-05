@@ -39,7 +39,7 @@ const pastila = (areGrile: boolean): SX => ({
   background: areGrile ? 'var(--okS)' : 'var(--surf2)',
 });
 
-export function AcoperireCapitole({ taxonomie }: { taxonomie: Taxonomie }) {
+export function AcoperireCapitole({ taxonomie, onDeschide }: { taxonomie: Taxonomie; onDeschide?: (capitol: string) => void }) {
   const [randuri, setRanduri] = useState<AcoperireCapitol[] | null>(null);
   const [eroare, setEroare] = useState<string | null>(null);
   const [incercare, setIncercare] = useState(0);
@@ -175,6 +175,7 @@ export function AcoperireCapitole({ taxonomie }: { taxonomie: Taxonomie }) {
                     >
                       {(a?.publicata ?? 0) > 0 ? a!.publicata : '—'}
                     </span>
+                    {onDeschide && <button className="btn-quiet" aria-label={`Vezi grilele: ${chapterLabel(c)}`} onClick={() => onDeschide(c.id)}>Vezi grilele</button>}
                   </div>
                 );
               })}

@@ -17,11 +17,8 @@ export function OrigineGrile({ sursa, colectie, colectii, onChange }: {
   const [inLucru, setInLucru] = useState(false);
   return <section>
     <h3>De unde vine conținutul?</h3>
-    <p className="admin-ajutor">Tipul este categoria generală. Colecția este cartea sau examenul concret, de exemplu „Corint – Sistemul nervos” sau „Simulare 2026 UMFCD”.</p>
+    <p className="admin-ajutor">Alege cartea sau examenul. Tipul se completează din colecția aleasă. Pentru conținut propriu poți continua fără colecție.</p>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-      <label>Tip de conținut<select className="field" aria-label="Tip de conținut" value={sursa} onChange={(e) => onChange(e.target.value as QuestionSursa, colectie)}>
-        {SURSE.map((s) => <option key={s.id} value={s.id}>{s.eticheta}</option>)}
-      </select></label>
       <label>Origine / colecție<select className="field" aria-label="Origine / colecție" value={colectie} onChange={(e) => {
         const c = colectii.colectie(e.target.value);
         const tip = c ? (c.tip === 'culegere' ? 'culegere' : c.tip === 'autor' ? 'materie' : 'subiect_oficial') : sursa;
@@ -29,6 +26,9 @@ export function OrigineGrile({ sursa, colectie, colectii, onChange }: {
       }}>
         <option value="">Fără colecție</option>
         {colectii.lista.map((c) => <option key={c.id} value={c.id}>{c.nume}</option>)}
+      </select></label>
+      <label>Tip de conținut<select className="field" aria-label="Tip de conținut" value={sursa} onChange={(e) => onChange(e.target.value as QuestionSursa, colectie)}>
+        {SURSE.map((s) => <option key={s.id} value={s.id}>{s.id === 'materie' ? 'Conținut propriu / curriculum' : s.eticheta}</option>)}
       </select></label>
     </div>
     <button type="button" className="btn-quiet" style={{ marginTop: 12 }} aria-expanded={creez} onClick={() => setCreez(!creez)}>Creează o colecție aici</button>
