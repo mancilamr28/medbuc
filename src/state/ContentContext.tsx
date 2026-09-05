@@ -117,7 +117,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     return () => {
       anulat = true;
     };
-  }, []);
+  }, [user]);
 
   // Cât timp sesiunea încă se rezolvă, biblioteca e „în curs", nu „goală": altfel
   // ecranele ar apuca să anunțe o bibliotecă fără grile înainte să fi cerut una.

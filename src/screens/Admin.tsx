@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { Segmented } from '../components/Segmented';
 import { chapterLabel, type ChapterId } from '../data/chapters';
-import { OPTION_KEYS, SURSE, type OptionKey, type QuestionSursa, type QuestionType } from '../data/questions';
+import { OPTION_KEYS, type OptionKey, type QuestionType } from '../data/questions';
 import {
   FILTRE_GOALE,
   atribuieColectia,
@@ -20,10 +20,9 @@ import { AdminColectii } from './AdminColectii';
 import { AdminTaxonomie } from './AdminTaxonomie';
 import { AdminTestePredefinite } from './AdminTestePredefinite';
 import { useSectiuneAdmin } from '../lib/router';
-import { useIsDesktop } from '../lib/hooks';
 import { reportError } from '../lib/sentry';
 import { numar } from '../lib/text';
-import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip, twoCol } from '../lib/ui';
+import { SANS, SERIF, autoGrid, eyebrow, label, pageLead, pageTitle, sideStack, statusChip } from '../lib/ui';
 import { useAuth } from '../state/authState';
 import { useContent } from '../state/contentState';
 import { useToast } from '../state/toastState';
@@ -31,11 +30,11 @@ import {
   catreSalvare,
   ciornaGoala,
   dinGrila,
-  idSugerat,
   valideaza,
   variantScrise,
   type Ciorna,
 } from './adminCiorna';
+import { OrigineGrile } from './OrigineGrile';
 import { ImportGrile } from './ImportGrile';
 
 /** Ce vede un cont fără drepturi de administrare. */
@@ -91,10 +90,18 @@ const stareaLui = (s: QuestionStatus) => STARI.find((x) => x.id === s) ?? STARI[
 function AdminPanel() {
   const { catalog, taxonomie, tipuri, colectii, reload, reloadStructura } = useContent();
   const { notify } = useToast();
-  const isDesktop = useIsDesktop();
 
   const [sectiune, mergiLa] = useSectiuneAdmin();
-  const [ciorna, setCiorna] = useState<Ciorna>(() => ciornaGoala());
+  const [ciorna, setCiorna] = useState<Ciorna>(() => ({ ...ciornaGoala(''), id: `grila-${crypto.randomUUID()}` }));
+  const [pas, setPas] = useState(0);
+  const [raspunsAles, setRaspunsAles] = useState(false);
+  const [modificata, setModificata] = useState(false);
+  useEffect(() => {
+    if (!modificata) return;
+    const avertizeaza = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', avertizeaza);
+    return () => window.removeEventListener('beforeunload', avertizeaza);
+  }, [modificata]);
   const [editez, setEditez] = useState<string | null>(null);
   const [filtre, setFiltre] = useState<FiltreGrile>(FILTRE_GOALE);
   const biblioteca = useBibliotecaAdmin(filtre);
@@ -107,17 +114,24 @@ function AdminPanel() {
   const [inLucru, setInLucru] = useState(false);
   const [aratatProbleme, setAratatProbleme] = useState(false);
 
-  const probleme = valideaza(ciorna, taxonomie, tipuri);
+  const probleme = [...valideaza(ciorna, taxonomie, tipuri), ...(!raspunsAles ? ['Alege explicit răspunsul corect.'] : [])];
   const scrise = variantScrise(ciorna);
 
-  const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) =>
+  const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) => {
+    setModificata(true);
     setCiorna((prev) => ({ ...prev, [key]: value }));
+  };
 
-  const setVarianta = (k: OptionKey, parte: 'text' | 'why', value: string) =>
+  const setVarianta = (k: OptionKey, parte: 'text' | 'why', value: string) => {
+    setModificata(true);
     setCiorna((prev) => ({ ...prev, opts: { ...prev.opts, [k]: { ...prev.opts[k], [parte]: value } } }));
+  };
 
   const reseteaza = () => {
-    setCiorna(ciornaGoala(ciorna.capId));
+    setCiorna({ ...ciornaGoala(ciorna.capId), id: `grila-${crypto.randomUUID()}`, sursa: ciorna.sursa, colectie: ciorna.colectie, an: ciorna.an });
+    setPas(0);
+    setRaspunsAles(false);
+    setModificata(false);
     setEditez(null);
     setAratatProbleme(false);
   };
@@ -156,12 +170,17 @@ function AdminPanel() {
   };
 
   const incarcaPentruEditare = async (g: RezumatGrila) => {
+    if (seSalveaza) return;
+    if (modificata && !window.confirm('Ai o grilă nesalvată. Renunți la ea și deschizi grila aleasă?')) return;
     try {
       const completa = await citesteGrilaAdmin(g.id);
       setCiorna(dinGrila(completa));
       setEditez(g.id);
+      setPas(1);
+      setRaspunsAles(true);
+      setModificata(false);
       setAratatProbleme(false);
-      mergiLa('grile');
+      mergiLa('adauga');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e: unknown) {
       notify('eroare', e instanceof Error ? e.message : 'Nu am putut deschide grila.');
@@ -176,6 +195,10 @@ function AdminPanel() {
       return;
     }
 
+    if (!editez && catalog.some((g) => g.id === ciorna.id.trim())) {
+      notify('eroare', 'Codul aparține deja unei grile. Deschide grila din bibliotecă pentru editare sau folosește un cod nou.');
+      return;
+    }
     setSeSalveaza(true);
     try {
       await salveazaGrila(catreSalvare(ciorna, status, tipuri));
@@ -183,6 +206,7 @@ function AdminPanel() {
       biblioteca.reincarca();
       notify('succes', status === 'publicata' ? 'Grila e publicată.' : 'Ciorna a fost salvată.');
       reseteaza();
+      mergiLa('grile');
     } catch (e: unknown) {
       notify('eroare', e instanceof Error ? e.message : 'Nu am putut salva grila.');
     } finally {
@@ -223,7 +247,7 @@ function AdminPanel() {
   };
 
   return (
-    <div className="screen">
+    <div className="screen admin-panou">
       <div
         style={{
           marginBottom: 18,
@@ -240,19 +264,29 @@ function AdminPanel() {
         </div>
         <Segmented
           items={[
-            { id: 'grile' as const, label: 'O grilă' },
-            { id: 'import' as const, label: 'Import în masă' },
-            { id: 'acoperire' as const, label: 'Acoperire' },
-            { id: 'taxonomie' as const, label: 'Materii' },
-            { id: 'colectii' as const, label: 'Colecții' },
+            { id: 'grile' as const, label: 'Bibliotecă' },
+            { id: 'acoperire' as const, label: 'Acoperirea programei' },
+            { id: 'taxonomie' as const, label: 'Materii și capitole' },
+            { id: 'colectii' as const, label: 'Surse și colecții' },
             { id: 'teste' as const, label: 'Teste' },
           ]}
-          value={sectiune}
+          value={sectiune === 'adauga' || sectiune === 'import' ? 'grile' : sectiune}
           onChange={mergiLa}
           ariaLabel="Ce faci în administrare"
         />
       </div>
 
+      <div className="admin-actiuni">
+        <div>
+          <h2>{sectiune === 'adauga' ? (editez ? 'Editează grila' : 'Adaugă o grilă') : sectiune === 'import' ? 'Importă un lot' : sectiune === 'grile' ? 'Biblioteca ta' : 'Organizează conținutul'}</h2>
+          <p>{sectiune === 'grile' ? 'Găsește și editează grilele existente sau adaugă conținut nou.' : 'Modificările ajung la elevi numai după salvare și publicare.'}</p>
+        </div>
+        <div className="admin-butoane">
+          {sectiune !== 'adauga' && <button className="btn-primary" onClick={() => mergiLa('adauga')}>{modificata ? 'Continuă grila nesalvată' : 'Adaugă o grilă'}</button>}
+          {sectiune !== 'import' && <button className="btn-ghost" onClick={() => mergiLa('import')}>Importă un lot</button>}
+          {(sectiune === 'adauga' || sectiune === 'import') && <button className="btn-quiet" onClick={() => mergiLa('grile')}>Înapoi la bibliotecă</button>}
+        </div>
+      </div>
       {/* Acoperirea e un ecran întreg, nu o coloană: e o hartă a programei, iar
           lângă ea lista de grile n-ar avea ce adăuga. */}
       {sectiune === 'acoperire' ? (
@@ -264,21 +298,13 @@ function AdminPanel() {
       ) : sectiune === 'teste' ? (
         <AdminTestePredefinite taxonomie={taxonomie} colectii={colectii} />
       ) : (
-      <div style={twoCol(isDesktop)}>
-        {sectiune === 'import' ? (
-          <ImportGrile
-              catalog={catalog}
-              taxonomie={taxonomie}
-              tipuri={tipuri}
-              colectii={colectii}
-              reload={reload}
-              dupaImport={biblioteca.reincarca}
-            />
-        ) : (
-        <div className="card" style={{ padding: 22 }}>
+      <div>
+        {sectiune === 'adauga' && (
+        <div className="card admin-formular" style={{ padding: 22 }}>
+          <fieldset disabled={seSalveaza} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ font: `600 15px ${SANS}` }}>{editez ? 'Editezi o grilă' : 'Adaugă o grilă'}</div>
-            {editez && (
+            {(editez || modificata) && (
               <>
                 <span className="tabular" style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>
                   {editez}
@@ -286,15 +312,22 @@ function AdminPanel() {
                 <button
                   type="button"
                   className="btn-ghost"
-                  onClick={reseteaza}
+                  onClick={() => { if (!modificata || window.confirm('Renunți la modificările nesalvate ale grilei?')) reseteaza(); }}
                   style={{ marginLeft: 'auto', padding: '7px 12px', font: `500 12px ${SANS}` }}
                 >
-                  Renunță la editare
+                  {editez ? 'Renunță la editare' : 'Golește formularul'}
                 </button>
               </>
             )}
           </div>
 
+          <nav className="admin-pasi" aria-label="Pașii grilei">
+            {['Încadrare și sursă', 'Întrebare și răspuns', 'Verificare și salvare'].map((nume, i) =>
+              <button key={nume} type="button" aria-current={pas === i ? 'step' : undefined} onClick={() => setPas(i)}>{i + 1}. {nume}</button>
+            )}
+          </nav>
+          <p className="admin-ajutor">{modificata ? 'Ai modificări nesalvate. Poți schimba secțiunea și reveni, dar salvează înainte să închizi pagina.' : 'Completează pe rând. La final verifici grila și alegi dacă rămâne ciornă sau devine publică.'}</p>
+          <div hidden={pas !== 0}>
           <div style={{ marginTop: 18, ...autoGrid(200, 14) }}>
             <label style={{ display: 'block' }}>
               <span style={label}>Capitol</span>
@@ -304,6 +337,7 @@ function AdminPanel() {
                 onChange={(e) => camp('capId', e.target.value as ChapterId)}
                 style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
               >
+                <option value="">Alege capitolul…</option>
                 {taxonomie.materii.map((m) => (
                   <optgroup key={m.id} label={m.name}>
                     {m.list.map((c) => (
@@ -321,7 +355,16 @@ function AdminPanel() {
               <select
                 className="field"
                 value={ciorna.tip}
-                onChange={(e) => camp('tip', e.target.value as QuestionType)}
+                onChange={(e) => {
+                  const tip = tipuri.tip(e.target.value);
+                  if (scrise.length > 0 && !window.confirm('Schimbarea formatului va reseta variantele și răspunsul corect. Continui?')) return;
+                  setModificata(true);
+                  setRaspunsAles(false);
+                  setCiorna((c) => ({ ...c, tip: e.target.value as QuestionType,
+                    enunturi: Array.from({ length: tip?.nrEnunturi ?? 0 }, (_, i) => c.enunturi[i] ?? ''),
+                    opts: Object.fromEntries(OPTION_KEYS.map((k, i) => [k, { text: tip?.sablonOptiuni?.[i] ?? '', why: '' }])) as Ciorna['opts'],
+                  }));
+                }}
                 style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
               >
                 {tipuri.lista.map((t) => (
@@ -332,31 +375,47 @@ function AdminPanel() {
               </select>
             </label>
 
-            <label style={{ display: 'block' }}>
-              <span style={label}>Identificator</span>
-              <div style={{ display: 'flex', gap: 8 }}>
+          </div>
+          <OrigineGrile sursa={ciorna.sursa} colectie={ciorna.colectie} colectii={colectii} onChange={(sursa, colectie, an) => {
+            setModificata(true);
+            setCiorna((c) => ({ ...c, sursa, colectie, an: an === undefined ? c.an : an === null ? '' : String(an) }));
+          }} />
+          <div>
+            {ciorna.sursa === 'subiect_oficial' && (
+              <label style={{ display: 'block' }}>
+                <span style={label}>Anul subiectului</span>
                 <input
                   className="field"
-                  value={ciorna.id}
-                  onChange={(e) => camp('id', e.target.value)}
-                  placeholder="bio-nervos-07"
-                  disabled={editez !== null}
+                  value={ciorna.an}
+                  onChange={(e) => camp('an', e.target.value)}
+                  placeholder="2026"
+                  inputMode="numeric"
                   style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
                 />
-                {editez === null && (
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => camp('id', idSugerat(ciorna.capId, catalog))}
-                    style={{ flex: '0 0 auto', padding: '0 12px', font: `500 12px ${SANS}` }}
-                  >
-                    Sugerează
-                  </button>
-                )}
-              </div>
-            </label>
+              </label>
+            )}
           </div>
 
+          <label style={{ display: 'block', marginTop: 14 }}>
+            <span style={label}>Referință / pagină (opțional)</span>
+            <input
+              className="field"
+              value={ciorna.src}
+              onChange={(e) => camp('src', e.target.value)}
+              placeholder="ex. Biologie, manual clasa a XI-a, cap. Glandele endocrine, p. 84"
+              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
+            />
+          </label>
+
+          <details className="admin-detalii">
+            <summary>Cod intern (completat automat)</summary>
+            <label><span style={label}>Identificator</span><input className="field" value={ciorna.id} disabled={editez !== null}
+              placeholder="bio-nervos-07" onChange={(e) => camp('id', e.target.value)} /></label>
+            <p className="admin-ajutor">Nu trebuie schimbat. Acest cod identifică grila, nu apare ca titlu pentru elevi.</p>
+          </details>
+
+          </div>
+          <div hidden={pas !== 1}>
           <label style={{ display: 'block', marginTop: 18 }}>
             <span style={label}>Enunțul grilei</span>
             <textarea
@@ -370,7 +429,7 @@ function AdminPanel() {
 
           {tipuri.tip(ciorna.tip)?.cereEnunturi && (
             <div style={{ marginTop: 18 }}>
-              <span style={label}>Cele patru afirmații</span>
+              <span style={label}>Afirmațiile întrebării</span>
               <div style={{ display: 'grid', gap: 8 }}>
                 {ciorna.enunturi.map((e, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -398,10 +457,11 @@ function AdminPanel() {
           )}
 
           <div style={{ marginTop: 20 }}>
-            <span style={label}>Variantele și explicațiile lor</span>
+            <span style={label}>Variantele de răspuns</span>
+            <p className="admin-ajutor">{tipuri.tip(ciorna.tip)?.sablonOptiuni ? 'Cheia de răspuns este completată automat și nu se editează. Apasă litera combinației corecte.' : 'Scrie variantele, apoi apasă litera răspunsului corect. Verde înseamnă corect.'}</p>
             <div style={{ display: 'grid', gap: 12 }}>
               {OPTION_KEYS.map((k) => {
-                const activa = ciorna.correct === k;
+                const activa = raspunsAles && ciorna.correct === k;
                 const completata = ciorna.opts[k].text.trim() !== '';
                 return (
                   <div
@@ -418,7 +478,7 @@ function AdminPanel() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button
                         type="button"
-                        onClick={() => camp('correct', k)}
+                        onClick={() => { camp('correct', k); setRaspunsAles(true); }}
                         aria-pressed={activa}
                         aria-label={`Varianta ${k} e răspunsul corect`}
                         disabled={!completata}
@@ -442,20 +502,21 @@ function AdminPanel() {
                         className="field"
                         value={ciorna.opts[k].text}
                         aria-label={`Varianta ${k}`}
+                        readOnly={tipuri.tip(ciorna.tip)?.sablonOptiuni != null}
                         onChange={(e) => setVarianta(k, 'text', e.target.value)}
                         placeholder={k === 'A' || k === 'B' ? 'Textul variantei' : 'Textul variantei (opțional)'}
                         style={{ padding: '10px 12px', font: `400 13.5px ${SANS}` }}
                       />
                     </div>
                     {completata && (
-                      <textarea
+                      <details className="admin-detalii"><summary>Explicația variantei {k} (opțional)</summary><textarea
                         className="field"
                         value={ciorna.opts[k].why}
                         aria-label={`De ce ${activa ? 'ține' : 'cade'} varianta ${k}`}
                         onChange={(e) => setVarianta(k, 'why', e.target.value)}
                         placeholder={activa ? 'De ce e corectă…' : 'De ce cade varianta asta…'}
                         style={{ minHeight: 52, resize: 'vertical', padding: 10, font: `400 13px/1.5 ${SANS}` }}
-                      />
+                      /></details>
                     )}
                   </div>
                 );
@@ -479,70 +540,17 @@ function AdminPanel() {
             />
           </label>
 
-          <label style={{ display: 'block', marginTop: 14 }}>
-            <span style={label}>Referință bibliografică</span>
-            <input
-              className="field"
-              value={ciorna.src}
-              onChange={(e) => camp('src', e.target.value)}
-              placeholder="ex. Biologie, manual clasa a XI-a, cap. Glandele endocrine, p. 84"
-              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
-            />
-          </label>
-
-          <label style={{ display: 'block', marginTop: 14 }}>
-            <span style={label}>Colecția</span>
-            <select
-              className="field"
-              value={ciorna.colectie}
-              onChange={(e) => camp('colectie', e.target.value)}
-              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
-            >
-              <option value="">— fără colecție —</option>
-              {colectii.lista.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nume}
-                </option>
-              ))}
-            </select>
-            <span style={{ display: 'block', marginTop: 6, font: `400 11.5px ${SANS}`, color: 'var(--fg3)' }}>
-              Lotul din care vine grila. Referința de mai sus e pagina; asta e materialul întreg.
-            </span>
-          </label>
-
-          <div style={{ marginTop: 14, ...autoGrid(200, 14) }}>
-            <label style={{ display: 'block' }}>
-              <span style={label}>Sursă</span>
-              <select
-                className="field"
-                value={ciorna.sursa}
-                onChange={(e) => camp('sursa', e.target.value as QuestionSursa)}
-                style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
-              >
-                {SURSE.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.eticheta}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {ciorna.sursa === 'subiect_oficial' && (
-              <label style={{ display: 'block' }}>
-                <span style={label}>Anul subiectului</span>
-                <input
-                  className="field"
-                  value={ciorna.an}
-                  onChange={(e) => camp('an', e.target.value)}
-                  placeholder="2026"
-                  inputMode="numeric"
-                  style={{ padding: '11px 12px', font: `400 13.5px ${SANS}` }}
-                />
-              </label>
-            )}
           </div>
-
-          {aratatProbleme && probleme.length > 0 && (
+          <div hidden={pas !== 2}>
+            <h3>Verifică înainte de salvare</h3>
+            <p className="admin-ajutor">{taxonomie.eticheta(ciorna.capId)} · {tipuri.tip(ciorna.tip)?.nume} · {colectii.eticheta(ciorna.colectie) || 'Fără colecție'}</p>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{ciorna.text || 'Enunțul nu este încă scris.'}</p>
+            {tipuri.tip(ciorna.tip)?.cereEnunturi && <ol>{ciorna.enunturi.map((e, i) => <li key={i}>{e}</li>)}</ol>}
+            <ul className="admin-previzualizare">{scrise.map((k) => <li key={k}><strong>{k}.</strong> {ciorna.opts[k].text} {raspunsAles && ciorna.correct === k && <strong> — răspuns corect</strong>}{ciorna.opts[k].why && <p className="admin-ajutor">{ciorna.opts[k].why}</p>}</li>)}</ul>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{ciorna.expl}</p>
+            {ciorna.src && <p className="admin-ajutor">Referință: {ciorna.src}</p>}
+            <p className="admin-ajutor">Ciorna este vizibilă doar administratorilor. Publicarea face grila disponibilă elevilor eligibili.</p>
+          {(aratatProbleme || pas === 2) && probleme.length > 0 && (
             <ul
               style={{
                 margin: '16px 0 0',
@@ -593,10 +601,16 @@ function AdminPanel() {
               {seSalveaza ? 'Se salvează…' : editez ? 'Salvează și publică' : 'Publică grila'}
             </button>
           </div>
+          </div>
+          <div className="admin-butoane" style={{ marginTop: 18 }}>
+            {pas > 0 && <button className="btn-ghost" onClick={() => setPas(pas - 1)}>Pasul anterior</button>}
+            {pas < 2 && <button className="btn-primary" onClick={() => setPas(pas + 1)}>Continuă</button>}
+          </div>
+          </fieldset>
         </div>
         )}
 
-        <div style={sideStack}>
+        {sectiune === 'grile' && <div style={sideStack}>
           <div className="card-flat" style={{ padding: 20 }}>
             <div style={eyebrow(undefined, 11)}>Biblioteca de grile</div>
             <div style={{ marginTop: 14, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
@@ -814,7 +828,7 @@ function AdminPanel() {
                 hint={
                   areFiltru
                     ? 'Schimbă filtrul sau șterge căutarea.'
-                    : 'Prima grilă scrisă din formularul de alături apare aici.'
+                    : 'Folosește „Adaugă o grilă” sau „Importă un lot” pentru a începe.'
                 }
               />
             ) : (
@@ -885,6 +899,7 @@ function AdminPanel() {
                           >
                             Editează
                           </button>
+                          <details className="admin-detalii" style={{ margin: 0 }}><summary>Mai multe acțiuni</summary>
                           {g.status !== 'retrasa' && (
                             <button
                               type="button"
@@ -910,6 +925,7 @@ function AdminPanel() {
                           >
                             Șterge
                           </button>
+                          </details>
                         </div>
                       )}
                     </div>
@@ -961,9 +977,12 @@ function AdminPanel() {
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
       )}
+      <div hidden={sectiune !== 'import'}>
+        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} />
+      </div>
     </div>
   );
 }

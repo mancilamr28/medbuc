@@ -9,6 +9,11 @@ const api = vi.hoisted(() => ({
   citeste: vi.fn(),
   salveaza: vi.fn(),
 }));
+vi.mock('../lib/continut', () => ({
+  FILTRE_GOALE: { cautare: '', capitole: [], colectieId: '', tipId: '', status: 'toate' },
+  cautaGrile: async () => ({ randuri: [], total: 0 }),
+  numaraPeStare: async () => ({ publicata: 0, retrasa: 0, ciorna: 0 }),
+}));
 const notifica = vi.hoisted(() => vi.fn());
 
 vi.mock('../lib/testePredefinite', async (original) => ({
@@ -69,8 +74,12 @@ describe('constructorul testelor predefinite', () => {
     const user = userEvent.setup();
     render(<AdminTestePredefinite taxonomie={TAXONOMIE_SEED} colectii={colectii} />);
 
+    await user.click(screen.getByRole('button', { name: 'Creează un test' }));
+    await user.click(screen.getByText('Cod intern al testului (automat)'));
+    await user.clear(screen.getByLabelText('Identificatorul testului'));
     await user.type(screen.getByLabelText('Identificatorul testului'), 'admitere-2026');
     await user.type(screen.getByLabelText('Numele testului'), 'Admitere 2026');
+    await user.click(screen.getByText('Introdu codurile manual (avansat)'));
     await user.type(
       screen.getByLabelText('Grilele în ordinea testului'),
       'bio-nervos-01\nchim-alcooli-01',
@@ -89,9 +98,12 @@ describe('constructorul testelor predefinite', () => {
     const user = userEvent.setup();
     render(<AdminTestePredefinite taxonomie={TAXONOMIE_SEED} colectii={colectii} />);
 
-    await user.selectOptions(screen.getByLabelText('Cum se aleg grilele'), 'dupa_regula');
+    await user.click(screen.getByRole('button', { name: 'Creează un test' }));
+    await user.click(screen.getByText('Cod intern al testului (automat)'));
+    await user.clear(screen.getByLabelText('Identificatorul testului'));
     await user.type(screen.getByLabelText('Identificatorul testului'), 'simulare-2027');
     await user.type(screen.getByLabelText('Numele testului'), 'Simulare 2027');
+    await user.selectOptions(screen.getByLabelText('Cum se aleg grilele'), 'dupa_regula');
     await user.clear(screen.getByLabelText('Număr pentru Biologie'));
     await user.type(screen.getByLabelText('Număr pentru Biologie'), '60');
     await user.clear(screen.getByLabelText('Număr pentru Chimie organică'));

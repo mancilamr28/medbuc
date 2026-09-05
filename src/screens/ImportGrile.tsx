@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Segmented } from '../components/Segmented';
 import {
   exportaGrileAdmin,
@@ -8,12 +8,14 @@ import {
 } from '../lib/continut';
 import { descarcaText, ziua } from '../lib/exportDate';
 import { numar } from '../lib/text';
-import { MONO, SANS, autoGrid, label } from '../lib/ui';
+import { MONO, SANS, label } from '../lib/ui';
 import { useToast } from '../state/toastState';
 import { catreJson, citesteImport, frazaRescrieri, importa, type BilantImport } from './importLot';
-import { SURSE, type QuestionSursa } from '../data/questions';
+import { type QuestionSursa } from '../data/questions';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
+import { OrigineGrile } from './OrigineGrile';
+import { antetTabel, tabelCatreJson, tabelCuIdentitati } from './importTabel';
 import type { Colectii } from '../lib/colectii';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
@@ -62,6 +64,13 @@ export function ImportGrile({
   const { notify } = useToast();
 
   const [brut, setBrut] = useState('');
+  const [format, setFormat] = useState<'tabel' | 'json'>('tabel');
+  const [capitol, setCapitol] = useState('');
+  const [tipId, setTipId] = useState('simplu');
+  const [lotId, setLotId] = useState(() => `lot-${crypto.randomUUID()}`);
+  const [confirmat, setConfirmat] = useState(false);
+  const [revizuit, setRevizuit] = useState(false);
+  const tip = tipuri.tip(tipId);
   const [implicit, setImplicit] = useState<QuestionStatus>('ciorna');
   // Proveniența lotului: se scrie o dată, nu pe fiecare din cele cincizeci de rânduri.
   const [sursa, setSursa] = useState<QuestionSursa>('materie');
@@ -69,35 +78,53 @@ export function ImportGrile({
   const [progres, setProgres] = useState<{ facut: number; total: number } | null>(null);
   const [bilant, setBilant] = useState<BilantImport | null>(null);
 
+  useEffect(() => { setConfirmat(false); setRevizuit(false); }, [brut, format, capitol, tipId, sursa, colectie, implicit]);
+  useEffect(() => {
+    if (!brut.trim()) return;
+    const avertizeaza = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', avertizeaza);
+    return () => window.removeEventListener('beforeunload', avertizeaza);
+  }, [brut]);
   const citire = useMemo(
-    () => citesteImport(brut, { status: implicit, sursa, colectie }, catalog, taxonomie, tipuri),
-    [brut, implicit, sursa, colectie, catalog, taxonomie, tipuri],
+    () => {
+      try {
+        const json = format === 'json' ? brut : tip ? tabelCatreJson(brut, capitol, tip, lotId) : '';
+        return citesteImport(json, { status: implicit, sursa, colectie }, catalog, taxonomie, tipuri);
+      } catch (e) { return { randuri: [], eroare: e instanceof Error ? e.message : 'Tabelul nu poate fi citit.' }; }
+    },
+    [brut, format, capitol, tip, lotId, implicit, sursa, colectie, catalog, taxonomie, tipuri],
   );
 
   const valide = citire.randuri.filter((r) => r.grila !== null);
   const cuProbleme = citire.randuri.filter((r) => r.grila === null);
   const rescrise = valide.filter((r) => r.suprascrie);
 
+  const cereConfirmare = rescrise.length > 0 || cuProbleme.length > 0 || valide.some((r) => r.grila?.status === 'publicata');
+
   const ruleaza = async () => {
-    if (progres !== null || valide.length === 0) return;
+    if (progres !== null || valide.length === 0 || !revizuit || (cereConfirmare && !confirmat)) return;
 
     setBilant(null);
     setProgres({ facut: 0, total: valide.length });
     const rezultat = await importa(citire.randuri, salveazaGrila, (facut, total) =>
       setProgres({ facut, total }),
     );
-    setProgres(null);
     setBilant(rezultat);
-    await reload();
-    dupaImport?.();
+    try { await reload(); dupaImport?.(); }
+    catch { notify('eroare', 'Importul a fost procesat, dar lista nu s-a reîncărcat. Verifică biblioteca înainte să reîncerci.'); }
+    finally { setProgres(null); }
+    setRevizuit(false);
+    setConfirmat(false);
 
-    if (rezultat.esecuri.length === 0) {
+    if (rezultat.esecuri.length === 0 && cuProbleme.length === 0) {
       notify('succes', `${numar(rezultat.reusite, 'grilă importată', 'grile importate')}.`);
       // Golit doar la reușită deplină: dacă ceva a picat, textul trebuie să
       // rămână ca să poată fi corectat rândul vinovat și lotul reluat.
       setBrut('');
+      setLotId(`lot-${crypto.randomUUID()}`);
     } else {
-      notify('eroare', `${numar(rezultat.esecuri.length, 'grilă n-a intrat', 'grile n-au intrat')}.`);
+      if (format === 'tabel') setBrut(tabelCuIdentitati(brut, lotId));
+      notify('eroare', `${numar(rezultat.esecuri.length + cuProbleme.length, 'grilă n-a intrat', 'grile n-au intrat')}. Lotul a rămas pentru corectare. Păstrează codurile interne la reîncercare.`);
     }
   };
 
@@ -116,7 +143,8 @@ export function ImportGrile({
   };
 
   return (
-    <div className="card" style={{ padding: 22 }}>
+    <div className="card admin-formular" style={{ padding: 22 }}>
+      <fieldset disabled={progres !== null} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ font: `600 15px ${SANS}` }}>Import în masă</div>
         <button
@@ -130,11 +158,24 @@ export function ImportGrile({
       </div>
 
       <p style={{ margin: '8px 0 0', font: `400 12.5px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
-        Lipește o listă de grile în JSON. Fiecare trece prin aceleași verificări ca formularul, iar cele cu
-        probleme sunt lăsate deoparte — restul lotului intră.
+        Pregătește un tabel, verifică rezultatul și abia apoi salvează. Nimic nu intră în bibliotecă doar prin lipire.
       </p>
 
-      <details style={{ marginTop: 14 }}>
+      <h3>1. Alege formatul și conținutul</h3>
+      <Segmented items={[{ id: 'tabel' as const, label: 'Din tabel (Excel)' }, { id: 'json' as const, label: 'JSON (avansat)' }]} value={format} onChange={(f) => {
+        if (brut.trim() && !window.confirm('Schimbarea formatului va goli textul lipit. Continui?')) return;
+        setBrut(''); setFormat(f);
+      }} ariaLabel="Formatul importului" />
+      {format === 'tabel' && <>
+        <p className="admin-ajutor">Copiază celulele din Excel sau Google Sheets, inclusiv primul rând cu numele coloanelor. Un lot are același capitol și format de întrebare.</p>
+        <label>Capitolul lotului<select className="field" aria-label="Capitolul lotului" value={capitol} onChange={(e) => setCapitol(e.target.value)}>
+          <option value="">Alege capitolul…</option>{taxonomie.materii.map((m) => <optgroup key={m.id} label={m.name}>{m.list.map((c) => <option key={c.id} value={c.id}>{c.nr}. {c.name}</option>)}</optgroup>)}
+        </select></label>
+        <label>Formatul întrebărilor<select className="field" aria-label="Formatul întrebărilor" value={tipId} onChange={(e) => setTipId(e.target.value)}>{tipuri.lista.map((t) => <option key={t.id} value={t.id}>{t.nume}</option>)}</select></label>
+        <button className="btn-ghost" style={{ marginTop: 12 }} disabled={!tip} onClick={() => tip && descarcaText(antetTabel(tip) + '\n', 'model-grile.tsv')}>Descarcă modelul pentru tabel</button>
+        <p className="admin-ajutor">Deschide modelul în aplicația de tabele. Completează răspunsul corect cu o literă (A–E); codurile interne se creează automat. Un lot nou creează grile noi: pentru corectarea celor deja importate, folosește biblioteca sau exportul JSON.</p>
+      </>}
+      <details hidden={format !== 'json'} style={{ marginTop: 14 }}>
         <summary style={{ font: `500 12.5px ${SANS}`, color: 'var(--fg2)', cursor: 'pointer' }}>
           Formatul așteptat
         </summary>
@@ -172,72 +213,20 @@ export function ImportGrile({
       </details>
 
       <label style={{ display: 'block', marginTop: 16 }}>
-        <span style={label}>Grilele, în JSON</span>
+        <span style={label}>{format === 'json' ? 'Grilele, în JSON' : 'Lipește tabelul aici'}</span>
         <textarea
           className="field"
           value={brut}
           onChange={(e) => setBrut(e.target.value)}
           spellCheck={false}
-          placeholder={'[\n  { "id": "bio-nervos-07", … }\n]'}
-          aria-label="Grilele, în JSON"
+          placeholder={format === 'tabel' && tip ? antetTabel(tip) : '[ … ]'}
+          aria-label={format === 'json' ? 'Grilele, în JSON' : 'Lipește tabelul aici'}
           style={{ minHeight: 260, resize: 'vertical', padding: 12, font: `400 12.5px/1.6 ${MONO}` }}
         />
       </label>
 
-      <div
-        style={{
-          marginTop: 16,
-          padding: 14,
-          border: '1px solid var(--line)',
-          borderRadius: 11,
-          display: 'grid',
-          gap: 12,
-        }}
-      >
-        <div style={{ font: `600 12.5px ${SANS}` }}>De unde vine lotul</div>
-
-        <div style={autoGrid(220, 12)}>
-          <label style={{ display: 'block' }}>
-            <span style={label}>Sursă</span>
-            <select
-              className="field"
-              value={sursa}
-              onChange={(e) => setSursa(e.target.value as QuestionSursa)}
-              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
-            >
-              {SURSE.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.eticheta}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: 'block' }}>
-            <span style={label}>Colecția</span>
-            <select
-              className="field"
-              value={colectie}
-              onChange={(e) => setColectie(e.target.value)}
-              style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
-            >
-              <option value="">— fără colecție —</option>
-              {colectii.lista.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nume}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div style={{ font: `400 11.5px/1.6 ${SANS}`, color: 'var(--fg3)' }}>
-          Se aplică tuturor grilelor din lot. O grilă care își scrie propria{' '}
-          <code>sursa</code> sau <code>colectie</code> (id-ul colecției) și-o păstrează, deci un export
-          al bibliotecii se poate relipi întreg fără să fie uniformizat de câmpurile de aici.
-        </div>
-      </div>
-
+      <OrigineGrile sursa={sursa} colectie={colectie} colectii={colectii} onChange={(s, c) => { setSursa(s); setColectie(c); }} />
+      <p className="admin-ajutor">Aceste alegeri se aplică rândurilor fără proveniență proprie. În JSON, sursa și colecția scrise pe fiecare grilă se păstrează.</p>
       <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <span style={{ font: `400 12px ${SANS}`, color: 'var(--fg3)' }}>Grilele fără stare proprie intră ca</span>
         <Segmented
@@ -251,6 +240,8 @@ export function ImportGrile({
         />
       </div>
 
+      <h3>2. Verifică lotul</h3>
+      <p className="admin-ajutor">Verificările apar mai jos. Grilele cu probleme nu se salvează.</p>
       {citire.eroare && (
         <div
           role="alert"
@@ -279,6 +270,7 @@ export function ImportGrile({
           }}
         >
           {cifra(valide.length, 'var(--ok)')} gata de import
+          <p>{numar(valide.filter((r) => r.grila?.status === 'publicata').length, 'grilă va fi publicată', 'grile vor fi publicate')} pentru elevi. Restul păstrează starea indicată în lot.</p>
           {cuProbleme.length > 0 && <> · {cifra(cuProbleme.length, 'var(--bad)')} cu probleme</>}
           {rescrise.length > 0 && (
             <> · {cifra(rescrise.length, 'var(--fg2)')} {frazaRescrieri(rescrise.length)}</>
@@ -314,6 +306,18 @@ export function ImportGrile({
         </div>
       )}
 
+      {valide.length > 0 && <details className="admin-detalii">
+        <summary>Previzualizează grilele pregătite ({valide.length})</summary>
+        <div className="admin-lista-compacta">{valide.map((r) => <article key={r.pozitie} className="admin-previzualizare">
+          <h4>Rândul {r.pozitie}: {r.grila!.text}</h4>
+          <ol>{r.grila!.enunturi?.map((e, i) => <li key={i}>{e}</li>)}</ol>
+          <ul>{r.grila!.opts.map((o) => <li key={o.key}>{o.key}. {o.text}{o.key === r.grila!.correct ? ' — corect' : ''}</li>)}</ul>
+          <p>{r.grila!.expl}</p>
+        </article>)}</div>
+      </details>}
+      <h3>3. Confirmă și salvează</h3>
+      {valide.length > 0 && <label style={{ display: 'block', margin: '12px 0' }}><input type="checkbox" checked={revizuit} onChange={(e) => setRevizuit(e.target.checked)} /> Am verificat întrebările și răspunsurile corecte.</label>}
+      {cereConfirmare && <label style={{ display: 'block', margin: '12px 0' }}><input type="checkbox" checked={confirmat} onChange={(e) => setConfirmat(e.target.checked)} /> Confirm modificarea grilelor existente, publicarea și omiterea rândurilor cu probleme, acolo unde sunt anunțate mai sus.</label>}
       {bilant && (
         <div
           style={{
@@ -360,7 +364,7 @@ export function ImportGrile({
           type="button"
           className="btn-primary"
           onClick={() => void ruleaza()}
-          disabled={progres !== null || valide.length === 0}
+          disabled={progres !== null || valide.length === 0 || !revizuit || (cereConfirmare && !confirmat)}
           style={{
             marginLeft: 'auto',
             padding: '11px 18px',
@@ -376,6 +380,7 @@ export function ImportGrile({
               : `Importă ${numar(valide.length, 'grilă', 'grile')}`}
         </button>
       </div>
+      </fieldset>
     </div>
   );
 }

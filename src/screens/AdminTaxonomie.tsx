@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { chapterLabel, type Chapter, type Materie } from '../data/chapters';
 import { salveazaCapitol, salveazaMaterie } from '../lib/continut';
+import { numar } from '../lib/text';
 import { reportError } from '../lib/sentry';
 import type { Taxonomie } from '../lib/taxonomie';
 import { SANS, autoGrid, eyebrow, label, pageLead } from '../lib/ui';
@@ -35,9 +36,11 @@ export function AdminTaxonomie({
       await ce();
       dupaSalvare();
       notify('succes', reusit);
+      return true;
     } catch (e: unknown) {
       notify('eroare', e instanceof Error ? e.message : 'Nu am putut salva.');
       reportError(e, 'Administrare: taxonomie');
+      return false;
     } finally {
       setInLucru(false);
     }
@@ -46,14 +49,15 @@ export function AdminTaxonomie({
   return (
     <div style={{ display: 'grid', gap: 18 }}>
       <p style={pageLead}>
-        Materiile și capitolele pe care le văd elevii. Un capitol depublicat dispare din alegerea
-        sesiunii, dar grilele și notițele lui rămân neatinse.
+        Deschide materia în care lucrezi pentru a vedea capitolele. Adaugă aici un capitol lipsă,
+        apoi întoarce-te la grile și alege-l din listă.
       </p>
 
+      <details className="admin-detalii"><summary>Adaugă o materie</summary>
       <FormularMaterie
         inLucru={inLucru}
         onSalveaza={(m) => cu(() => salveazaMaterie(m), 'Materia a fost salvată.')}
-      />
+      /></details>
 
       {taxonomie.materii.map((m) => (
         <CardMaterie
@@ -80,9 +84,9 @@ function FormularMaterie({
   onSalveaza,
 }: {
   inLucru: boolean;
-  onSalveaza: (m: { id: string; nume: string }) => void;
+  onSalveaza: (m: { id: string; nume: string }) => Promise<boolean | undefined>;
 }) {
-  const [id, setId] = useState('');
+  const [id, setId] = useState(() => `materie-${crypto.randomUUID()}`);
   const [nume, setNume] = useState('');
 
   const poate = id.trim() !== '' && nume.trim() !== '';
@@ -91,7 +95,7 @@ function FormularMaterie({
     <div className="card" style={{ padding: 18 }}>
       <div style={eyebrow(undefined, 11)}>Materie nouă</div>
       <div style={{ marginTop: 12, ...autoGrid(180, 12) }}>
-        <label style={{ display: 'block' }}>
+        <details className="admin-detalii"><summary>Cod intern al materiei (automat)</summary><label style={{ display: 'block' }}>
           <span style={label}>Identificator</span>
           <input
             className="field"
@@ -100,7 +104,7 @@ function FormularMaterie({
             placeholder="fiz"
             style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
           />
-        </label>
+        </label></details>
         <label style={{ display: 'block' }}>
           <span style={label}>Nume</span>
           <input
@@ -119,10 +123,11 @@ function FormularMaterie({
         type="button"
         className="btn-primary"
         disabled={!poate || inLucru}
-        onClick={() => {
-          onSalveaza({ id: id.trim(), nume: nume.trim() });
-          setId('');
-          setNume('');
+        onClick={async () => {
+          if (await onSalveaza({ id: id.trim(), nume: nume.trim() })) {
+            setId(`materie-${crypto.randomUUID()}`);
+            setNume('');
+          }
         }}
         style={{ marginTop: 12, padding: '9px 15px', font: `600 13px ${SANS}`, opacity: poate ? 1 : 0.5 }}
       >
@@ -140,16 +145,17 @@ function CardMaterie({
 }: {
   materie: Materie;
   inLucru: boolean;
-  onSalveazaMaterie: (m: { id: string; nume: string }) => void;
-  onSalveazaCapitol: (c: { id: string; materieId: string; nr: string; nume: string }) => void;
+  onSalveazaMaterie: (m: { id: string; nume: string }) => Promise<boolean | undefined>;
+  onSalveazaCapitol: (c: { id: string; materieId: string; nr: string; nume: string }) => Promise<boolean | undefined>;
 }) {
   const [nume, setNume] = useState(materie.name);
-  const [capNou, setCapNou] = useState({ id: '', nr: '', nume: '' });
+  const [capNou, setCapNou] = useState(() => ({ id: `${materie.id}-${crypto.randomUUID()}`, nr: '', nume: '' }));
 
   const poateCapitol = capNou.id.trim() !== '' && capNou.nume.trim() !== '';
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
+    <details className="card admin-detalii" style={{ overflow: 'hidden' }}>
+      <summary style={{ padding: 18, fontWeight: 600 }}>{materie.name} · {numar(materie.list.length, 'capitol', 'capitole')}</summary>
       <div
         style={{
           padding: '14px 18px',
@@ -188,6 +194,7 @@ function CardMaterie({
         <RandCapitol key={c.id} capitol={c} inLucru={inLucru} onSalveaza={onSalveazaCapitol} />
       ))}
 
+      <details className="admin-detalii" style={{ padding: 18 }}><summary>Adaugă un capitol în {materie.name}</summary>
       <div style={{ padding: '12px 18px', background: 'var(--surf2)', ...autoGrid(120, 8) }}>
         <input
           className="field"
@@ -197,14 +204,14 @@ function CardMaterie({
           aria-label={`Numărul capitolului nou din ${materie.name}`}
           style={{ padding: '8px 10px', font: `400 12.5px ${SANS}` }}
         />
-        <input
+        <details className="admin-detalii"><summary>Cod intern al capitolului (automat)</summary><input
           className="field"
           value={capNou.id}
           onChange={(e) => setCapNou((p) => ({ ...p, id: e.target.value }))}
           placeholder={`${materie.id}-nou`}
           aria-label={`Identificatorul capitolului nou din ${materie.name}`}
           style={{ padding: '8px 10px', font: `400 12.5px ${SANS}` }}
-        />
+        /></details>
         <input
           className="field"
           value={capNou.nume}
@@ -218,21 +225,21 @@ function CardMaterie({
           className="btn-ghost"
           aria-label={`Adaugă un capitol în ${materie.name}`}
           disabled={!poateCapitol || inLucru}
-          onClick={() => {
-            onSalveazaCapitol({
+          onClick={async () => {
+            const reusit = await onSalveazaCapitol({
               id: capNou.id.trim(),
               materieId: materie.id,
               nr: capNou.nr.trim(),
               nume: capNou.nume.trim(),
             });
-            setCapNou({ id: '', nr: '', nume: '' });
+            if (reusit) setCapNou({ id: `${materie.id}-${crypto.randomUUID()}`, nr: '', nume: '' });
           }}
           style={{ padding: '8px 12px', font: `500 12px ${SANS}`, opacity: poateCapitol ? 1 : 0.5 }}
         >
           Adaugă capitolul
         </button>
-      </div>
-    </div>
+      </div></details>
+    </details>
   );
 }
 
@@ -243,7 +250,7 @@ function RandCapitol({
 }: {
   capitol: Chapter;
   inLucru: boolean;
-  onSalveaza: (c: { id: string; materieId: string; nr: string; nume: string }) => void;
+  onSalveaza: (c: { id: string; materieId: string; nr: string; nume: string }) => Promise<boolean | undefined>;
 }) {
   const [editez, setEditez] = useState(false);
   const [nume, setNume] = useState(capitol.name);
@@ -301,14 +308,14 @@ function RandCapitol({
         className="btn-ghost"
         aria-label={`Salvează capitolul ${capitol.id}`}
         disabled={inLucru || nume.trim() === ''}
-        onClick={() => {
-          onSalveaza({
+        onClick={async () => {
+          const reusit = await onSalveaza({
             id: capitol.id,
             materieId: capitol.materie,
             nr: nr.trim(),
             nume: nume.trim(),
           });
-          setEditez(false);
+          if (reusit) setEditez(false);
         }}
         style={{ padding: '7px 11px', font: `500 12px ${SANS}` }}
       >

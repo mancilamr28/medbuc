@@ -34,6 +34,7 @@ export function AdminColectii({
   dupaSalvare: () => void;
 }) {
   const { notify } = useToast();
+  const [cautare, setCautare] = useState('');
   const [inLucru, setInLucru] = useState(false);
 
   const salveaza = async (c: Parameters<typeof salveazaColectie>[0], reusit: string) => {
@@ -43,9 +44,11 @@ export function AdminColectii({
       await salveazaColectie(c);
       dupaSalvare();
       notify('succes', reusit);
+      return true;
     } catch (e: unknown) {
       notify('eroare', e instanceof Error ? e.message : 'Nu am putut salva colecția.');
       reportError(e, 'Administrare: colecții');
+      return false;
     } finally {
       setInLucru(false);
     }
@@ -54,14 +57,15 @@ export function AdminColectii({
   return (
     <div style={{ display: 'grid', gap: 18 }}>
       <p style={pageLead}>
-        Loturile din care vin grilele: lucrări de admitere, simulări oficiale, culegeri. O colecție
-        depublicată nu mai apare la alegere, dar grilele ei rămân.
+        O colecție grupează grilele din aceeași carte, admitere sau simulare. Creeaz-o o singură dată,
+        apoi alege-o când adaugi grile sau imporți un lot. Capitolul spune ce se învață; colecția spune de unde vine conținutul.
       </p>
 
-      <FormularColectie
-        inLucru={inLucru}
-        onSalveaza={(c) => void salveaza(c, 'Colecția a fost creată.')}
-      />
+      <details className="admin-detalii">
+        <summary>Adaugă o sursă / colecție</summary>
+        <FormularColectie inLucru={inLucru} onSalveaza={(c) => salveaza(c, 'Colecția a fost creată.')} />
+      </details>
+      <input className="field" aria-label="Caută o colecție" placeholder="Caută după nume sau an…" value={cautare} onChange={(e) => setCautare(e.target.value)} />
 
       <div className="card" style={{ overflow: 'hidden' }}>
         {colectii.lista.length === 0 ? (
@@ -69,12 +73,12 @@ export function AdminColectii({
             Nicio colecție încă. Prima scrisă mai sus apare aici.
           </div>
         ) : (
-          colectii.lista.map((c) => (
+          colectii.lista.filter((c) => `${c.nume} ${c.an ?? ''}`.toLocaleLowerCase('ro').includes(cautare.toLocaleLowerCase('ro'))).map((c) => (
             <RandColectie
               key={c.id}
               colectie={c}
               inLucru={inLucru}
-              onSalveaza={(x) => void salveaza(x, 'Colecția a fost salvată.')}
+              onSalveaza={(x) => salveaza(x, 'Colecția a fost salvată.')}
             />
           ))
         )}
@@ -83,12 +87,12 @@ export function AdminColectii({
   );
 }
 
-function FormularColectie({
+export function FormularColectie({
   inLucru,
   onSalveaza,
 }: {
   inLucru: boolean;
-  onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => void;
+  onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => Promise<boolean | undefined>;
 }) {
   const gol: {
     id: string;
@@ -97,7 +101,7 @@ function FormularColectie({
     an: string;
     sursa: string;
     acces: 'liber' | 'premium';
-  } = { id: '', nume: '', tip: 'subiect_oficial', an: '', sursa: '', acces: 'liber' };
+  } = { id: `colectie-${crypto.randomUUID()}`, nume: '', tip: 'subiect_oficial', an: '', sursa: '', acces: 'liber' };
   const [c, setC] = useState(gol);
 
   const poate = c.id.trim() !== '' && c.nume.trim() !== '';
@@ -108,7 +112,7 @@ function FormularColectie({
       <div style={eyebrow(undefined, 11)}>Colecție nouă</div>
 
       <div style={{ marginTop: 12, ...autoGrid(170, 12) }}>
-        <label style={{ display: 'block' }}>
+        <details className="admin-detalii"><summary>Cod intern (automat)</summary><label style={{ display: 'block' }}>
           <span style={label}>Identificator</span>
           <input
             className="field"
@@ -117,7 +121,7 @@ function FormularColectie({
             placeholder="umfcd-2027-mg"
             style={{ padding: '9px 11px', font: `400 13px ${SANS}` }}
           />
-        </label>
+        </label></details>
         <label style={{ display: 'block' }}>
           <span style={label}>Nume</span>
           <input
@@ -189,8 +193,8 @@ function FormularColectie({
         type="button"
         className="btn-primary"
         disabled={!poate || inLucru}
-        onClick={() => {
-          onSalveaza({
+        onClick={async () => {
+          const reusit = await onSalveaza({
             id: c.id.trim(),
             nume: c.nume.trim(),
             tip: c.tip,
@@ -200,7 +204,7 @@ function FormularColectie({
             sursaBibliografica: c.sursa.trim(),
             acces: c.acces,
           });
-          setC(gol);
+          if (reusit) setC(gol);
         }}
         style={{ marginTop: 14, padding: '9px 15px', font: `600 13px ${SANS}`, opacity: poate ? 1 : 0.5 }}
       >
@@ -217,7 +221,7 @@ function RandColectie({
 }: {
   colectie: Colectie;
   inLucru: boolean;
-  onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => void;
+  onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => Promise<boolean | undefined>;
 }) {
   const [nume, setNume] = useState(colectie.nume);
   const [editez, setEditez] = useState(false);
@@ -269,16 +273,16 @@ function RandColectie({
           type="button"
           className="btn-ghost"
           disabled={inLucru || nume.trim() === ''}
-          onClick={() => {
+          onClick={async () => {
             // Doar numele. Anul, cartea, centrul și poziția rămân ce erau —
             // formularul ăsta nu le arată, deci n-are ce să spună despre ele.
-            onSalveaza({
+            const reusit = await onSalveaza({
               id: colectie.id,
               nume: nume.trim(),
               tip: colectie.tip,
               acces: colectie.acces,
             });
-            setEditez(false);
+            if (reusit) setEditez(false);
           }}
           style={{ padding: '6px 11px', font: `500 12px ${SANS}` }}
         >
