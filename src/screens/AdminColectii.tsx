@@ -29,13 +29,17 @@ const etichetaFelului = (id: string) => FELURI.find((f) => f.id === id)?.etichet
 export function AdminColectii({
   colectii,
   dupaSalvare,
+  onContinut,
 }: {
   colectii: Colectii;
   dupaSalvare: () => void;
+  onContinut?: (colectie: Colectie, actiune: 'vezi' | 'adauga' | 'import') => void;
 }) {
   const { notify } = useToast();
   const [cautare, setCautare] = useState('');
   const [inLucru, setInLucru] = useState(false);
+  const normal = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('ro').trim();
+  const vizibile = colectii.lista.filter((c) => normal(`${c.nume} ${c.an ?? ''}`).includes(normal(cautare)));
 
   const salveaza = async (c: Parameters<typeof salveazaColectie>[0], reusit: string) => {
     if (inLucru) return;
@@ -72,13 +76,17 @@ export function AdminColectii({
           <div style={{ padding: 20, font: `400 13px ${SANS}`, color: 'var(--fg3)' }}>
             Nicio colecție încă. Prima scrisă mai sus apare aici.
           </div>
-        ) : (
-          colectii.lista.filter((c) => `${c.nume} ${c.an ?? ''}`.toLocaleLowerCase('ro').includes(cautare.toLocaleLowerCase('ro'))).map((c) => (
+        ) : vizibile.length === 0 ? <div style={{ padding: 20 }}>
+          <p>Nicio colecție nu corespunde căutării.</p>
+          <button type="button" className="btn-quiet" onClick={() => setCautare('')}>Șterge căutarea</button>
+        </div> : (
+          vizibile.map((c) => (
             <RandColectie
               key={c.id}
               colectie={c}
               inLucru={inLucru}
               onSalveaza={(x) => salveaza(x, 'Colecția a fost salvată.')}
+              onContinut={onContinut}
             />
           ))
         )}
@@ -218,10 +226,12 @@ function RandColectie({
   colectie,
   inLucru,
   onSalveaza,
+  onContinut,
 }: {
   colectie: Colectie;
   inLucru: boolean;
   onSalveaza: (c: Parameters<typeof salveazaColectie>[0]) => Promise<boolean | undefined>;
+  onContinut?: (colectie: Colectie, actiune: 'vezi' | 'adauga' | 'import') => void;
 }) {
   const [nume, setNume] = useState(colectie.nume);
   const [editez, setEditez] = useState(false);
@@ -290,6 +300,11 @@ function RandColectie({
         </button>
       ) : (
         <>
+          {onContinut && <div className="admin-butoane" style={{ width: '100%' }}>
+            <button className="btn-ghost" disabled={inLucru} aria-label={`Vezi grilele: ${colectie.nume}`} onClick={() => onContinut(colectie, 'vezi')}>Vezi grilele</button>
+            <button className="btn-quiet" disabled={inLucru} aria-label={`Adaugă grile: ${colectie.nume}`} onClick={() => onContinut(colectie, 'adauga')}>Adaugă aici</button>
+            <button className="btn-quiet" disabled={inLucru} aria-label={`Importă grile: ${colectie.nume}`} onClick={() => onContinut(colectie, 'import')}>Importă aici</button>
+          </div>}
           <button
             type="button"
             className="btn-quiet"

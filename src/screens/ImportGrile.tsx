@@ -54,6 +54,7 @@ export function ImportGrile({
   reload,
   dupaImport,
   capitolCerut,
+  colectieCeruta,
 }: {
   catalog: GrilaCatalog[];
   taxonomie: Taxonomie;
@@ -63,6 +64,7 @@ export function ImportGrile({
   /** Lista din Administrare e o interogare separată; are nevoie de un semnal. */
   dupaImport?: () => void;
   capitolCerut?: { id: string; cerere: number } | null;
+  colectieCeruta?: { id: string; cerere: number } | null;
 }) {
   const { notify } = useToast();
 
@@ -82,6 +84,14 @@ export function ImportGrile({
   const [progres, setProgres] = useState<{ facut: number; total: number } | null>(null);
   const [bilant, setBilant] = useState<BilantImport | null>(null);
   const [cerereTratata, setCerereTratata] = useState(0);
+  const [colectieTratata, setColectieTratata] = useState(0);
+  const sursaInAsteptare = colectieCeruta && colectieCeruta.cerere !== colectieTratata ? colectii.colectie(colectieCeruta.id) : undefined;
+  useEffect(() => {
+    if (!sursaInAsteptare || brut.trim() || progres !== null) return;
+    setColectie(sursaInAsteptare.id);
+    setSursa(sursaInAsteptare.tip === 'culegere' ? 'culegere' : sursaInAsteptare.tip === 'autor' ? 'materie' : 'subiect_oficial');
+    setColectieTratata(colectieCeruta!.cerere);
+  }, [sursaInAsteptare, colectieCeruta, brut, progres]);
   const capitolInAsteptare = capitolCerut && capitolCerut.cerere !== cerereTratata ? capitolCerut.id : null;
   useEffect(() => {
     if (!capitolInAsteptare || brut.trim() || progres !== null) return;
@@ -179,6 +189,15 @@ export function ImportGrile({
       </p>
 
       <h3>1. Alege formatul și conținutul</h3>
+      {sursaInAsteptare && brut.trim() && <div role="status" className="admin-previzualizare">
+        <p>Ai un lot în lucru. Aplici sursa „{sursaInAsteptare.nume}”? Textul rămâne neschimbat; în JSON, proveniența scrisă pe fiecare grilă are prioritate.</p>
+        <button type="button" className="btn-ghost" onClick={() => {
+          setColectie(sursaInAsteptare.id);
+          setSursa(sursaInAsteptare.tip === 'culegere' ? 'culegere' : sursaInAsteptare.tip === 'autor' ? 'materie' : 'subiect_oficial');
+          setColectieTratata(colectieCeruta!.cerere);
+        }}>Aplică sursa lotului</button>
+        <button type="button" className="btn-quiet" onClick={() => setColectieTratata(colectieCeruta!.cerere)}>Păstrează sursa curentă</button>
+      </div>}
       {capitolInAsteptare && brut.trim() && <div role="status" className="admin-previzualizare">
         <p>Ai deja un lot în lucru. Ai ales capitolul „{taxonomie.eticheta(capitolInAsteptare)}”. Textul nu a fost schimbat.</p>
         {format === 'tabel' && <button type="button" className="btn-ghost" onClick={() => {

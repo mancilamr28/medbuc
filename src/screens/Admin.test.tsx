@@ -143,6 +143,40 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('cere acordul înainte să schimbe sursa unui import existent', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await screen.findByRole('button', { name: 'Importă un lot' }));
+    await user.click(screen.getByLabelText('Lipește tabelul aici'));
+    await user.paste('Enunț\tA\tB\tCorect\tExplicație\nQ\ta\tb\tA\te');
+    await user.click(screen.getByRole('tab', { name: 'Surse și colecții' }));
+    await user.click(await screen.findByRole('button', { name: 'Importă grile: Admitere UMFCD 2026' }));
+    expect(screen.getByLabelText('Origine / colecție')).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Aplică sursa lotului' }));
+    expect(screen.getByLabelText('Origine / colecție')).toHaveValue('umfcd-2026-mg');
+    expect(screen.getByLabelText('Tip de conținut')).toHaveValue('subiect_oficial');
+    expect(screen.getByLabelText('Lipește tabelul aici')).toHaveValue('Enunț\tA\tB\tCorect\tExplicație\nQ\ta\tb\tA\te');
+    expect(salveaza).not.toHaveBeenCalled();
+  });
+  it('deschide biblioteca filtrată pe colecția aleasă', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+    await user.click(screen.getByRole('tab', { name: 'Surse și colecții' }));
+    await user.click(await screen.findByRole('button', { name: 'Vezi grilele: Admitere UMFCD 2026' }));
+    expect(screen.getByRole('combobox', { name: 'Filtrează după colecție' })).toHaveValue('umfcd-2026-mg');
+  });
+  it('începe o întrebare din colecție cu originea, tipul și anul completate', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await gata();
+    await user.click(screen.getByRole('tab', { name: 'Surse și colecții' }));
+    await user.click(await screen.findByRole('button', { name: 'Adaugă grile: Admitere UMFCD 2026' }));
+    expect(screen.getByRole('combobox', { name: 'Origine / colecție' })).toHaveValue('umfcd-2026-mg');
+    expect(screen.getByRole('combobox', { name: 'Tip de conținut' })).toHaveValue('subiect_oficial');
+    expect(screen.getByLabelText('Anul subiectului')).toHaveValue('2026');
+    expect(salveaza).not.toHaveBeenCalled();
+  });
   it('pornește scrierea și importul din capitolul ales în acoperire', async () => {
     const user = userEvent.setup();
     monteaza();
