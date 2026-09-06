@@ -1,23 +1,53 @@
-import { describe, expect, it } from 'vitest';
-import { reportError } from './sentry';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-/**
- * Fără `VITE_SENTRY_DSN` (cazul de test, de PR, de dezvoltare locală fără
- * cheie), `initSentry()` nu rulează niciodată. `reportError` trebuie să rămână
- * sigur de apelat oricum — `ErrorBoundary` îl cheamă la orice eroare prinsă,
- * și n-are voie să arunce el însuși în timp ce raportează o altă eroare.
- */
-describe('reportError fără raportare configurată', () => {
-  it('nu aruncă', () => {
-    expect(() => reportError(new Error('test'))).not.toThrow();
-  });
+const { init, send, capture } = vi.hoisted(() => ({ init: vi.fn(), send: vi.fn(async () => ({})), capture: vi.fn() }));
+vi.mock('@sentry/react', () => ({ init, captureException: capture, makeFetchTransport: () => ({ send, flush: async () => true }) }));
+beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); vi.stubEnv('VITE_SENTRY_DSN', 'https://example.invalid/1'); });
+afterEach(() => vi.unstubAllEnvs());
 
-  it('nu aruncă nici cu un component stack atașat', () => {
-    expect(() => reportError(new Error('test'), 'in <Grile>')).not.toThrow();
-  });
+it('fără DSN rămâne sigur pentru orice eroare, chiar și cu acord', async () => {
+  vi.stubEnv('VITE_SENTRY_DSN', '');
+  const sentry = await import('./sentry');
+  sentry.seteazaAcordDiagnostic(() => true);
+  expect(() => sentry.reportError(new Error('test'))).not.toThrow();
+  expect(() => sentry.reportError(new Error('test'), 'in <Grile>')).not.toThrow();
+  expect(() => sentry.reportError('un șir')).not.toThrow();
+  expect(() => sentry.reportError({ ceva: 'neașteptat' })).not.toThrow();
+  expect(init).not.toHaveBeenCalled();
+  expect(capture).not.toHaveBeenCalled();
+});
 
-  it('acceptă orice a fost prins, nu doar Error', () => {
-    expect(() => reportError('un șir, nu un Error')).not.toThrow();
-    expect(() => reportError({ ceva: 'neașteptat' })).not.toThrow();
-  });
+it('nu pornește fără acord; retragerea blochează toate trimiterile', async () => {
+  const sentry = await import('./sentry');
+  sentry.initSentry();
+  sentry.reportError(new Error('înainte de acord'));
+  expect(init).not.toHaveBeenCalled();
+  let acord = true;
+  sentry.seteazaAcordDiagnostic(() => acord);
+  await vi.waitFor(() => expect(init).toHaveBeenCalledTimes(1));
+  const optiuni = init.mock.calls[0]![0];
+  const transport = optiuni.transport({});
+  await transport.send([]);
+  expect(send).toHaveBeenCalledTimes(1);
+  acord = false;
+  await transport.send([]);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(optiuni.beforeSend({ message: 'oprit' })).toBeNull();
+  expect(optiuni.beforeBreadcrumb({ message: 'oprit' })).toBeNull();
+  sentry.reportError(new Error('după retragere'));
+  expect(capture).not.toHaveBeenCalled();
+  acord = true;
+  sentry.seteazaAcordDiagnostic(() => acord);
+  expect(init).toHaveBeenCalledTimes(1);
+  await transport.send([]);
+  expect(send).toHaveBeenCalledTimes(2);
+});
+
+it('nu inițializează SDK-ul dacă acordul dispare în timpul încărcării', async () => {
+  const sentry = await import('./sentry');
+  let acord = true;
+  sentry.seteazaAcordDiagnostic(() => acord);
+  acord = false;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(init).not.toHaveBeenCalled();
 });
