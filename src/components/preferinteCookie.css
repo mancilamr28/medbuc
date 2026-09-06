@@ -1,0 +1,31 @@
+.preferinte-cookie { padding: 16px 24px; text-align: center; color: var(--fg2); background: var(--bg); font-size: 12px; }
+@media (max-width: 959px) { .preferinte-cookie { padding-bottom: 100px; } }
+.preferinte-cookie button { padding: 8px 12px; text-decoration: underline; }
+#cc-main {
+  --cc-font-family: 'Public Sans', system-ui, sans-serif;
+  --cc-bg: var(--surf);
+  --cc-primary-color: var(--fg);
+  --cc-secondary-color: var(--fg2);
+  --cc-btn-primary-bg: var(--brand);
+  --cc-btn-primary-color: var(--onBrand);
+  --cc-btn-primary-border-color: var(--brand);
+  --cc-btn-primary-hover-bg: var(--brand);
+  --cc-btn-primary-hover-color: var(--onBrand);
+  --cc-btn-primary-hover-border-color: var(--brand);
+  --cc-btn-secondary-bg: var(--surf2);
+  --cc-btn-secondary-color: var(--fg);
+  --cc-btn-secondary-border-color: var(--line);
+  --cc-btn-secondary-hover-bg: var(--surf3);
+  --cc-btn-secondary-hover-color: var(--fg);
+  --cc-btn-secondary-hover-border-color: var(--line);
+  --cc-separator-border-color: var(--line);
+  --cc-cookie-category-block-bg: var(--surf2);
+  --cc-cookie-category-block-hover-bg: var(--surf3);
+  --cc-cookie-category-block-border: var(--line);
+  --cc-toggle-on-bg: var(--brand);
+  --cc-toggle-off-bg: var(--fg3);
+  --cc-toggle-readonly-bg: var(--surf3);
+  --cc-modal-border-radius: 16px;
+  --cc-btn-border-radius: 9px;
+}
+@media (prefers-reduced-motion: reduce) { #cc-main { --cc-modal-transition-duration: 0s; } }

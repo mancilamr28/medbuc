@@ -1,33 +1,45 @@
 /**
  * Raportare de erori, încărcată dinamic.
  *
- * `@sentry/react` adaugă ~30 KB gzip la bundle — cost pe care nu are sens să-l
- * plătească nimeni fără `VITE_SENTRY_DSN` configurat (orice PR, orice
- * dezvoltare locală fără cheie). `import()` face pachetul să nu fie nici măcar
- * descărcat în acele cazuri; când DSN-ul există, se încarcă asincron, fără să
- * blocheze prima randare.
+ * Pachetul se descarcă numai cu `VITE_SENTRY_DSN` configurat și acord valabil.
+ * Retragerea acordului blochează trimiterile viitoare, inclusiv cele automate.
  *
  * Deliberat minimal, dincolo de ce arată wizard-ul de configurare al Sentry:
  * doar monitorizarea erorilor, fără Session Replay și fără urmărire de
  * performanță. Suntem în UE, cu posibili utilizatori minori — Session Replay
  * înregistrează interacțiunea reală cu pagina și ar cere consimțământ explicit
- * înainte să fie pornit, nu activat tăcut la instalare. Se poate adăuga mai
- * târziu, cu consimțământul din Faza 7, nu acum.
+ * înainte să fie pornit. Acordul actual pentru erori nu autorizează Replay.
  */
 
 type SentryModule = typeof import('@sentry/react');
 
-let sentryReady: Promise<SentryModule> | null = null;
+let sentryReady: Promise<SentryModule | null> | null = null;
+let permiteRaportarea: () => boolean = () => false;
 
-/** Pornește raportarea, dacă e configurată. Fără efect altfel. */
+/** Verificată și la trimitere: retragerea sau expirarea acordului oprește traficul. */
+export function seteazaAcordDiagnostic(permite: () => boolean): void {
+  permiteRaportarea = permite;
+  if (permite()) initSentry();
+}
+
+/** Pornește raportarea numai dacă este configurată și există acord valabil. */
 export function initSentry(): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
-  if (!dsn) return;
+  if (!dsn || !permiteRaportarea() || sentryReady) return;
 
   sentryReady = import('@sentry/react').then((Sentry) => {
-    Sentry.init({ dsn, sendDefaultPii: false, environment: import.meta.env.MODE });
+    if (!permiteRaportarea()) { sentryReady = null; return null; }
+    Sentry.init({
+      dsn, sendDefaultPii: false, environment: import.meta.env.MODE,
+      beforeSend: (event) => permiteRaportarea() ? event : null,
+      beforeBreadcrumb: (breadcrumb) => permiteRaportarea() ? breadcrumb : null,
+      transport: (options) => {
+        const transport = Sentry.makeFetchTransport(options);
+        return { ...transport, send: (envelope) => permiteRaportarea() ? transport.send(envelope) : Promise.resolve({}) };
+      },
+    });
     return Sentry;
-  });
+  }).catch(() => { sentryReady = null; return null; });
 }
 
 /**
@@ -35,9 +47,10 @@ export function initSentry(): void {
  * pornită (sau pachetul încă se încarcă), nu face nimic și nu aruncă.
  */
 export function reportError(error: unknown, componentStack?: string): void {
+  if (!permiteRaportarea()) return;
   sentryReady
     ?.then((Sentry) => {
-      Sentry.captureException(error, componentStack ? { contexts: { react: { componentStack } } } : undefined);
+      if (permiteRaportarea()) Sentry?.captureException(error, componentStack ? { contexts: { react: { componentStack } } } : undefined);
     })
     .catch(() => {
       /* pachetul nu s-a putut încărca — nu mai e nimic de raportat */

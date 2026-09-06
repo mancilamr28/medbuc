@@ -176,11 +176,13 @@ Do **not** add `@fortawesome/fontawesome-svg-core` or `@fortawesome/react-fontaw
 
 ### Error reporting — `src/lib/sentry.ts`
 
-`@sentry/react` is a real dependency, but it is **never in the main bundle**. `initSentry()` (called once, first line of `main.tsx`) checks `VITE_SENTRY_DSN` and only then does `import('@sentry/react')` — a dynamic import, so without a configured DSN the package is not fetched at all, and Rollup tree-shakes the whole branch away at build time (confirmed: build output has one chunk, same size as before Sentry was added). With a DSN, it becomes a second, separate chunk (~160 KB gzip) fetched asynchronously, after first paint, never blocking it.
+`@sentry/react` remains dynamically imported. It is loaded only when `VITE_SENTRY_DSN` exists **and** CookieConsent reports valid opt-in to `diagnostic`. `main.tsx` no longer starts Sentry. `PreferinteCookie` mounts outside authentication and exposes a permanent preferences button. `lib/consimtamant.ts` owns the Romanian configuration; without a DSN there is no misleading optional category. See `docs/consimtamant.md` for revision and storage rules.
+
+The consent predicate is checked before loading, after loading, before capturing errors and at transport send time. Withdrawal or expiry blocks future envelopes, including automatic ones; already-started requests cannot be recalled. Do not replace the transport guard with a hidden button or only a `beforeSend` callback.
 
 `ErrorBoundary.componentDidCatch` calls `reportError(error, info.componentStack)`, not the SDK directly — `reportError` is safe to call unconditionally (no-op until the dynamic import resolves, never throws) so the boundary itself stays free of any Sentry-shaped import.
 
-**Deliberately narrower than Sentry's own setup wizard suggests:** only error monitoring, `sendDefaultPii: false`, no Session Replay, no performance tracing. This project is EU-facing with likely-minor users; Session Replay records real interaction with the page and needs explicit consent before it's turned on, not silent opt-in at install time. Add it later, gated behind the consent flow from Faza 7 — not now.
+**Deliberately narrower than Sentry's own setup wizard suggests:** only error monitoring, `sendDefaultPii: false`, no Session Replay, no performance tracing. The current diagnostic consent does not authorize adding those services. New purposes require a separate review and an updated consent revision.
 
 `VITE_SENTRY_DSN` goes in `.env.local` (gitignored) for local dev, and as a `VITE_SENTRY_DSN` GitHub Actions secret for `deploy.yml` to bake into the published build. It's optional everywhere: CI and any build without it just produce an app with reporting off, not a failure.
 
