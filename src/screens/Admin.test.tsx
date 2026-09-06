@@ -143,6 +143,30 @@ beforeEach(() => {
 });
 
 describe('Administrare', () => {
+  it('deschide câmpul potrivit din revizuire, inclusiv codul ascuns', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await formular(user, 'COD-INVALID');
+    // Codul invalid este oprit la Continuă; revizuirea rămâne accesibilă explicit.
+    await user.click(screen.getByRole('button', { name: '3. Verificare și salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Corectează: Enunțul nu poate fi gol.' }));
+    expect(screen.getByRole('textbox', { name: 'Enunțul grilei' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: '3. Verificare și salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Corectează: Identificatorul poate conține doar litere mici, cifre și cratime.' }));
+    expect(screen.getByRole('textbox', { name: 'Identificator' })).toHaveFocus();
+  });
+  it('oprește continuarea fără capitol și oferă corectarea directă', async () => {
+    const user = userEvent.setup();
+    monteaza();
+    await user.click(await gata());
+    await user.click(screen.getByRole('button', { name: 'Continuă' }));
+    expect(screen.getByRole('combobox', { name: 'Capitol' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Corectează: Alege un capitol.' }));
+    expect(screen.getByRole('combobox', { name: 'Capitol' })).toHaveFocus();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Capitol' }), 'bio-nervos');
+    await user.click(screen.getByRole('button', { name: 'Continuă' }));
+    expect(screen.getByRole('textbox', { name: 'Enunțul grilei' })).toBeVisible();
+  });
   it('cere acordul înainte să schimbe sursa unui import existent', async () => {
     const user = userEvent.setup();
     monteaza();
@@ -271,6 +295,7 @@ describe('Administrare', () => {
     const user = userEvent.setup();
     monteaza();
     await user.click(await gata());
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Capitol' }), 'bio-nervos');
     await user.selectOptions(screen.getByLabelText('Tipul întrebării'), 'grupat');
     await user.click(screen.getByRole('button', { name: 'Continuă' }));
     expect(screen.getByLabelText('Varianta A')).toHaveValue(TIPURI_SEED.tip('grupat')!.sablonOptiuni![0]);

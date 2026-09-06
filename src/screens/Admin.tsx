@@ -30,7 +30,10 @@ import {
   catreSalvare,
   ciornaGoala,
   dinGrila,
-  valideaza,
+  valideazaCampuri,
+  pasulCampului,
+  type CampProblema,
+  type ProblemaCiorna,
   variantScrise,
   type Ciorna,
 } from './adminCiorna';
@@ -116,7 +119,21 @@ function AdminPanel({ userId }: { userId: string }) {
   const [capitolImport, setCapitolImport] = useState<{ id: string; cerere: number } | null>(null);
   const [colectieImport, setColectieImport] = useState<{ id: string; cerere: number } | null>(null);
 
-  const probleme = [...valideaza(ciorna, taxonomie, tipuri), ...(!raspunsAles ? ['Alege explicit răspunsul corect.'] : [])];
+  const problemeCampuri: ProblemaCiorna[] = [...valideazaCampuri(ciorna, taxonomie, tipuri), ...(!raspunsAles ? [{ camp: 'correct' as const, mesaj: 'Alege explicit răspunsul corect.' }] : [])];
+  const probleme = problemeCampuri.map((p) => p.mesaj);
+  const [tinta, setTinta] = useState<{ camp: CampProblema } | null>(null);
+  useEffect(() => {
+    if (!tinta) return;
+    const element = document.getElementById(`admin-camp-${tinta.camp === 'correct' ? 'opts' : tinta.camp}`);
+    const detalii = element?.closest('details');
+    if (detalii) detalii.open = true;
+    const control = element?.matches('input, textarea, select, button') ? element
+      : (tinta.camp === 'correct' ? element?.querySelector<HTMLElement>('button:not(:disabled)') : null)
+        ?? element?.querySelector<HTMLElement>('input, textarea, select');
+    control?.focus();
+    setTinta(null);
+  }, [tinta, pas]);
+  const corecteaza = (camp: CampProblema) => { setPas(pasulCampului(camp)); setTinta({ camp }); };
   const scrise = variantScrise(ciorna);
 
   const camp = <K extends keyof Ciorna>(key: K, value: Ciorna[K]) => {
@@ -393,6 +410,7 @@ function AdminPanel({ userId }: { userId: string }) {
                 className="field"
                 value={ciorna.capId}
                 aria-label="Capitol"
+                id="admin-camp-capId"
                 onChange={(e) => camp('capId', e.target.value as ChapterId)}
                 style={{ padding: '11px 12px', font: `400 13.5px ${SANS}`, cursor: 'pointer' }}
               >
@@ -441,12 +459,13 @@ function AdminPanel({ userId }: { userId: string }) {
             setCiorna((c) => ({ ...c, sursa, colectie, an: an === undefined ? c.an : an === null ? '' : String(an) }));
           }} />
           <div>
-            {ciorna.sursa === 'subiect_oficial' && (
+            {(ciorna.sursa === 'subiect_oficial' || ciorna.an.trim() !== '') && (
               <label style={{ display: 'block' }}>
                 <span style={label}>Anul subiectului</span>
                 <input
                   className="field"
                   value={ciorna.an}
+                  id="admin-camp-an"
                   onChange={(e) => camp('an', e.target.value)}
                   placeholder="2026"
                   inputMode="numeric"
@@ -469,7 +488,7 @@ function AdminPanel({ userId }: { userId: string }) {
 
           <details className="admin-detalii">
             <summary>Cod intern (completat automat)</summary>
-            <label><span style={label}>Identificator</span><input className="field" value={ciorna.id} disabled={editez !== null}
+            <label><span style={label}>Identificator</span><input id="admin-camp-id" className="field" value={ciorna.id} disabled={editez !== null}
               placeholder="bio-nervos-07" onChange={(e) => camp('id', e.target.value)} /></label>
             <p className="admin-ajutor">Nu trebuie schimbat. Acest cod identifică grila, nu apare ca titlu pentru elevi.</p>
           </details>
@@ -481,6 +500,7 @@ function AdminPanel({ userId }: { userId: string }) {
             <textarea
               className="field"
               value={ciorna.text}
+              id="admin-camp-text"
               onChange={(e) => camp('text', e.target.value)}
               placeholder="Scrie enunțul exact cum apare la examen…"
               style={{ minHeight: 84, resize: 'vertical', padding: 12, font: `400 14px/1.5 ${SANS}` }}
@@ -488,7 +508,7 @@ function AdminPanel({ userId }: { userId: string }) {
           </label>
 
           {tipuri.tip(ciorna.tip)?.cereEnunturi && (
-            <div style={{ marginTop: 18 }}>
+            <div id="admin-camp-enunturi" style={{ marginTop: 18 }}>
               <span style={label}>Afirmațiile întrebării</span>
               <div style={{ display: 'grid', gap: 8 }}>
                 {ciorna.enunturi.map((e, i) => (
@@ -516,7 +536,7 @@ function AdminPanel({ userId }: { userId: string }) {
             </div>
           )}
 
-          <div style={{ marginTop: 20 }}>
+          <div id="admin-camp-opts" style={{ marginTop: 20 }}>
             <span style={label}>Variantele de răspuns</span>
             <p className="admin-ajutor">{tipuri.tip(ciorna.tip)?.sablonOptiuni ? 'Cheia de răspuns este completată automat și nu se editează. Apasă litera combinației corecte.' : 'Scrie variantele, apoi apasă litera răspunsului corect. Verde înseamnă corect.'}</p>
             <div style={{ display: 'grid', gap: 12 }}>
@@ -594,6 +614,7 @@ function AdminPanel({ userId }: { userId: string }) {
             <textarea
               className="field"
               value={ciorna.expl}
+              id="admin-camp-expl"
               onChange={(e) => camp('expl', e.target.value)}
               placeholder="Ideea de fond a grilei, în două-trei fraze…"
               style={{ minHeight: 84, resize: 'vertical', padding: 12, font: `400 14px/1.5 ${SANS}` }}
@@ -610,7 +631,7 @@ function AdminPanel({ userId }: { userId: string }) {
             <p style={{ whiteSpace: 'pre-wrap' }}>{ciorna.expl}</p>
             {ciorna.src && <p className="admin-ajutor">Referință: {ciorna.src}</p>}
             <p className="admin-ajutor">Ciorna este vizibilă doar administratorilor. Publicarea face grila disponibilă elevilor eligibili.</p>
-          {(aratatProbleme || pas === 2) && probleme.length > 0 && (
+          {pas === 2 && probleme.length > 0 && (
             <ul
               style={{
                 margin: '16px 0 0',
@@ -622,8 +643,8 @@ function AdminPanel({ userId }: { userId: string }) {
                 color: 'var(--fg)',
               }}
             >
-              {probleme.map((p) => (
-                <li key={p}>{p}</li>
+              {problemeCampuri.map((p) => (
+                <li key={p.mesaj}><button type="button" className="btn-quiet" aria-label={`Corectează: ${p.mesaj}`} onClick={() => corecteaza(p.camp)}>{p.mesaj}</button></li>
               ))}
             </ul>
           )}
@@ -664,9 +685,18 @@ function AdminPanel({ userId }: { userId: string }) {
             </button>
           </div>
           </div>
+          {pas < 2 && aratatProbleme && <div role="status" className="admin-ajutor">
+            {problemeCampuri.filter((p) => pasulCampului(p.camp) === pas).map((p) => <p key={p.mesaj}>
+              <button type="button" className="btn-quiet" aria-label={`Corectează: ${p.mesaj}`} onClick={() => corecteaza(p.camp)}>{p.mesaj}</button>
+            </p>)}
+          </div>}
           <div className="admin-butoane" style={{ marginTop: 18 }}>
             {pas > 0 && <button className="btn-ghost" onClick={() => setPas(pas - 1)}>Pasul anterior</button>}
-            {pas < 2 && <button className="btn-primary" onClick={() => setPas(pas + 1)}>Continuă</button>}
+            {pas < 2 && <button className="btn-primary" onClick={() => {
+              const lipsa = problemeCampuri.find((p) => pasulCampului(p.camp) <= pas);
+              if (lipsa) { setAratatProbleme(true); corecteaza(lipsa.camp); }
+              else { setAratatProbleme(false); setPas(pas + 1); }
+            }}>Continuă</button>}
           </div>
           </fieldset>
         </div>
