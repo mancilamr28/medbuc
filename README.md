@@ -5,6 +5,8 @@ plan de învățare, simulări de examen și un panou de administrare a conținu
 
 Implementarea urmează designul din `design/MedBuc.dc.html` (proiectul Claude Design).
 
+Pentru importul de întrebări și teste din fișiere JSON, vezi [ghidul de import pentru administratori](docs/import-admin.md).
+
 ## Rulare
 
 ```bash

@@ -2,7 +2,7 @@ import { OPTION_KEYS } from '../data/questions';
 import type { TipGrila } from '../lib/tipuriGrile';
 
 /** TSV copiat dintr-un tabel; celulele citate pot avea taburi și rânduri noi. */
-export function celuleDin(text: string): string[][] {
+export function celuleDin(text: string, separator = '\t'): string[][] {
   const randuri: string[][] = [];
   let rand: string[] = [], celula = '', citat = false;
   const brut = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
@@ -11,7 +11,7 @@ export function celuleDin(text: string): string[][] {
     if (c === '"' && (citat || celula === '')) {
       if (citat && brut[i + 1] === '"') { celula += '"'; i++; }
       else citat = !citat;
-    } else if (!citat && (c === '\t' || c === '\n')) {
+    } else if (!citat && (c === separator || c === '\n')) {
       rand.push(celula); celula = '';
       if (c === '\n') { randuri.push(rand); rand = []; }
     } else celula += c;

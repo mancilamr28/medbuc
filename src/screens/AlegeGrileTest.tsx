@@ -6,11 +6,12 @@ import { numar } from '../lib/text';
 import { useBibliotecaAdmin } from './adminBiblioteca';
 
 /** Se caută o pagină pe server; nu se descarcă întregul conținut al bibliotecii. */
-export function AlegeGrileTest({ alese, onChange, taxonomie, colectii }: {
+export function AlegeGrileTest({ alese, onChange, taxonomie, colectii, titluriInitiale = {} }: {
   alese: string[]; onChange: (ids: string[]) => void; taxonomie: Taxonomie; colectii: Colectii;
+  titluriInitiale?: Record<string, string>;
 }) {
   const [filtre, setFiltre] = useState({ ...FILTRE_GOALE, status: 'publicata' as const });
-  const [titluri, setTitluri] = useState<Record<string, string>>({});
+  const [titluri, setTitluri] = useState<Record<string, string>>(titluriInitiale);
   const biblioteca = useBibliotecaAdmin(filtre);
   const muta = (i: number, j: number) => {
     if (j < 0 || j >= alese.length) return;
