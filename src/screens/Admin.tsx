@@ -40,6 +40,7 @@ import {
 import { OrigineGrile } from './OrigineGrile';
 import { ImportGrile } from './ImportGrile';
 import { useCiornaAdmin } from './useCiornaAdmin';
+import type { TestDinFisier } from './importJson';
 import { PrevizualizareGrila } from './PrevizualizareGrila';
 
 /** Ce vede un cont fără drepturi de administrare. */
@@ -118,6 +119,7 @@ function AdminPanel({ userId }: { userId: string }) {
   const [materieFiltrata, setMaterieFiltrata] = useState('');
   const [capitolImport, setCapitolImport] = useState<{ id: string; cerere: number } | null>(null);
   const [colectieImport, setColectieImport] = useState<{ id: string; cerere: number } | null>(null);
+  const [testDinImport, setTestDinImport] = useState<{ grile: string[]; colectieId: string; test?: TestDinFisier | null; titluri: Record<string, string> } | null>(null);
 
   const problemeCampuri: ProblemaCiorna[] = [...valideazaCampuri(ciorna, taxonomie, tipuri), ...(!raspunsAles ? [{ camp: 'correct' as const, mesaj: 'Alege explicit răspunsul corect.' }] : [])];
   const probleme = problemeCampuri.map((p) => p.mesaj);
@@ -361,7 +363,7 @@ function AdminPanel({ userId }: { userId: string }) {
           }
         }} />
       ) : sectiune === 'teste' ? (
-        <AdminTestePredefinite taxonomie={taxonomie} colectii={colectii} />
+        <AdminTestePredefinite taxonomie={taxonomie} colectii={colectii} dinImport={testDinImport} consumaImport={() => setTestDinImport(null)} />
       ) : (
       <div>
         {sectiune === 'adauga' && (
@@ -1072,7 +1074,9 @@ function AdminPanel({ userId }: { userId: string }) {
       </div>
       )}
       <div hidden={sectiune !== 'import'}>
-        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} capitolCerut={capitolImport} colectieCeruta={colectieImport} />
+        <ImportGrile catalog={catalog} taxonomie={taxonomie} tipuri={tipuri} colectii={colectii} reload={reload} dupaImport={biblioteca.reincarca} capitolCerut={capitolImport} colectieCeruta={colectieImport} creeazaTest={(grile, colectieId, test, titluri) => {
+          setTestDinImport({ grile, colectieId, test, titluri }); mergiLa('teste');
+        }} />
       </div>
     </div>
   );

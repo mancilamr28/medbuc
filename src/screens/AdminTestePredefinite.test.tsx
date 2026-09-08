@@ -44,6 +44,14 @@ beforeEach(() => {
 });
 
 describe('constructorul testelor predefinite', () => {
+  it('deschide lotul importat fără coduri introduse manual și păstrează ordinea la salvare', async () => {
+    const user = userEvent.setup();
+    render(<AdminTestePredefinite taxonomie={TAXONOMIE_SEED} colectii={colectii} dinImport={{ grile: ['a-doua', 'prima'], colectieId: 'umfcd-2026', test: { nume: 'Simulare importată', durata: '90' } }} />);
+    expect(screen.getByLabelText('Numele testului')).toHaveValue('Simulare importată');
+    expect(screen.getByLabelText('Durata testului')).toHaveValue(90);
+    await user.click(screen.getByRole('button', { name: 'Salvează testul' }));
+    await waitFor(() => expect(api.salveaza).toHaveBeenCalledWith(expect.objectContaining({ nume: 'Simulare importată', durata_minute: 90, grile: ['a-doua', 'prima'], mod_selectie: 'fix', publicat: false })));
+  });
   it('arată definițiile existente și starea lor', async () => {
     api.citeste.mockResolvedValue([
       {

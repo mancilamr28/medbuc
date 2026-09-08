@@ -168,7 +168,7 @@ function catreCiorna(
 
   const corect = sir(brut['correct']).trim().toUpperCase();
   if (!(OPTION_KEYS as string[]).includes(corect)) {
-    probleme.push(`Răspunsul corect „${sir(brut['correct'])}" nu e o literă între A și E.`);
+    probleme.push(corect === '' ? 'Lipsește răspunsul corect. Alege o variantă între A și E.' : `Răspunsul corect „${sir(brut['correct'])}" nu e o literă între A și E.`);
   } else {
     ciorna.correct = corect as OptionKey;
   }

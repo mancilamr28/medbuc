@@ -15,9 +15,13 @@ import { type QuestionSursa } from '../data/questions';
 import type { Taxonomie } from '../lib/taxonomie';
 import type { TipuriGrile } from '../lib/tipuriGrile';
 import { OrigineGrile } from './OrigineGrile';
-import { antetTabel, tabelCatreJson, tabelCuIdentitati, randuriRepetate } from './importTabel';
+import { antetTabel, tabelCatreJson, tabelCuIdentitati, randuriRepetate, scrieCelule } from './importTabel';
 import type { Colectii } from '../lib/colectii';
 import { EditorTabelImport } from './EditorTabelImport';
+import { ImportDocument } from './ImportDocument';
+import { fisierTabel } from './citesteDocument';
+import { modelJson, pregatesteJson, scrieJsonPregatit, type TestDinFisier } from './importJson';
+import { EditorJsonImport } from './EditorJsonImport';
 
 /** Exemplul din interfață: forma canonică, cu tot ce contează într-o grilă bună. */
 const EXEMPLU = `[
@@ -55,6 +59,7 @@ export function ImportGrile({
   dupaImport,
   capitolCerut,
   colectieCeruta,
+  creeazaTest,
 }: {
   catalog: GrilaCatalog[];
   taxonomie: Taxonomie;
@@ -65,6 +70,7 @@ export function ImportGrile({
   dupaImport?: () => void;
   capitolCerut?: { id: string; cerere: number } | null;
   colectieCeruta?: { id: string; cerere: number } | null;
+  creeazaTest?: (grile: string[], colectieId: string, test: TestDinFisier | null, titluri: Record<string, string>) => void;
 }) {
   const { notify } = useToast();
 
@@ -76,6 +82,12 @@ export function ImportGrile({
   const [confirmat, setConfirmat] = useState(false);
   const [revizuit, setRevizuit] = useState(false);
   const [editezTabel, setEditezTabel] = useState(false);
+  const [editezJson, setEditezJson] = useState(false);
+  const [dinDocument, setDinDocument] = useState(false);
+  const [documentModificat, setDocumentModificat] = useState(false);
+  const [citesteFisier, setCitesteFisier] = useState(false);
+  const [eroareFisier, setEroareFisier] = useState('');
+  const [lotSalvat, setLotSalvat] = useState<{ grile: string[]; colectieId: string; test: TestDinFisier | null; titluri: Record<string, string> } | null>(null);
   const tip = tipuri.tip(tipId);
   const [implicit, setImplicit] = useState<QuestionStatus>('ciorna');
   // Proveniența lotului: se scrie o dată, nu pe fiecare din cele cincizeci de rânduri.
@@ -107,30 +119,37 @@ export function ImportGrile({
     window.addEventListener('beforeunload', avertizeaza);
     return () => window.removeEventListener('beforeunload', avertizeaza);
   }, [brut]);
+  const jsonPregatit = useMemo(() => {
+    if (format !== 'json' || !brut.trim()) return null;
+    try { return pregatesteJson(brut, lotId, capitol, tipId); }
+    catch { return null; }
+  }, [format, brut, lotId, capitol, tipId]);
   const citire = useMemo(
     () => {
       try {
-        const json = format === 'json' ? brut : tip ? tabelCatreJson(brut, capitol, tip, lotId) : '';
+        const json = format === 'json' && brut.trim() ? JSON.stringify(pregatesteJson(brut, lotId, capitol, tipId).grile) : format === 'json' ? '' : tip ? tabelCatreJson(brut, capitol, tip, lotId) : '';
         return citesteImport(json, { status: implicit, sursa, colectie }, catalog, taxonomie, tipuri);
       } catch (e) { return { randuri: [], eroare: e instanceof Error ? e.message : 'Tabelul nu poate fi citit.' }; }
     },
-    [brut, format, capitol, tip, lotId, implicit, sursa, colectie, catalog, taxonomie, tipuri],
+    [brut, format, capitol, tip, tipId, lotId, implicit, sursa, colectie, catalog, taxonomie, tipuri],
   );
 
   const valide = citire.randuri.filter((r) => r.grila !== null);
   const cuProbleme = citire.randuri.filter((r) => r.grila === null);
   const rescrise = valide.filter((r) => r.suprascrie);
   const repetate = useMemo(() => {
-    try { return format === 'tabel' ? randuriRepetate(brut) : []; }
+    try { return randuriRepetate(format === 'tabel' ? brut : scrieCelule([['Enunț'], ...(jsonPregatit?.grile ?? []).map((g) => [typeof g['text'] === 'string' ? g['text'] : ''])])); }
     catch { return []; }
-  }, [format, brut]);
+  }, [format, brut, jsonPregatit]);
 
   const cereConfirmare = rescrise.length > 0 || cuProbleme.length > 0 || valide.some((r) => r.grila?.status === 'publicata');
+  const testIncomplet = !!jsonPregatit?.test && cuProbleme.length > 0;
 
   const ruleaza = async () => {
-    if (progres !== null || valide.length === 0 || !revizuit || (cereConfirmare && !confirmat)) return;
+    if (citesteFisier || testIncomplet || progres !== null || valide.length === 0 || !revizuit || (cereConfirmare && !confirmat)) return;
 
     setBilant(null);
+    setLotSalvat(null);
     setProgres({ facut: 0, total: valide.length });
     const rezultat = await importa(citire.randuri, salveazaGrila, (facut, total) =>
       setProgres({ facut, total }),
@@ -143,16 +162,41 @@ export function ImportGrile({
     setConfirmat(false);
 
     if (rezultat.esecuri.length === 0 && cuProbleme.length === 0) {
+      setLotSalvat({ grile: valide.map((r) => r.id), colectieId: colectie, test: jsonPregatit?.test ?? null, titluri: Object.fromEntries(valide.map((r) => [r.id, r.grila!.text])) });
       notify('succes', `${numar(rezultat.reusite, 'grilă importată', 'grile importate')}.`);
       // Golit doar la reușită deplină: dacă ceva a picat, textul trebuie să
       // rămână ca să poată fi corectat rândul vinovat și lotul reluat.
       setBrut('');
       setEditezTabel(false);
+      setEditezJson(false);
       setLotId(`lot-${crypto.randomUUID()}`);
     } else {
       if (format === 'tabel') setBrut(tabelCuIdentitati(brut, lotId));
+      else if (jsonPregatit) setBrut(scrieJsonPregatit(jsonPregatit));
       notify('eroare', `${numar(rezultat.esecuri.length + cuProbleme.length, 'grilă n-a intrat', 'grile n-au intrat')}. Lotul a rămas pentru corectare. Păstrează codurile interne la reîncercare.`);
     }
+  };
+
+  const incarcaFisier = async (fisier: File) => {
+    if (fisier.size > 5 * 1024 * 1024) { setEroareFisier('Fișierul depășește 5 MB. Împarte-l în loturi mai mici.'); return; }
+    const extensie = fisier.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!['csv', 'tsv', 'json'].includes(extensie)) {
+      setEroareFisier('Alege un fișier CSV, TSV sau JSON. Din Excel, folosește „Salvare ca → CSV” sau copiază celulele. Din Word/PDF, copiază textul în „Din document”.'); return;
+    }
+    if ((brut.trim() || documentModificat) && !window.confirm('Ai un lot în lucru. Îl înlocuiești cu fișierul ales?')) return;
+    setCitesteFisier(true); setEroareFisier('');
+    try {
+      const text = await fisier.text();
+      if (!text.trim()) throw new Error('Fișierul este gol. Alege un fișier care conține întrebări.');
+      const nou = extensie === 'json' ? text : fisierTabel(text, extensie);
+      if (extensie === 'json') pregatesteJson(text, 'verificare', capitol, tipId);
+      setBrut(nou); setFormat(extensie === 'json' ? 'json' : 'tabel');
+      setEditezTabel(false); setDinDocument(false); setBilant(null);
+      setDocumentModificat(false);
+      setEditezJson(extensie === 'json');
+      setLotId(`lot-${crypto.randomUUID()}`);
+    } catch (e) { setEroareFisier(e instanceof Error ? e.message : 'Fișierul nu a putut fi citit.'); }
+    finally { setCitesteFisier(false); }
   };
 
   const exporta = async () => {
@@ -171,7 +215,7 @@ export function ImportGrile({
 
   return (
     <div className="card admin-formular" style={{ padding: 22 }}>
-      <fieldset disabled={progres !== null} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+      <fieldset disabled={progres !== null || citesteFisier} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ font: `600 15px ${SANS}` }}>Import în masă</div>
         <button
@@ -185,10 +229,23 @@ export function ImportGrile({
       </div>
 
       <p style={{ margin: '8px 0 0', font: `400 12.5px/1.6 ${SANS}`, color: 'var(--fg2)' }}>
-        Pregătește un tabel, verifică rezultatul și abia apoi salvează. Nimic nu intră în bibliotecă doar prin lipire.
+        Încarcă întrebările, verifică rezultatul și abia apoi salvează. Nimic nu intră în bibliotecă doar prin încărcare sau lipire.
       </p>
 
       <h3>1. Alege formatul și conținutul</h3>
+      <label className="admin-detalii">Încarcă un fișier (CSV, TSV sau JSON)
+        <input className="field" type="file" accept=".csv,.tsv,.json" onChange={(e) => {
+          const fisier = e.target.files?.[0]; e.target.value = '';
+          if (fisier) void incarcaFisier(fisier);
+        }} />
+      </label>
+      {citesteFisier && <p role="status">Se citește fișierul…</p>}
+      {eroareFisier && <p role="alert" style={{ color: 'var(--bad)' }}>{eroareFisier}</p>}
+      <div className="admin-butoane" style={{ marginTop: 12 }}>
+        <button type="button" className="btn-ghost" disabled={!tip} onClick={() => tip && descarcaText(modelJson(tip, false), 'model-grile.json')}>Descarcă model JSON — întrebări</button>
+        <button type="button" className="btn-ghost" disabled={!tip} onClick={() => tip && descarcaText(modelJson(tip, true), 'model-test.json')}>Descarcă model JSON — test complet</button>
+      </div>
+      <p className="admin-ajutor">JSON poate conține întrebări separate sau un test cu nume și durată. Codurile interne se generează automat când lipsesc. După încărcare, corectezi întrebările în formular și verifici răspunsurile înainte de salvare.</p>
       {sursaInAsteptare && brut.trim() && <div role="status" className="admin-previzualizare">
         <p>Ai un lot în lucru. Aplici sursa „{sursaInAsteptare.nume}”? Textul rămâne neschimbat; în JSON, proveniența scrisă pe fiecare grilă are prioritate.</p>
         <button type="button" className="btn-ghost" onClick={() => {
@@ -207,17 +264,23 @@ export function ImportGrile({
         <button type="button" className="btn-quiet" onClick={() => setCerereTratata(capitolCerut!.cerere)}>Păstrează lotul curent</button>
       </div>}
       <Segmented items={[{ id: 'tabel' as const, label: 'Din tabel (Excel)' }, { id: 'json' as const, label: 'JSON (avansat)' }]} value={format} onChange={(f) => {
-        if (brut.trim() && !window.confirm('Schimbarea formatului va goli textul lipit. Continui?')) return;
-        setBrut(''); setEditezTabel(false); setFormat(f);
+        if ((brut.trim() || documentModificat) && !window.confirm('Schimbarea formatului va goli textul lipit. Continui?')) return;
+        setBrut(''); setEditezTabel(false); setEditezJson(false); setFormat(f); setDocumentModificat(false);
       }} ariaLabel="Formatul importului" />
-      {format === 'tabel' && <>
-        <p className="admin-ajutor">Copiază celulele din Excel sau Google Sheets, inclusiv primul rând cu numele coloanelor. Un lot are același capitol și format de întrebare.</p>
         <label>Capitolul lotului<select className="field" aria-label="Capitolul lotului" value={capitol} onChange={(e) => setCapitol(e.target.value)}>
           <option value="">Alege capitolul…</option>{taxonomie.materii.map((m) => <optgroup key={m.id} label={m.name}>{m.list.map((c) => <option key={c.id} value={c.id}>{c.nr}. {c.name}</option>)}</optgroup>)}
         </select></label>
         <label>Formatul întrebărilor<select className="field" aria-label="Formatul întrebărilor" value={tipId} onChange={(e) => setTipId(e.target.value)}>{tipuri.lista.map((t) => <option key={t.id} value={t.id}>{t.nume}</option>)}</select></label>
+      {format === 'json' && <p className="admin-ajutor">Aceste alegeri completează doar capitolul și formatul care lipsesc din fișier. Fiecare grilă poate avea propriul capitol și format.</p>}
+      {format === 'tabel' && <>
+        <p className="admin-ajutor">Copiază celulele din Excel sau Google Sheets, inclusiv primul rând cu numele coloanelor. Un lot are același capitol și format de întrebare.</p>
         <button className="btn-ghost" style={{ marginTop: 12 }} disabled={!tip} onClick={() => tip && descarcaText(antetTabel(tip) + '\n', 'model-grile.tsv')}>Descarcă modelul pentru tabel</button>
         <p className="admin-ajutor">Deschide modelul în aplicația de tabele. Completează răspunsul corect cu o literă (A–E); codurile interne se creează automat. Un lot nou creează grile noi: pentru corectarea celor deja importate, folosește biblioteca sau exportul JSON.</p>
+        <button type="button" className="btn-ghost" aria-expanded={dinDocument} onClick={() => setDinDocument(!dinDocument)}>{dinDocument ? 'Ascunde documentul' : 'Din document (Word / PDF)'}</button>
+        <div hidden={!dinDocument}><ImportDocument key={lotId} tip={tip} onModificat={setDocumentModificat} onPregatit={(text) => {
+          if (brut.trim() && !window.confirm('Înlocuiești lotul în lucru cu întrebările din document?')) return;
+          setBrut(text); setLotId(`lot-${crypto.randomUUID()}`); setEditezTabel(true); setDinDocument(false); setBilant(null); setDocumentModificat(false);
+        }} /></div>
       </>}
       <details hidden={format !== 'json'} style={{ marginTop: 14 }}>
         <summary style={{ font: `500 12.5px ${SANS}`, color: 'var(--fg2)', cursor: 'pointer' }}>
@@ -256,7 +319,7 @@ export function ImportGrile({
         </ul>
       </details>
 
-      <label hidden={editezTabel} style={{ display: 'block', marginTop: 16 }}>
+      {!editezJson && <label hidden={editezTabel} style={{ display: editezTabel ? 'none' : 'block', marginTop: 16 }}>
         <span style={label}>{format === 'json' ? 'Grilele, în JSON' : 'Lipește tabelul aici'}</span>
         <textarea
           className="field"
@@ -267,7 +330,7 @@ export function ImportGrile({
           aria-label={format === 'json' ? 'Grilele, în JSON' : 'Lipește tabelul aici'}
           style={{ minHeight: 260, resize: 'vertical', padding: 12, font: `400 12.5px/1.6 ${MONO}` }}
         />
-      </label>
+      </label>}
 
       <OrigineGrile sursa={sursa} colectie={colectie} colectii={colectii} onChange={(s, c) => { setSursa(s); setColectie(c); }} />
       <p className="admin-ajutor">Aceste alegeri se aplică rândurilor fără proveniență proprie. În JSON, sursa și colecția scrise pe fiecare grilă se păstrează.</p>
@@ -285,6 +348,15 @@ export function ImportGrile({
       </div>
 
       <h3>2. Verifică lotul</h3>
+      {jsonPregatit?.test && <p className="admin-previzualizare">Test detectat: <strong>{jsonPregatit.test.nume}</strong> · {jsonPregatit.test.durata ? `${jsonPregatit.test.durata} minute` : 'fără limită de timp'}. După importul complet, apasă „Creează un test din acest lot” pentru a-l salva.</p>}
+      {jsonPregatit && jsonPregatit.grile.length > 0 && <>
+        <div className="admin-butoane">
+          <button type="button" className="btn-ghost" onClick={() => setEditezJson(!editezJson)}>{editezJson ? 'Editează textul JSON (avansat)' : 'Corectează întrebările în formular'}</button>
+          <button type="button" className="btn-ghost" onClick={() => descarcaText(scrieJsonPregatit(jsonPregatit), 'grile-pregatite.json')}>Descarcă lotul pregătit</button>
+        </div>
+        {editezJson && <EditorJsonImport pregatit={jsonPregatit} onChange={setBrut} taxonomie={taxonomie} tipuri={tipuri} probleme={cuProbleme} />}
+      </>}
+      {testIncomplet && <p role="alert" style={{ color: 'var(--bad)' }}>Corectează toate grilele înainte de importul testului. Un test complet trebuie să păstreze toate întrebările.</p>}
       <p className="admin-ajutor">Verificările apar mai jos. Grilele cu probleme nu se salvează.</p>
       {repetate.length > 0 && <div className="admin-ajutor" role="status">
         <strong>Verifică posibilele duplicate din acest lot.</strong>
@@ -399,6 +471,11 @@ export function ImportGrile({
           )}
         </div>
       )}
+      {lotSalvat && creeazaTest && <div className="admin-previzualizare" role="status">
+        <p>Ultimul lot complet importat: {numar(lotSalvat.grile.length, 'grilă', 'grile')}. Întrebările sunt în bibliotecă și pot fi folosite și separat.</p>
+        <button type="button" className="btn-ghost" onClick={() => creeazaTest(lotSalvat.grile, lotSalvat.colectieId, lotSalvat.test, lotSalvat.titluri)}>Creează un test din acest lot</button>
+        <p className="admin-ajutor">Ordinea se păstrează. În pasul următor alegi numele, durata și verifici publicarea testului.</p>
+      </div>}
 
       <div
         style={{
@@ -420,7 +497,7 @@ export function ImportGrile({
           type="button"
           className="btn-primary"
           onClick={() => void ruleaza()}
-          disabled={progres !== null || valide.length === 0 || !revizuit || (cereConfirmare && !confirmat)}
+          disabled={citesteFisier || testIncomplet || progres !== null || valide.length === 0 || !revizuit || (cereConfirmare && !confirmat)}
           style={{
             marginLeft: 'auto',
             padding: '11px 18px',

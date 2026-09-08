@@ -1,4 +1,5 @@
 import { AlegeGrileTest } from './AlegeGrileTest';
+import type { TestDinFisier } from './importJson';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChapterId, MaterieId } from '../data/chapters';
 import type { Colectii } from '../lib/colectii';
@@ -75,17 +76,28 @@ const dinTest = (t: TestPredefinitAdmin): CiornaTest => {
 export function AdminTestePredefinite({
   taxonomie,
   colectii,
+  dinImport,
+  consumaImport,
 }: {
   taxonomie: Taxonomie;
   colectii: Colectii;
+  dinImport?: { grile: string[]; colectieId: string; test?: TestDinFisier | null; titluri?: Record<string, string> } | null;
+  consumaImport?: () => void;
 }) {
   const { notify } = useToast();
   const [teste, setTeste] = useState<TestPredefinitAdmin[]>([]);
-  const [ciorna, setCiorna] = useState<CiornaTest>(goala);
+  const [ciorna, setCiorna] = useState<CiornaTest>(() => dinImport ? {
+    ...goala(), grile: dinImport.grile.join('\n'), colectieId: dinImport.colectieId,
+    nume: dinImport.test?.nume ?? colectii.colectie(dinImport.colectieId)?.nume ?? '',
+    durata: dinImport.test?.durata ?? '',
+    acces: colectii.colectie(dinImport.colectieId)?.acces ?? 'liber',
+  } : goala());
   const [seIncarca, setSeIncarca] = useState(true);
   const [seSalveaza, setSeSalveaza] = useState(false);
-  const [deschis, setDeschis] = useState(false);
+  const [deschis, setDeschis] = useState(!!dinImport);
   const [editez, setEditez] = useState<string | null>(null);
+  const [titluriImport] = useState(dinImport?.titluri ?? {});
+  useEffect(() => { if (dinImport) consumaImport?.(); }, [dinImport, consumaImport]);
 
   const reincarca = useCallback(async () => {
     setSeIncarca(true);
@@ -265,7 +277,8 @@ export function AdminTestePredefinite({
 
         {ciorna.mod === 'fix' ? (
           <>
-          <AlegeGrileTest alese={grile} onChange={(ids) => camp('grile', ids.join('\n'))} taxonomie={taxonomie} colectii={colectii} />
+          <AlegeGrileTest alese={grile} onChange={(ids) => camp('grile', ids.join('\n'))} taxonomie={taxonomie} colectii={colectii} titluriInitiale={titluriImport} />
+          <p className="admin-ajutor">Poți salva testul ca ciornă. Pentru publicare, toate întrebările din el trebuie să fie publicate în bibliotecă.</p>
           <details className="admin-detalii"><summary>Introdu codurile manual (avansat)</summary>
           <Camp eticheta="Grilele în ordinea testului" sus>
             <textarea
